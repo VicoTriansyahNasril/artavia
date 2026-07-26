@@ -48,6 +48,9 @@ class TransactionDetailScreen extends StatelessWidget {
     final String category = arg?['category'] ?? 'Lainnya';
     final String note = arg?['note'] ?? '';
     final String account = arg?['account'] ?? 'CASH';
+    final int? accountId = arg?['account_id'];
+    final String destinationAccount = arg?['destination_account'] ?? '';
+    final int? destinationAccountId = arg?['destination_account_id'];
     final DateTime date = arg?['date'] ?? DateTime.now();
 
     final isExpense = type == 'pengeluaran';
@@ -100,7 +103,7 @@ class TransactionDetailScreen extends StatelessWidget {
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete_outline, color: colorWhite),
-                          onPressed: () => _confirmDelete(id, account, amount, isExpense),
+                          onPressed: () => _confirmDelete(id, accountId, destinationAccountId, amount, isExpense, isTransfer),
                         ),
                       ],
                     ),
@@ -162,7 +165,7 @@ class TransactionDetailScreen extends StatelessWidget {
                         _buildRow(Icons.grid_view_rounded, 'Kategori', category),
                         _divider(),
                         _buildRow(Icons.account_balance_wallet_rounded,
-                            'Rekening', account),
+                            'Rekening', isTransfer ? '$account -> $destinationAccount' : account),
                         _divider(),
                         _buildRow(
                           Icons.calendar_today_rounded,
@@ -190,7 +193,7 @@ class TransactionDetailScreen extends StatelessWidget {
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: () =>
-                            _confirmDelete(id, account, amount, isExpense),
+                            _confirmDelete(id, accountId, destinationAccountId, amount, isExpense, isTransfer),
                         icon: const Icon(Icons.delete_outline,
                             color: colorExpense),
                         label: const Text('Hapus Transaksi',
@@ -250,7 +253,7 @@ class TransactionDetailScreen extends StatelessWidget {
       );
 
   void _confirmDelete(
-      String? id, String account, int amount, bool isExpense) {
+      String? id, int? accountId, int? destinationAccountId, int amount, bool isExpense, bool isTransfer) {
     Get.defaultDialog(
       backgroundColor: colorCard,
       title: 'Hapus Transaksi',
@@ -264,9 +267,16 @@ class TransactionDetailScreen extends StatelessWidget {
         style: ElevatedButton.styleFrom(backgroundColor: colorExpense),
         onPressed: () async {
           if (id != null) {
-            final multiplier = isExpense ? 1 : -1;
-            await DatabaseHelper.instance
-                .updateAccountBalance(account, amount * multiplier);
+            if (isTransfer && accountId != null && destinationAccountId != null) {
+              await DatabaseHelper.instance
+                  .updateAccountBalanceById(accountId, amount);
+              await DatabaseHelper.instance
+                  .updateAccountBalanceById(destinationAccountId, -amount);
+            } else if (accountId != null) {
+              final multiplier = isExpense ? 1 : -1;
+              await DatabaseHelper.instance
+                  .updateAccountBalanceById(accountId, amount * multiplier);
+            }
             await DatabaseHelper.instance
                 .deleteTransaction(int.parse(id));
             if (Get.isRegistered<HomeController>()) {

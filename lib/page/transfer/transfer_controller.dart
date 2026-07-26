@@ -6,9 +6,11 @@ import 'package:artavia/page/home/home_controller.dart';
 class TransferController extends GetxController {
   final amountStr = '0'.obs;
   
-  final sourceAccount = 'CASH'.obs;
-  final destinationAccount = 'BCA'.obs;
-  final availableAccounts = <String>[].obs;
+  final sourceAccountId = RxnInt();
+  final sourceAccountName = 'CASH'.obs;
+  final destinationAccountId = RxnInt();
+  final destinationAccountName = 'BCA'.obs;
+  final availableAccounts = <Map<String, dynamic>>[].obs;
   
   final selectedDate = DateTime.now().obs;
   
@@ -25,12 +27,15 @@ class TransferController extends GetxController {
   Future<void> _loadAccounts() async {
     final accs = await DatabaseHelper.instance.readAllAccounts();
     if (accs.isNotEmpty) {
-      availableAccounts.value = accs.map((e) => e['name'].toString()).toList();
-      sourceAccount.value = availableAccounts.first;
-      if (availableAccounts.length > 1) {
-        destinationAccount.value = availableAccounts[1];
+      availableAccounts.value = accs;
+      sourceAccountId.value = accs.first['id'] as int;
+      sourceAccountName.value = accs.first['name'].toString();
+      if (accs.length > 1) {
+        destinationAccountId.value = accs[1]['id'] as int;
+        destinationAccountName.value = accs[1]['name'].toString();
       } else {
-        destinationAccount.value = availableAccounts.first;
+        destinationAccountId.value = accs.first['id'] as int;
+        destinationAccountName.value = accs.first['name'].toString();
       }
     }
   }
@@ -60,15 +65,16 @@ class TransferController extends GetxController {
         final transaction = {
           'type': 'transfer',
           'amount': parsedAmount,
-          'category': 'Transfer',
+          'category_id': null, // category not needed for transfer usually, but depends on logic
           'note': note.value,
-          'account': '${sourceAccount.value} -> ${destinationAccount.value}',
+          'account_id': sourceAccountId.value,
+          'destination_account_id': destinationAccountId.value,
           'date': selectedDate.value.toIso8601String(),
         };
         
         DatabaseHelper.instance.insertTransaction(transaction).then((_) {
-          DatabaseHelper.instance.updateAccountBalance(sourceAccount.value, -parsedAmount);
-          DatabaseHelper.instance.updateAccountBalance(destinationAccount.value, parsedAmount);
+          DatabaseHelper.instance.updateAccountBalanceById(sourceAccountId.value!, -parsedAmount);
+          DatabaseHelper.instance.updateAccountBalanceById(destinationAccountId.value!, parsedAmount);
           
           if (Get.isRegistered<HomeController>()) {
             Get.find<HomeController>().loadData();

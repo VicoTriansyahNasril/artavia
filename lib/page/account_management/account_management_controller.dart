@@ -171,12 +171,21 @@ class AccountManagementController extends GetxController {
       confirm: ElevatedButton(
         style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
         onPressed: () async {
-          await DatabaseHelper.instance.deleteAccount(id);
-          Get.back();
-          loadAccounts();
-          Get.snackbar('Berhasil', 'Rekening "$name" telah dihapus',
-              snackPosition: SnackPosition.BOTTOM,
-              margin: const EdgeInsets.all(16));
+          try {
+            await DatabaseHelper.instance.deleteAccount(id);
+            Get.back();
+            loadAccounts();
+            Get.snackbar('Berhasil', 'Rekening "$name" telah dihapus',
+                snackPosition: SnackPosition.BOTTOM,
+                margin: const EdgeInsets.all(16));
+          } catch (e) {
+            Get.back();
+            Get.snackbar('Gagal', 'Tidak dapat menghapus rekening yang sudah memiliki riwayat transaksi.',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.red.shade800,
+                colorText: Colors.white,
+                margin: const EdgeInsets.all(16));
+          }
         },
         child: const Text('Hapus', style: TextStyle(color: Colors.white)),
       ),

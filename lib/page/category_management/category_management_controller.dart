@@ -136,11 +136,20 @@ class CategoryManagementController extends GetxController {
         style:
             ElevatedButton.styleFrom(backgroundColor: Colors.red),
         onPressed: () async {
-          await DatabaseHelper.instance.deleteCategory(id);
-          Get.back();
-          loadCategories();
-          Get.snackbar('Berhasil', 'Kategori dihapus',
-              snackPosition: SnackPosition.BOTTOM);
+          try {
+            await DatabaseHelper.instance.deleteCategory(id);
+            Get.back();
+            loadCategories();
+            Get.snackbar('Berhasil', 'Kategori dihapus',
+                snackPosition: SnackPosition.BOTTOM);
+          } catch (e) {
+            Get.back();
+            Get.snackbar('Gagal', 'Tidak dapat menghapus kategori yang sudah digunakan pada transaksi.',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.red.shade800,
+                colorText: Colors.white,
+                margin: const EdgeInsets.all(16));
+          }
         },
         child:
             const Text('Hapus', style: TextStyle(color: Colors.white)),

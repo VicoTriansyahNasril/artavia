@@ -1,11 +1,17 @@
 class TransactionModel {
-  String? id;
+  int? id;
   int? amount;
   DateTime? date;
   String? note;
   String? type; // "pengeluaran" or "pemasukan"
+  int? categoryId;
   String? categoryName;
-  String? account;
+  int? accountId;
+  String? accountName;
+  int? destinationAccountId;
+  String? destinationAccountName;
+  int? categoryIconCode;
+  int? categoryColorVal;
 
   TransactionModel({
     this.id,
@@ -13,8 +19,14 @@ class TransactionModel {
     this.date,
     this.note,
     this.type,
+    this.categoryId,
     this.categoryName,
-    this.account,
+    this.accountId,
+    this.accountName,
+    this.destinationAccountId,
+    this.destinationAccountName,
+    this.categoryIconCode,
+    this.categoryColorVal,
   });
 
   TransactionModel.fromJson(Map<String, dynamic> json) {
@@ -23,8 +35,14 @@ class TransactionModel {
     date = json['date'] != null ? DateTime.parse(json['date']) : null;
     note = json['note'];
     type = json['type'];
-    categoryName = json['categoryName'];
-    account = json['account'];
+    categoryId = json['category_id'];
+    categoryName = json['categoryName']; // Filled via JOIN
+    accountId = json['account_id'];
+    accountName = json['accountName']; // Filled via JOIN
+    destinationAccountId = json['destination_account_id'];
+    destinationAccountName = json['destinationAccountName']; // Filled via JOIN
+    categoryIconCode = json['categoryIconCode'];
+    categoryColorVal = json['categoryColorVal'];
   }
 
   Map<String, dynamic> toJson() {
@@ -36,7 +54,9 @@ class TransactionModel {
     }
     data['note'] = note;
     data['type'] = type;
-    data['categoryName'] = categoryName;
+    data['category_id'] = categoryId;
+    data['account_id'] = accountId;
+    data['destination_account_id'] = destinationAccountId;
     return data;
   }
 }

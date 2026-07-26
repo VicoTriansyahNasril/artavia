@@ -242,7 +242,10 @@ class CalendarScreen extends GetView<CalendarController> {
           'amount': amount,
           'category': tx.categoryName,
           'note': tx.note,
-          'account': tx.account ?? 'CASH',
+          'account': tx.accountName ?? 'CASH',
+          'account_id': tx.accountId,
+          'destination_account': tx.destinationAccountName,
+          'destination_account_id': tx.destinationAccountId,
           'date': tx.date,
         }),
         leading: Container(

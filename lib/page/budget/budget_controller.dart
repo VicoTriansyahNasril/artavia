@@ -96,6 +96,7 @@ class BudgetController extends GetxController {
 
         items.add({
           'id': b['id'],
+          'category_id': b['category_id'] as int?,
           'category': catName,
           'budget_amount': b['budget_amount'] as int,
           'used': usedByCat[catName] ?? 0,
@@ -178,8 +179,9 @@ class BudgetController extends GetxController {
               if (formKey.currentState!.validate() &&
                   selectedCategory != null) {
                 final amount = int.tryParse(amountCtrl.text) ?? 0;
+                final catId = availableCategories.firstWhere((c) => c['name'] == selectedCategory)['id'] as int;
                 await DatabaseHelper.instance.upsertBudget(
-                  category: selectedCategory!,
+                  categoryId: catId,
                   amount: amount,
                   month: currentDate.value.month,
                   year: currentDate.value.year,
@@ -233,7 +235,7 @@ class BudgetController extends GetxController {
               final amount = int.tryParse(amountCtrl.text) ?? 0;
               if (amount > 0) {
                 await DatabaseHelper.instance.upsertBudget(
-                  category: item['category'] as String,
+                  categoryId: item['category_id'] as int,
                   amount: amount,
                   month: currentDate.value.month,
                   year: currentDate.value.year,

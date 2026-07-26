@@ -36,13 +36,19 @@ class SearchController extends GetxController {
         if (matchFilter) {
           final amt = row['amount'] as int;
           results.add(TransactionModel(
-            id: row['id'].toString(),
+            id: row['id'] as int,
             amount: type == 'pemasukan' ? amt : -amt,
             date: DateTime.parse(row['date'] as String),
             note: row['note'] as String,
             type: type,
-            categoryName: row['category'] as String,
-            account: row['account'] as String,
+            categoryId: row['category_id'] as int?,
+            categoryName: row['categoryName'] as String?,
+            accountId: row['account_id'] as int?,
+            accountName: row['accountName'] as String?,
+            destinationAccountId: row['destination_account_id'] as int?,
+            destinationAccountName: row['destinationAccountName'] as String?,
+            categoryIconCode: row['categoryIconCode'] as int?,
+            categoryColorVal: row['categoryColorVal'] as int?,
           ));
         }
       }

@@ -213,7 +213,10 @@ class SearchScreen extends GetView<app_search.SearchController> {
           'amount': displayAmount,
           'category': tx.categoryName,
           'note': tx.note,
-          'account': tx.account ?? 'CASH',
+          'account': tx.accountName ?? 'CASH',
+          'account_id': tx.accountId,
+          'destination_account': tx.destinationAccountName,
+          'destination_account_id': tx.destinationAccountId,
           'date': tx.date,
         });
       },
@@ -231,7 +234,7 @@ class SearchScreen extends GetView<app_search.SearchController> {
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        '${tx.categoryName ?? ''} • ${DateFormat('dd MMM yyyy', 'id_ID').format(tx.date!)} • ${tx.account ?? ''}',
+        '${tx.categoryName ?? ''} • ${DateFormat('dd MMM yyyy', 'id_ID').format(tx.date!)} • ${tx.type == 'transfer' ? '${tx.accountName ?? ''} -> ${tx.destinationAccountName ?? ''}' : tx.accountName ?? ''}',
         style: const TextStyle(color: colorGrey, fontSize: 11),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,

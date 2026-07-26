@@ -20,10 +20,15 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
+      onConfigure: _onConfigure,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
+  }
+
+  Future _onConfigure(Database db) async {
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   Future _createDB(Database db, int version) async {
@@ -36,10 +41,14 @@ CREATE TABLE transactions (
   id $idType,
   type $textType,
   amount $intType,
-  category $textType,
+  category_id INTEGER,
   note $textType,
-  account $textType,
-  date $textType
+  account_id INTEGER,
+  destination_account_id INTEGER,
+  date $textType,
+  FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE RESTRICT,
+  FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE RESTRICT,
+  FOREIGN KEY (destination_account_id) REFERENCES accounts (id) ON DELETE RESTRICT
 )
 ''');
 
@@ -68,10 +77,11 @@ CREATE TABLE categories (
     await db.execute('''
 CREATE TABLE budgets (
   id $idType,
-  category TEXT,
+  category_id INTEGER,
   budget_amount $intType,
   month $intType,
-  year $intType
+  year $intType,
+  FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
 )
 ''');
 
@@ -179,7 +189,15 @@ CREATE TABLE IF NOT EXISTS settings (
 
   Future<List<Map<String, dynamic>>> readAllTransactions() async {
     final db = await instance.database;
-    return await db.query('transactions', orderBy: 'date DESC');
+    return await db.rawQuery('''
+      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.color_val as categoryColorVal, 
+             a.name as accountName, da.name as destinationAccountName 
+      FROM transactions t 
+      LEFT JOIN categories c ON t.category_id = c.id 
+      LEFT JOIN accounts a ON t.account_id = a.id 
+      LEFT JOIN accounts da ON t.destination_account_id = da.id 
+      ORDER BY t.date DESC
+    ''');
   }
 
   Future<List<Map<String, dynamic>>> readTransactionsByMonth(
@@ -187,12 +205,16 @@ CREATE TABLE IF NOT EXISTS settings (
     final db = await instance.database;
     final startDate = DateTime(year, month, 1).toIso8601String();
     final endDate = DateTime(year, month + 1, 1).toIso8601String();
-    return await db.query(
-      'transactions',
-      where: 'date >= ? AND date < ?',
-      whereArgs: [startDate, endDate],
-      orderBy: 'date DESC',
-    );
+    return await db.rawQuery('''
+      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.color_val as categoryColorVal, 
+             a.name as accountName, da.name as destinationAccountName
+      FROM transactions t 
+      LEFT JOIN categories c ON t.category_id = c.id 
+      LEFT JOIN accounts a ON t.account_id = a.id 
+      LEFT JOIN accounts da ON t.destination_account_id = da.id 
+      WHERE t.date >= ? AND t.date < ?
+      ORDER BY t.date DESC
+    ''', [startDate, endDate]);
   }
 
   Future<int> updateTransaction(int id, Map<String, dynamic> row) async {
@@ -209,12 +231,16 @@ CREATE TABLE IF NOT EXISTS settings (
 
   Future<List<Map<String, dynamic>>> searchTransactions(String query) async {
     final db = await instance.database;
-    return await db.query(
-      'transactions',
-      where: 'note LIKE ? OR category LIKE ?',
-      whereArgs: ['%$query%', '%$query%'],
-      orderBy: 'date DESC',
-    );
+    return await db.rawQuery('''
+      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.color_val as categoryColorVal, 
+             a.name as accountName, da.name as destinationAccountName
+      FROM transactions t 
+      LEFT JOIN categories c ON t.category_id = c.id 
+      LEFT JOIN accounts a ON t.account_id = a.id 
+      LEFT JOIN accounts da ON t.destination_account_id = da.id 
+      WHERE t.note LIKE ? OR c.name LIKE ?
+      ORDER BY t.date DESC
+    ''', ['%$query%', '%$query%']);
   }
 
   // ─── Accounts CRUD ───────────────────────────────────────────────────────
@@ -238,22 +264,6 @@ CREATE TABLE IF NOT EXISTS settings (
   Future<int> deleteAccount(int id) async {
     final db = await instance.database;
     return await db.delete('accounts', where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<int> updateAccountBalance(String name, int amountChange) async {
-    final db = await instance.database;
-    final res =
-        await db.query('accounts', where: 'name = ?', whereArgs: [name]);
-    if (res.isNotEmpty) {
-      final currentBalance = res.first['balance'] as int;
-      return await db.update(
-        'accounts',
-        {'balance': currentBalance + amountChange},
-        where: 'name = ?',
-        whereArgs: [name],
-      );
-    }
-    return 0;
   }
 
   Future<int> updateAccountBalanceById(int id, int amountChange) async {
@@ -299,34 +309,35 @@ CREATE TABLE IF NOT EXISTS settings (
   Future<List<Map<String, dynamic>>> readBudgetsByMonth(
       int year, int month) async {
     final db = await instance.database;
-    return await db.query(
-      'budgets',
-      where: 'year = ? AND month = ?',
-      whereArgs: [year, month],
-    );
+    return await db.rawQuery('''
+      SELECT b.*, c.name as categoryName, c.type as categoryType, c.icon_code as categoryIconCode, c.color_val as categoryColorVal 
+      FROM budgets b
+      INNER JOIN categories c ON b.category_id = c.id
+      WHERE b.year = ? AND b.month = ?
+    ''', [year, month]);
   }
 
   Future<int> upsertBudget(
-      {required String category,
+      {required int categoryId,
       required int amount,
       required int month,
       required int year}) async {
     final db = await instance.database;
     final existing = await db.query(
       'budgets',
-      where: 'category = ? AND month = ? AND year = ?',
-      whereArgs: [category, month, year],
+      where: 'category_id = ? AND month = ? AND year = ?',
+      whereArgs: [categoryId, month, year],
     );
     if (existing.isNotEmpty) {
       return await db.update(
         'budgets',
         {'budget_amount': amount},
-        where: 'category = ? AND month = ? AND year = ?',
-        whereArgs: [category, month, year],
+        where: 'category_id = ? AND month = ? AND year = ?',
+        whereArgs: [categoryId, month, year],
       );
     } else {
       return await db.insert('budgets', {
-        'category': category,
+        'category_id': categoryId,
         'budget_amount': amount,
         'month': month,
         'year': year,

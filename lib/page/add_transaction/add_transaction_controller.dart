@@ -16,22 +16,25 @@ class AddTransactionController extends GetxController {
 
   final note = ''.obs;
   final selectedDate = DateTime.now().obs;
-  final selectedAccount = 'CASH'.obs;
-  final availableAccounts = <String>['CASH'].obs;
+  final selectedAccountId = RxnInt();
+  final selectedAccountName = 'CASH'.obs;
+  final availableAccounts = <Map<String, dynamic>>[].obs;
   final availableCategories = <Map<String, dynamic>>[].obs;
 
   final noteHistory = <String>[].obs;
   final TextEditingController noteTextController = TextEditingController();
 
   // Selected category
-  final selectedCategory = ''.obs;
+  final selectedCategoryId = RxnInt();
+  final selectedCategoryName = ''.obs;
 
   // Quick amount shortcuts
   final quickAmounts = [5000, 10000, 20000, 50000, 100000, 500000];
 
   void onTabChanged(String tab) {
     currentTab.value = tab;
-    selectedCategory.value = '';
+    selectedCategoryId.value = null;
+    selectedCategoryName.value = '';
     _pendingValueObs.value = 0;
     _pendingOperatorObs.value = '';
     amountStr.value = '0';
@@ -76,6 +79,7 @@ class AddTransactionController extends GetxController {
           colorData = Color(c['color_val'] as int);
         }
         parsedCats.add({
+          'id': c['id'],
           'name': c['name'],
           'icon': iconData,
           'color': colorData,
@@ -83,15 +87,16 @@ class AddTransactionController extends GetxController {
       }
     }
     availableCategories.value = parsedCats;
-    selectedCategory.value = '';
+    selectedCategoryId.value = null;
+    selectedCategoryName.value = '';
   }
 
   Future<void> _loadAccounts() async {
     final accs = await DatabaseHelper.instance.readAllAccounts();
     if (accs.isNotEmpty) {
-      availableAccounts.value =
-          accs.map((e) => e['name'].toString()).toList();
-      selectedAccount.value = availableAccounts.first;
+      availableAccounts.value = accs;
+      selectedAccountId.value = accs.first['id'] as int;
+      selectedAccountName.value = accs.first['name'].toString();
     }
   }
 
@@ -137,7 +142,7 @@ class AddTransactionController extends GetxController {
         return;
       }
 
-      if (selectedCategory.value.isEmpty) {
+      if (selectedCategoryId.value == null) {
         Get.snackbar('Peringatan', 'Pilih kategori terlebih dahulu',
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: Colors.orange.shade800,
@@ -155,16 +160,16 @@ class AddTransactionController extends GetxController {
       final transaction = {
         'type': type,
         'amount': parsedAmount,
-        'category': selectedCategory.value,
+        'category_id': selectedCategoryId.value,
         'note': note.value,
-        'account': selectedAccount.value,
+        'account_id': selectedAccountId.value,
         'date': selectedDate.value.toIso8601String(),
       };
 
       DatabaseHelper.instance.insertTransaction(transaction).then((_) {
         final multiplier = type == 'pengeluaran' ? -1 : 1;
-        DatabaseHelper.instance.updateAccountBalance(
-            selectedAccount.value, parsedAmount * multiplier);
+        DatabaseHelper.instance.updateAccountBalanceById(
+            selectedAccountId.value!, parsedAmount * multiplier);
         if (Get.isRegistered<HomeController>()) {
           Get.find<HomeController>().loadData();
         }
@@ -197,8 +202,9 @@ class AddTransactionController extends GetxController {
     amountStr.value = (current + amount).toString();
   }
 
-  void selectCategory(String category) {
-    selectedCategory.value = category;
+  void selectCategory(int id, String name) {
+    selectedCategoryId.value = id;
+    selectedCategoryName.value = name;
   }
 
   void onSuggestionTapped(String suggestion) {

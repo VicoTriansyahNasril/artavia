@@ -88,7 +88,7 @@ class TransferScreen extends StatelessWidget {
                   children: [
                     const Icon(Icons.account_balance_wallet, color: colorAccent, size: 20),
                     const SizedBox(width: 8),
-                    Obx(() => Text(controller.sourceAccount.value, style: const TextStyle(color: colorWhite, fontWeight: FontWeight.bold))),
+                    Obx(() => Text(controller.sourceAccountName.value, style: const TextStyle(color: colorWhite, fontWeight: FontWeight.bold))),
                     const Icon(Icons.arrow_drop_down, color: colorGrey),
                   ],
                 )
@@ -109,7 +109,7 @@ class TransferScreen extends StatelessWidget {
                   children: [
                     const Icon(Icons.account_balance, color: Colors.blue, size: 20),
                     const SizedBox(width: 8),
-                    Obx(() => Text(controller.destinationAccount.value, style: const TextStyle(color: colorWhite, fontWeight: FontWeight.bold))),
+                    Obx(() => Text(controller.destinationAccountName.value, style: const TextStyle(color: colorWhite, fontWeight: FontWeight.bold))),
                     const Icon(Icons.arrow_drop_down, color: colorGrey),
                   ],
                 )
@@ -127,15 +127,17 @@ class TransferScreen extends StatelessWidget {
         color: colorCard,
         child: Obx(() => Column(
           mainAxisSize: MainAxisSize.min,
-          children: controller.availableAccounts.map((accountName) {
+          children: controller.availableAccounts.map((account) {
             return ListTile(
               leading: const Icon(Icons.account_balance_wallet, color: colorWhite),
-              title: Text(accountName, style: const TextStyle(color: colorWhite)),
+              title: Text(account['name'] as String, style: const TextStyle(color: colorWhite)),
               onTap: () {
                 if (isSource) {
-                  controller.sourceAccount.value = accountName;
+                  controller.sourceAccountId.value = account['id'] as int;
+                  controller.sourceAccountName.value = account['name'] as String;
                 } else {
-                  controller.destinationAccount.value = accountName;
+                  controller.destinationAccountId.value = account['id'] as int;
+                  controller.destinationAccountName.value = account['name'] as String;
                 }
                 Get.back();
               },

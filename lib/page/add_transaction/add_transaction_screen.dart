@@ -109,7 +109,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                     color: colorGrey, size: 16),
                 const SizedBox(width: 6),
                 Obx(() => Text(
-                      controller.selectedAccount.value,
+                      controller.selectedAccountName.value,
                       style: const TextStyle(
                           color: colorWhite, fontSize: 14),
                     )),
@@ -156,10 +156,11 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                       leading: const Icon(
                           Icons.account_balance_wallet_outlined,
                           color: colorGrey),
-                      title: Text(acc,
+                      title: Text(acc['name'] as String,
                           style: const TextStyle(color: colorWhite)),
                       onTap: () {
-                        controller.selectedAccount.value = acc;
+                        controller.selectedAccountId.value = acc['id'] as int;
+                        controller.selectedAccountName.value = acc['name'] as String;
                         Get.back();
                       },
                     );
@@ -208,10 +209,10 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
           final cat = controller.availableCategories[index];
           return Obx(() {
             final isSelected =
-                controller.selectedCategory.value == cat['name'];
+                controller.selectedCategoryId.value == cat['id'];
             return GestureDetector(
               onTap: () =>
-                  controller.selectCategory(cat['name'] as String),
+                  controller.selectCategory(cat['id'] as int, cat['name'] as String),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
