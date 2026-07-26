@@ -1,0 +1,183 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:artavia/core/database/database_helper.dart';
+import 'package:artavia/core/utils/data_refresh.dart';
+import 'package:artavia/widgets/commons/common.dart';
+
+class CategoryManagementController extends GetxController {
+  final currentTab = 'Pengeluaran'.obs;
+
+  final expenseCategories = <Map<String, dynamic>>[].obs;
+  final incomeCategories = <Map<String, dynamic>>[].obs;
+
+  final isExpenseForm = true.obs;
+
+  final RxBool isWorking = false.obs;
+
+  final categoryName = ''.obs;
+  final selectedIconPath = Rx<String?>(null);
+  final selectedIconCode = Rx<int?>(null);
+  final selectedColor = (Colors.grey as Color).obs;
+
+  // Edit mode
+  final editingId = Rx<int?>(null);
+  bool get isEditMode => editingId.value != null;
+
+  final categorizedIcons = {
+    'Keuangan': AppIcons.keuangan,
+    'Makanan': AppIcons.makanan,
+    'Belanja': AppIcons.belanja,
+    'Transportasi': AppIcons.transportasi,
+    'Hiburan': AppIcons.hiburan,
+    'Kesehatan': AppIcons.kesehatan,
+    'Pendidikan': AppIcons.pendidikan,
+    'Olahraga': AppIcons.olahraga,
+    'Berpergian': AppIcons.berpergian,
+    'Kehidupan': AppIcons.kehidupan,
+    'Pribadi': AppIcons.pribadi,
+  };
+
+  final presetColors = <Color>[
+    Colors.red, Colors.pink, Colors.purple, Colors.deepPurple,
+    Colors.indigo, Colors.blue, Colors.lightBlue, Colors.cyan,
+    Colors.teal, Colors.green, Colors.lightGreen, Colors.lime,
+    Colors.yellow, Colors.amber, Colors.orange, Colors.deepOrange,
+    Colors.brown, Colors.grey, Colors.blueGrey, Colors.black,
+  ];
+
+  @override
+  void onInit() {
+    super.onInit();
+    loadCategories();
+  }
+
+  void resetForm() {
+    editingId.value = null;
+    categoryName.value = '';
+    selectedIconPath.value = null;
+    selectedIconCode.value = null;
+    selectedColor.value = Colors.grey;
+  }
+
+  Future<void> loadCategories() async {
+    final cats = await DatabaseHelper.instance.readAllCategories();
+    final exList = <Map<String, dynamic>>[];
+    final inList = <Map<String, dynamic>>[];
+
+    for (var c in cats) {
+      final type = c['type'];
+      final codePoint = c['icon_code'];
+      final iconPath = c['icon_path'];
+      final colorVal = c['color_val'];
+
+      Color colorData = Colors.grey;
+      if (colorVal != null) {
+        colorData = Color(colorVal as int);
+      }
+
+      final item = {
+        'id': c['id'],
+        'name': c['name'],
+        'icon_code': codePoint,
+        'icon_path': iconPath,
+        'color': colorData,
+      };
+
+      if (type == 'pengeluaran') {
+        exList.add(item);
+      } else {
+        inList.add(item);
+      }
+    }
+    expenseCategories.value = exList;
+    incomeCategories.value = inList;
+  }
+
+  void changeTab(String tab) {
+    currentTab.value = tab;
+  }
+
+  Future<void> saveCategory() async {
+    if (isWorking.value) return;
+    if (categoryName.value.trim().isEmpty) {
+      Get.snackbar('Gagal', 'Nama kategori tidak boleh kosong',
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    isWorking.value = true;
+    try {
+      final cVal = selectedColor.value.toARGB32();
+      final data = {
+        'name': categoryName.value.trim(),
+        'type': isExpenseForm.value ? 'pengeluaran' : 'pemasukan',
+        'icon_code': selectedIconCode.value,
+        'icon_path': selectedIconPath.value,
+        'color_val': cVal,
+      };
+
+      if (isEditMode) {
+        await DatabaseHelper.instance.updateCategory(editingId.value!, data);
+        Get.back();
+        Get.snackbar('Berhasil', 'Kategori berhasil diperbarui',
+            snackPosition: SnackPosition.BOTTOM);
+      } else {
+        await DatabaseHelper.instance.insertCategory(data);
+        Get.back();
+        Get.snackbar('Berhasil', 'Kategori baru disimpan',
+            snackPosition: SnackPosition.BOTTOM);
+      }
+
+      resetForm();
+      loadCategories();
+      refreshAllGlobalData();
+    } finally {
+      isWorking.value = false;
+    }
+  }
+
+  void deleteCategory(int id) async {
+    Get.defaultDialog(
+      backgroundColor: const Color(0xFF1E1E1E),
+      title: 'Hapus Kategori',
+      titleStyle: const TextStyle(
+          color: Colors.white, fontWeight: FontWeight.bold),
+      middleText:
+          'Kategori ini akan dihapus. Transaksi yang sudah ada tidak akan terpengaruh.',
+      middleTextStyle:
+          const TextStyle(color: Colors.grey, fontSize: 13),
+      radius: 8,
+      confirm: ElevatedButton(
+        style:
+            ElevatedButton.styleFrom(backgroundColor: Colors.red),
+        onPressed: () async {
+          if (isWorking.value) return;
+          isWorking.value = true;
+          try {
+            await DatabaseHelper.instance.deleteCategory(id);
+            Get.back();
+            loadCategories();
+            refreshAllGlobalData();
+            Get.snackbar('Berhasil', 'Kategori dihapus',
+                snackPosition: SnackPosition.BOTTOM);
+          } catch (e) {
+            Get.back();
+            Get.snackbar('Gagal', 'Tidak dapat menghapus kategori yang sudah digunakan pada transaksi.',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.red,
+                colorText: Colors.white);
+          } finally {
+            isWorking.value = false;
+          }
+        },
+        child:
+            const Text('Hapus', style: TextStyle(color: Colors.white)),
+      ),
+      cancel: TextButton(
+        onPressed: () => Get.back(),
+        child: const Text('Batal',
+            style: TextStyle(color: Colors.grey)),
+      ),
+    );
+  }
+}

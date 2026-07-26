@@ -1,0 +1,62 @@
+# Artavia - Premium Offline-First Fintech App PRD & Coding Style
+
+## 1. Project Overview
+- **App Name:** Artavia
+- **Description:** Aplikasi manajemen keuangan offline-first, premium, dan modern.
+- **Vibe/Theme:** Premium Fintech, elegan, rapi. Pitch Black (Dark Mode), Pure White (Light Mode), aksen Premium Gold/Yellow.
+- **VIP Status:** SEMUA FITUR VIP ADALAH GRATIS.
+
+## 2. Core Tech Stack (WAJIB DIIKUTI)
+- **Framework:** Flutter (stable terbaru).
+- **State Management:** `flutter_riverpod` (WAJIB gunakan `riverpod_generator` & `@riverpod` annotations).
+- **Routing:** `go_router`.
+- **Database Lokal:** `drift` (SQLite, offline-first).
+- **Cloud Backup:** `googleapis` & `google_sign_in` (Sync file SQLite murni ke Google Drive `appDataFolder` - Zero Cost Server).
+- **UI/Theming:** `flex_color_scheme` & `google_fonts` (Inter/Roboto).
+- **Charts:** `fl_chart`.
+- **Linter:** `very_good_analysis` (WAJIB dipatuhi, tidak boleh ada warning).
+
+## 3. Architecture Structure (Feature-First)
+lib/
+├── src/
+│   ├── core/                   # App-wide setups (Router, Theme, Drift DB init)
+│   ├── shared/                 # Reusable UI across features
+│   │   ├── constants/          # Colors, Strings, Assets paths (AppAssets, AppColors)
+│   │   └── widgets/            # CustomTextField, CustomButton, dll
+│   └── features/               # Independent feature modules
+│       ├── transactions/
+│       │   ├── data/           # Drift tables & Repositories
+│       │   ├── domain/         # Entities/Enums
+│       │   ├── application/    # Riverpod Controllers
+│       │   └── presentation/   # UI Screens & widgets
+│       ├── wallets/
+│       └── categories/
+└── main.dart
+
+## 4. Coding Standards & AI Rules (MUST FOLLOW)
+
+### State Management (Riverpod)
+- Jangan gunakan GetX.
+- Gunakan `@riverpod` untuk Controller.
+- Gunakan `AsyncValue` untuk menangani state loading, data, dan error pada UI.
+- Gunakan `ConsumerWidget` atau `ConsumerStatefulWidget` untuk Screen.
+
+### Data Layer (Drift)
+- Semua transaksi database lokal ditangani di `data/` menggunakan Repository class.
+- Gunakan `await` dan bungkus eksekusi dengan `try-catch`.
+
+### UI & Aesthetics
+- Jangan hardcode warna jika bisa menggunakan `Theme.of(context).colorScheme` agar support Dark/Light mode.
+- Ekstrak widget statis menggunakan `const`.
+- Gunakan `SizedBox` untuk jarak/spacing (hindari margin/padding hardcode dengan angka sembarangan, gunakan jarak proporsional).
+- Prefix custom reusable widget dengan `Custom` (contoh: `CustomTextField`).
+
+### Routing (GoRouter)
+- Gunakan `context.goNamed()` atau `context.pushNamed()`.
+- AWAS RACE CONDITION: Jika berpindah halaman setelah menutup BottomSheet/Dialog, berikan delay `await Future.delayed(const Duration(milliseconds: 300));` dan cek `if (!context.mounted) return;` sebelum navigasi.
+
+### Code Quality
+- Tulis kode yang SOLID dan DRY.
+- Hapus unused imports.
+- Jangan gunakan bang operator (`!`) sembarangan untuk menghindari Null Pointer Exception. Lakukan pengecekan null dengan aman.
+- Patuhi linter `very_good_analysis`.
