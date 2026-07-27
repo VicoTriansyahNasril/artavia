@@ -72,7 +72,7 @@ class ReportController extends GetxController {
         totalIn += amt;
       } else if (type == 'pengeluaran') {
         totalEx += amt;
-        final cat = t['category'] as String;
+        final cat = (t['categoryName'] as String?) ?? 'Lainnya';
         exByCat[cat] = (exByCat[cat] ?? 0) + amt;
       }
     }

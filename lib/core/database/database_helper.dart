@@ -248,6 +248,78 @@ CREATE TABLE IF NOT EXISTS settings (
         .delete('transactions', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> insertTransactionWithBalanceUpdate(Map<String, dynamic> row, int accountId, int balanceChange) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      await txn.insert('transactions', row);
+      final res = await txn.query('accounts', where: 'id = ?', whereArgs: [accountId]);
+      if (res.isNotEmpty) {
+        final currentBalance = res.first['balance'] as int;
+        await txn.update(
+          'accounts',
+          {'balance': currentBalance + balanceChange},
+          where: 'id = ?',
+          whereArgs: [accountId],
+        );
+      }
+    });
+  }
+
+  Future<void> insertTransferWithBalanceUpdate(Map<String, dynamic> row, int sourceAccountId, int destAccountId, int amount) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      await txn.insert('transactions', row);
+      
+      final sourceRes = await txn.query('accounts', where: 'id = ?', whereArgs: [sourceAccountId]);
+      if (sourceRes.isNotEmpty) {
+        final currentBalance = sourceRes.first['balance'] as int;
+        await txn.update(
+          'accounts',
+          {'balance': currentBalance - amount},
+          where: 'id = ?',
+          whereArgs: [sourceAccountId],
+        );
+      }
+      
+      final destRes = await txn.query('accounts', where: 'id = ?', whereArgs: [destAccountId]);
+      if (destRes.isNotEmpty) {
+        final currentBalance = destRes.first['balance'] as int;
+        await txn.update(
+          'accounts',
+          {'balance': currentBalance + amount},
+          where: 'id = ?',
+          whereArgs: [destAccountId],
+        );
+      }
+    });
+  }
+
+  Future<void> deleteTransactionWithBalanceUpdate(int transactionId, int? accountId, int? destinationAccountId, int amount, bool isExpense, bool isTransfer) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      if (isTransfer && accountId != null && destinationAccountId != null) {
+        final sourceRes = await txn.query('accounts', where: 'id = ?', whereArgs: [accountId]);
+        if (sourceRes.isNotEmpty) {
+          final currentBalance = sourceRes.first['balance'] as int;
+          await txn.update('accounts', {'balance': currentBalance + amount}, where: 'id = ?', whereArgs: [accountId]);
+        }
+        final destRes = await txn.query('accounts', where: 'id = ?', whereArgs: [destinationAccountId]);
+        if (destRes.isNotEmpty) {
+          final currentBalance = destRes.first['balance'] as int;
+          await txn.update('accounts', {'balance': currentBalance - amount}, where: 'id = ?', whereArgs: [destinationAccountId]);
+        }
+      } else if (accountId != null) {
+        final multiplier = isExpense ? 1 : -1;
+        final res = await txn.query('accounts', where: 'id = ?', whereArgs: [accountId]);
+        if (res.isNotEmpty) {
+          final currentBalance = res.first['balance'] as int;
+          await txn.update('accounts', {'balance': currentBalance + (amount * multiplier)}, where: 'id = ?', whereArgs: [accountId]);
+        }
+      }
+      await txn.delete('transactions', where: 'id = ?', whereArgs: [transactionId]);
+    });
+  }
+
   Future<List<Map<String, dynamic>>> searchTransactions(String query) async {
     final db = await instance.database;
     return await db.rawQuery('''

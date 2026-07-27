@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/models/account_model.dart';
+import 'package:artavia/core/utils/data_refresh.dart';
 
 /// Defines account type metadata for the type selector grid
 class AccountType {
@@ -166,12 +167,18 @@ class AccountManagementController extends GetxController {
   final balance = 0.obs;
   final currencyCode = 'IDR'.obs;
   final excludeFromTotal = false.obs;
+
+  final RxBool isWorking = false.obs;
+
   final selectedIconCode = Icons.payments_outlined.codePoint.obs;
   final selectedColorVal = 0xFFF5C842.obs;
 
   // Edit mode
   final editingId = Rx<int?>(null);
   bool get isEditMode => editingId.value != null;
+
+  final nameController = TextEditingController();
+  final balanceController = TextEditingController();
 
   // ─── Actions ─────────────────────────────────────────────────────────────
 
@@ -199,6 +206,13 @@ class AccountManagementController extends GetxController {
   void onInit() {
     super.onInit();
     loadAccounts();
+  }
+
+  @override
+  void onClose() {
+    nameController.dispose();
+    balanceController.dispose();
+    super.onClose();
   }
 
   Future<void> loadAccounts() async {
@@ -238,6 +252,9 @@ class AccountManagementController extends GetxController {
     selectedIconCode.value =
         acc['icon_code'] as int? ?? Icons.payments_outlined.codePoint;
     selectedColorVal.value = acc['color_val'] as int? ?? 0xFFF5C842;
+    
+    nameController.text = accountName.value;
+    balanceController.text = balance.value == 0 ? '' : balance.value.toString();
   }
 
   void resetForm() {
@@ -249,9 +266,13 @@ class AccountManagementController extends GetxController {
     excludeFromTotal.value = false;
     selectedIconCode.value = Icons.payments_outlined.codePoint;
     selectedColorVal.value = 0xFFF5C842;
+
+    nameController.clear();
+    balanceController.clear();
   }
 
   Future<void> saveAccount() async {
+    if (isWorking.value) return;
     final name = accountName.value.trim();
     if (name.isEmpty) {
       Get.snackbar(
@@ -267,30 +288,36 @@ class AccountManagementController extends GetxController {
       return;
     }
 
-    final account = AccountModel(
-      id: editingId.value,
-      name: name,
-      type: typeValue.value,
-      balance: balance.value,
-      currencyCode: currencyCode.value,
-      iconCode: selectedIconCode.value,
-      colorVal: selectedColorVal.value,
-      isExcluded: excludeFromTotal.value,
-    );
+    isWorking.value = true;
+    try {
+      final account = AccountModel(
+        id: editingId.value,
+        name: name,
+        type: typeValue.value,
+        balance: balance.value,
+        currencyCode: currencyCode.value,
+        iconCode: selectedIconCode.value,
+        colorVal: selectedColorVal.value,
+        isExcluded: excludeFromTotal.value,
+      );
 
-    if (isEditMode) {
-      await DatabaseHelper.instance.updateAccount(
-          editingId.value!, account.toJson()..remove('id'));
-      Get.back();
-      _showSuccessSnack('Rekening diperbarui', '${account.name} berhasil diperbarui');
-    } else {
-      await DatabaseHelper.instance.insertAccount(account.toJson()..remove('id'));
-      Get.back();
-      _showSuccessSnack('Rekening ditambahkan', '${account.name} berhasil ditambahkan');
+      if (isEditMode) {
+        await DatabaseHelper.instance.updateAccount(
+            editingId.value!, account.toJson()..remove('id'));
+        Get.back();
+        _showSuccessSnack('Rekening diperbarui', '${account.name} berhasil diperbarui');
+      } else {
+        await DatabaseHelper.instance.insertAccount(account.toJson()..remove('id'));
+        Get.back();
+        _showSuccessSnack('Rekening ditambahkan', '${account.name} berhasil ditambahkan');
+      }
+
+      resetForm();
+      loadAccounts();
+      refreshAllGlobalData();
+    } finally {
+      isWorking.value = false;
     }
-
-    resetForm();
-    loadAccounts();
   }
 
   Future<void> deleteAccount(int id, String name) async {
@@ -308,10 +335,13 @@ class AccountManagementController extends GetxController {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         onPressed: () async {
+          if (isWorking.value) return;
+          isWorking.value = true;
           try {
             await DatabaseHelper.instance.deleteAccount(id);
             Get.back();
             loadAccounts();
+            refreshAllGlobalData();
             Get.snackbar(
               'Berhasil',
               '"$name" telah dihapus',
@@ -330,6 +360,8 @@ class AccountManagementController extends GetxController {
               margin: const EdgeInsets.all(16),
               borderRadius: 12,
             );
+          } finally {
+            isWorking.value = false;
           }
         },
         child: const Text('Hapus', style: TextStyle(color: Colors.white)),

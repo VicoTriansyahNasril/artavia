@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
-import 'package:artavia/page/home/home_controller.dart';
+import 'package:artavia/core/utils/data_refresh.dart';
 
 class TransferController extends GetxController {
   final amountStr = '0'.obs;
@@ -17,6 +17,7 @@ class TransferController extends GetxController {
   final noteTextController = TextEditingController();
   final note = ''.obs;
   final noteHistory = <String>[].obs;
+  final RxBool isWorking = false.obs;
 
   @override
   void onInit() {
@@ -46,7 +47,7 @@ class TransferController extends GetxController {
     super.onClose();
   }
 
-  void onNumpadPressed(String key) {
+  Future<void> onNumpadPressed(String key) async {
     if (key == 'delete') {
       if (amountStr.value.length > 1) {
         amountStr.value = amountStr.value.substring(0, amountStr.value.length - 1);
@@ -56,6 +57,7 @@ class TransferController extends GetxController {
     } else if (key == 'C') {
       amountStr.value = '0';
     } else if (key == 'confirm') {
+      if (isWorking.value) return;
       if (note.value.isNotEmpty && !noteHistory.contains(note.value)) {
         noteHistory.insert(0, note.value);
       }
@@ -72,28 +74,35 @@ class TransferController extends GetxController {
           'date': selectedDate.value.toIso8601String(),
         };
         
-        DatabaseHelper.instance.insertTransaction(transaction).then((_) {
-          DatabaseHelper.instance.updateAccountBalanceById(sourceAccountId.value!, -parsedAmount);
-          DatabaseHelper.instance.updateAccountBalanceById(destinationAccountId.value!, parsedAmount);
-          
-          if (Get.isRegistered<HomeController>()) {
-            Get.find<HomeController>().loadData();
-          }
-        });
+        isWorking.value = true;
+        try {
+          await DatabaseHelper.instance.insertTransferWithBalanceUpdate(
+              transaction, sourceAccountId.value!, destinationAccountId.value!, parsedAmount);
+          refreshAllGlobalData();
+
+          Get.back();
+          Get.snackbar(
+            'Berhasil', 
+            'Transfer berhasil disimpan',
+            backgroundColor: Colors.green.shade800,
+            colorText: Colors.white,
+            snackPosition: SnackPosition.BOTTOM,
+            margin: const EdgeInsets.all(16),
+          );
+        } catch (e) {
+          Get.snackbar('Error', 'Gagal menyimpan transfer',
+              backgroundColor: Colors.red.shade800, colorText: Colors.white);
+        } finally {
+          isWorking.value = false;
+        }
       }
-      
-      Get.back();
-      Get.snackbar(
-        'Berhasil', 
-        'Transfer berhasil disimpan',
-        backgroundColor: Colors.green.shade800,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(16),
-      );
     } else if (key == '+' || key == '-') {
       // Operator placeholder
     } else {
+      if (amountStr.value.length >= 12) {
+        Get.snackbar('Batas Maksimal', 'Maksimal 12 digit angka', snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
       if (amountStr.value == '0') {
         amountStr.value = key;
       } else {

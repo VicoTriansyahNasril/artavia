@@ -4,7 +4,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/core/database/database_helper.dart';
-import 'package:artavia/page/home/home_controller.dart';
+import 'package:artavia/core/utils/data_refresh.dart';
 
 class TransactionDetailScreen extends StatelessWidget {
   const TransactionDetailScreen({super.key});
@@ -254,6 +254,7 @@ class TransactionDetailScreen extends StatelessWidget {
 
   void _confirmDelete(
       String? id, int? accountId, int? destinationAccountId, int amount, bool isExpense, bool isTransfer) {
+    bool isDeleting = false;
     Get.defaultDialog(
       backgroundColor: colorCard,
       title: 'Hapus Transaksi',
@@ -266,33 +267,27 @@ class TransactionDetailScreen extends StatelessWidget {
       confirm: ElevatedButton(
         style: ElevatedButton.styleFrom(backgroundColor: colorExpense),
         onPressed: () async {
-          if (id != null) {
-            if (isTransfer && accountId != null && destinationAccountId != null) {
-              await DatabaseHelper.instance
-                  .updateAccountBalanceById(accountId, amount);
-              await DatabaseHelper.instance
-                  .updateAccountBalanceById(destinationAccountId, -amount);
-            } else if (accountId != null) {
-              final multiplier = isExpense ? 1 : -1;
-              await DatabaseHelper.instance
-                  .updateAccountBalanceById(accountId, amount * multiplier);
+          if (isDeleting) return;
+          isDeleting = true;
+          try {
+            if (id != null) {
+              await DatabaseHelper.instance.deleteTransactionWithBalanceUpdate(
+                  int.parse(id), accountId, destinationAccountId, amount, isExpense, isTransfer);
+              refreshAllGlobalData();
             }
-            await DatabaseHelper.instance
-                .deleteTransaction(int.parse(id));
-            if (Get.isRegistered<HomeController>()) {
-              Get.find<HomeController>().loadData();
-            }
+            Get.back(); // close dialog
+            Get.back(); // go back
+            Get.snackbar(
+              'Berhasil',
+              'Transaksi telah dihapus',
+              backgroundColor: Colors.green.shade800,
+              colorText: colorWhite,
+              snackPosition: SnackPosition.BOTTOM,
+              margin: const EdgeInsets.all(16),
+            );
+          } finally {
+            isDeleting = false;
           }
-          Get.back(); // close dialog
-          Get.back(); // go back
-          Get.snackbar(
-            'Berhasil',
-            'Transaksi telah dihapus',
-            backgroundColor: Colors.green.shade800,
-            colorText: colorWhite,
-            snackPosition: SnackPosition.BOTTOM,
-            margin: const EdgeInsets.all(16),
-          );
         },
         child: const Text('Hapus', style: TextStyle(color: colorWhite)),
       ),

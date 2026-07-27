@@ -476,7 +476,10 @@ class ReportScreen extends GetView<ReportController> {
           const SizedBox(width: 12),
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () => Get.toNamed('/account-management'),
+              onPressed: () async {
+                await Get.toNamed('/account-management');
+                controller.loadData();
+              },
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: colorGrey.withValues(alpha: 0.4)),
                 padding: const EdgeInsets.symmetric(vertical: 12),

@@ -40,6 +40,11 @@ dependencies:
   table_calendar: any
   sqflite: any
   path: any
+  google_sign_in: ^7.2.0
+  googleapis: ^16.0.0
+  googleapis_auth: ^2.3.3
+  http: ^1.6.0
+  path_provider: ^2.1.6
 dev_dependencies:
   flutter_test:
     sdk: flutter

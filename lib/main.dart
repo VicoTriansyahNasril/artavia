@@ -4,10 +4,13 @@ import 'package:get/get.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:artavia/page/routes.dart';
 import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/core/services/google_drive_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id_ID', null);
+
+  Get.put(GoogleDriveService(), permanent: true);
 
   // Make status bar transparent so content bleeds through
   SystemChrome.setSystemUIOverlayStyle(

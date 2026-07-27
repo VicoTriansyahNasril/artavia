@@ -96,7 +96,7 @@ class ChartController extends GetxController {
 
       if (type == 'pengeluaran') {
         totEx += amt;
-        final cat = t['category'] as String;
+        final cat = (t['categoryName'] as String?) ?? 'Lainnya';
         byCat[cat] = (byCat[cat] ?? 0) + amt;
         final day = date.day;
         byDay[day] = (byDay[day] ?? 0) + amt;

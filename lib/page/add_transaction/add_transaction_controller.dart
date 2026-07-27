@@ -1,7 +1,7 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:artavia/core/database/database_helper.dart';
-import 'package:artavia/page/home/home_controller.dart';
+import 'package:artavia/core/utils/data_refresh.dart';
 
 class AddTransactionController extends GetxController {
   final currentTab = 'Pengeluaran'.obs;
@@ -22,6 +22,7 @@ class AddTransactionController extends GetxController {
   final availableCategories = <Map<String, dynamic>>[].obs;
 
   final noteHistory = <String>[].obs;
+  final RxBool isWorking = false.obs;
   final TextEditingController noteTextController = TextEditingController();
 
   // Selected category
@@ -101,7 +102,7 @@ class AddTransactionController extends GetxController {
   }
 
   // ─── Numpad logic with calculator support ───────────────────────────────
-  void onNumpadPressed(String key) {
+  Future<void> onNumpadPressed(String key) async {
     if (key == 'delete') {
       if (amountStr.value.length > 1) {
         amountStr.value =
@@ -119,6 +120,8 @@ class AddTransactionController extends GetxController {
       _pendingOperatorObs.value = key;
       amountStr.value = '0';
     } else if (key == '=' || key == 'confirm') {
+      if (key == 'confirm' && isWorking.value) return;
+
       // If there's a pending operation, resolve it first
       if (_pendingOperatorObs.value.isNotEmpty) {
         final a = _pendingValueObs.value;
@@ -166,28 +169,36 @@ class AddTransactionController extends GetxController {
         'date': selectedDate.value.toIso8601String(),
       };
 
-      DatabaseHelper.instance.insertTransaction(transaction).then((_) {
+      isWorking.value = true;
+      try {
         final multiplier = type == 'pengeluaran' ? -1 : 1;
-        DatabaseHelper.instance.updateAccountBalanceById(
-            selectedAccountId.value!, parsedAmount * multiplier);
-        if (Get.isRegistered<HomeController>()) {
-          Get.find<HomeController>().loadData();
-        }
-      });
+        await DatabaseHelper.instance.insertTransactionWithBalanceUpdate(
+            transaction, selectedAccountId.value!, parsedAmount * multiplier);
+        refreshAllGlobalData();
 
-      Get.back();
-      Get.snackbar(
-        'Tersimpan!',
-        '${type == 'pengeluaran' ? 'Pengeluaran' : 'Pemasukan'} berhasil dicatat',
-        backgroundColor: Colors.green.shade800,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(16),
-        icon: const Icon(Icons.check_circle, color: Colors.white),
-        duration: const Duration(seconds: 2),
-      );
+        Get.back();
+        Get.snackbar(
+          'Tersimpan!',
+          '${type == 'pengeluaran' ? 'Pengeluaran' : 'Pemasukan'} berhasil dicatat',
+          backgroundColor: Colors.green.shade800,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(16),
+          icon: const Icon(Icons.check_circle, color: Colors.white),
+          duration: const Duration(seconds: 2),
+        );
+      } catch (e) {
+        Get.snackbar('Error', 'Gagal menyimpan transaksi',
+            backgroundColor: Colors.red.shade800, colorText: Colors.white);
+      } finally {
+        isWorking.value = false;
+      }
     } else {
       // Digit
+      if (amountStr.value.length >= 12) {
+        Get.snackbar('Batas Maksimal', 'Maksimal 12 digit angka', snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
       if (amountStr.value == '0') {
         amountStr.value = key;
       } else {
@@ -199,7 +210,12 @@ class AddTransactionController extends GetxController {
   // Quick amount add shortcut
   void addQuickAmount(int amount) {
     final current = int.tryParse(amountStr.value) ?? 0;
-    amountStr.value = (current + amount).toString();
+    final newAmount = current + amount;
+    if (newAmount.toString().length > 12) {
+      Get.snackbar('Batas Maksimal', 'Nominal terlalu besar', snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    amountStr.value = newAmount.toString();
   }
 
   void selectCategory(int id, String name) {

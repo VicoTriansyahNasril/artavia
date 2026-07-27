@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
+import 'package:artavia/core/utils/data_refresh.dart';
 
 class CategoryManagementController extends GetxController {
   final currentTab = 'Pengeluaran'.obs;
@@ -9,6 +10,9 @@ class CategoryManagementController extends GetxController {
   final incomeCategories = <Map<String, dynamic>>[].obs;
 
   final isExpenseForm = true.obs;
+
+  final RxBool isWorking = false.obs;
+
   final categoryName = ''.obs;
   final selectedIcon = Icons.category.obs;
   final selectedColor = (Colors.grey as Color).obs;
@@ -90,35 +94,42 @@ class CategoryManagementController extends GetxController {
   }
 
   Future<void> saveCategory() async {
+    if (isWorking.value) return;
     if (categoryName.value.trim().isEmpty) {
       Get.snackbar('Gagal', 'Nama kategori tidak boleh kosong',
           snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
-    // ignore: deprecated_member_use
-    final cVal = selectedColor.value.value;
-    final data = {
-      'name': categoryName.value.trim(),
-      'type': isExpenseForm.value ? 'pengeluaran' : 'pemasukan',
-      'icon_code': selectedIcon.value.codePoint,
-      'color_val': cVal,
-    };
+    isWorking.value = true;
+    try {
+      // ignore: deprecated_member_use
+      final cVal = selectedColor.value.value;
+      final data = {
+        'name': categoryName.value.trim(),
+        'type': isExpenseForm.value ? 'pengeluaran' : 'pemasukan',
+        'icon_code': selectedIcon.value.codePoint,
+        'color_val': cVal,
+      };
 
-    if (isEditMode) {
-      await DatabaseHelper.instance.updateCategory(editingId.value!, data);
-      Get.back();
-      Get.snackbar('Berhasil', 'Kategori berhasil diperbarui',
-          snackPosition: SnackPosition.BOTTOM);
-    } else {
-      await DatabaseHelper.instance.insertCategory(data);
-      Get.back();
-      Get.snackbar('Berhasil', 'Kategori baru disimpan',
-          snackPosition: SnackPosition.BOTTOM);
+      if (isEditMode) {
+        await DatabaseHelper.instance.updateCategory(editingId.value!, data);
+        Get.back();
+        Get.snackbar('Berhasil', 'Kategori berhasil diperbarui',
+            snackPosition: SnackPosition.BOTTOM);
+      } else {
+        await DatabaseHelper.instance.insertCategory(data);
+        Get.back();
+        Get.snackbar('Berhasil', 'Kategori baru disimpan',
+            snackPosition: SnackPosition.BOTTOM);
+      }
+
+      resetForm();
+      loadCategories();
+      refreshAllGlobalData();
+    } finally {
+      isWorking.value = false;
     }
-
-    resetForm();
-    loadCategories();
   }
 
   void deleteCategory(int id) async {
@@ -136,19 +147,23 @@ class CategoryManagementController extends GetxController {
         style:
             ElevatedButton.styleFrom(backgroundColor: Colors.red),
         onPressed: () async {
+          if (isWorking.value) return;
+          isWorking.value = true;
           try {
             await DatabaseHelper.instance.deleteCategory(id);
             Get.back();
             loadCategories();
+            refreshAllGlobalData();
             Get.snackbar('Berhasil', 'Kategori dihapus',
                 snackPosition: SnackPosition.BOTTOM);
           } catch (e) {
             Get.back();
             Get.snackbar('Gagal', 'Tidak dapat menghapus kategori yang sudah digunakan pada transaksi.',
                 snackPosition: SnackPosition.BOTTOM,
-                backgroundColor: Colors.red.shade800,
-                colorText: Colors.white,
-                margin: const EdgeInsets.all(16));
+                backgroundColor: Colors.red,
+                colorText: Colors.white);
+          } finally {
+            isWorking.value = false;
           }
         },
         child:

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:artavia/page/profile/profile_controller.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/core/services/google_drive_service.dart';
 
 class ProfileScreen extends GetView<ProfileController> {
   const ProfileScreen({super.key});
@@ -57,6 +58,8 @@ class ProfileScreen extends GetView<ProfileController> {
               onTap: () => Get.toNamed('/ledger'),
             ),
           ]),
+          const SizedBox(height: 12),
+          _buildBackupSection(),
           const SizedBox(height: 12),
           _buildSection('Pengaturan', [
             _menuItem(
@@ -294,6 +297,82 @@ class ProfileScreen extends GetView<ProfileController> {
           onTap: onTap ?? () {},
         ),
         const Divider(indent: 66, height: 1, color: colorDivider),
+      ],
+    );
+  }
+
+  Widget _buildBackupSection() {
+    final driveService = Get.find<GoogleDriveService>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            'CLOUD BACKUP',
+            style: TextStyle(
+              color: colorGrey,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+        Material(
+          color: colorCard,
+          child: Column(
+            children: [
+              Obx(() => driveService.isConnected.value
+                  ? _menuItem(
+                      Icons.cloud_done_rounded,
+                      Colors.green,
+                      'Terhubung ke Google Drive',
+                      subtitle: 'Ketuk untuk memutuskan koneksi',
+                      onTap: controller.disconnectGoogleDrive,
+                    )
+                  : _menuItem(
+                      Icons.cloud_off_rounded,
+                      Colors.grey,
+                      'Hubungkan ke Google Drive',
+                      subtitle: 'Login untuk mencadangkan data',
+                      onTap: controller.connectGoogleDrive,
+                    )),
+              Obx(() => driveService.isConnected.value
+                  ? Column(
+                      children: [
+                        _menuItem(
+                          Icons.upload_file_rounded,
+                          Colors.blue,
+                          'Backup Data Sekarang',
+                          subtitle: 'Simpan data ke cloud',
+                          onTap: controller.backupData,
+                        ),
+                        _menuItem(
+                          Icons.download_rounded,
+                          Colors.orange,
+                          'Restore Data',
+                          subtitle: 'Pulihkan data dari cloud',
+                          onTap: () {
+                            Get.defaultDialog(
+                              title: 'Konfirmasi Restore',
+                              middleText: 'Data lokal akan ditimpa dengan data dari Google Drive. Lanjutkan?',
+                              textConfirm: 'Ya',
+                              textCancel: 'Batal',
+                              confirmTextColor: Colors.white,
+                              onConfirm: () {
+                                Get.back();
+                                controller.restoreData();
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    )
+                  : const SizedBox.shrink()),
+            ],
+          ),
+        ),
       ],
     );
   }

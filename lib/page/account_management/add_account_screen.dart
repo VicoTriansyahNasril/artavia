@@ -304,10 +304,7 @@ class _InfoCard extends StatelessWidget {
                 Expanded(
                   child: TextField(
                     autofocus: false,
-                    controller: TextEditingController(
-                        text: controller.accountName.value)
-                      ..selection = TextSelection.fromPosition(TextPosition(
-                          offset: controller.accountName.value.length)),
+                    controller: controller.nameController,
                     onChanged: (v) => controller.accountName.value = v,
                     style: const TextStyle(color: colorWhite, fontSize: 15),
                     decoration: const InputDecoration(
@@ -336,12 +333,7 @@ class _InfoCard extends StatelessWidget {
                     ),
                     Expanded(
                       child: TextField(
-                        key: ValueKey(controller.editingId.value),
-                        controller: TextEditingController(
-                          text: controller.balance.value == 0
-                              ? ''
-                              : controller.balance.value.toString(),
-                        ),
+                        controller: controller.balanceController,
                         onChanged: (v) {
                           controller.balance.value =
                               int.tryParse(v.replaceAll(
@@ -351,6 +343,7 @@ class _InfoCard extends StatelessWidget {
                         keyboardType: const TextInputType.numberWithOptions(
                             signed: true),
                         inputFormatters: [
+                          LengthLimitingTextInputFormatter(12),
                           FilteringTextInputFormatter.allow(
                               RegExp(r'^-?\d*')),
                         ],

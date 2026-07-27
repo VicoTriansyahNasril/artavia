@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
 
@@ -16,6 +17,8 @@ class BudgetController extends GetxController {
 
   // Available categories from DB
   final availableCategories = <Map<String, dynamic>>[].obs;
+  
+  final RxBool isWorking = false.obs;
 
   String get monthLabel {
     final months = [
@@ -73,7 +76,7 @@ class BudgetController extends GetxController {
       final Map<String, int> usedByCat = {};
       for (var t in transactions) {
         if (t['type'] == 'pengeluaran') {
-          final cat = t['category'] as String;
+          final cat = (t['categoryName'] as String?) ?? 'Lainnya';
           usedByCat[cat] = (usedByCat[cat] ?? 0) + (t['amount'] as int);
         }
       }
@@ -91,7 +94,7 @@ class BudgetController extends GetxController {
       final List<Map<String, dynamic>> items = [];
       int idx = 0;
       for (var b in budgets) {
-        final catName = b['category'] as String? ?? '';
+        final catName = (b['categoryName'] as String?) ?? '';
         final catData = catMap[catName];
 
         items.add({
@@ -160,6 +163,10 @@ class BudgetController extends GetxController {
                   enabledBorder: UnderlineInputBorder(
                       borderSide: BorderSide(color: Colors.grey)),
                 ),
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(12),
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
                 validator: (v) =>
                     (int.tryParse(v ?? '') ?? 0) <= 0 ? 'Masukkan nominal' : null,
               ),
@@ -176,20 +183,26 @@ class BudgetController extends GetxController {
             style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFCA28)),
             onPressed: () async {
+              if (isWorking.value) return;
               if (formKey.currentState!.validate() &&
                   selectedCategory != null) {
-                final amount = int.tryParse(amountCtrl.text) ?? 0;
-                final catId = availableCategories.firstWhere((c) => c['name'] == selectedCategory)['id'] as int;
-                await DatabaseHelper.instance.upsertBudget(
-                  categoryId: catId,
-                  amount: amount,
-                  month: currentDate.value.month,
-                  year: currentDate.value.year,
-                );
-                Get.back();
-                loadData();
-                Get.snackbar('Berhasil', 'Anggaran disimpan',
-                    snackPosition: SnackPosition.BOTTOM);
+                isWorking.value = true;
+                try {
+                  final amount = int.tryParse(amountCtrl.text) ?? 0;
+                  final catId = availableCategories.firstWhere((c) => c['name'] == selectedCategory)['id'] as int;
+                  await DatabaseHelper.instance.upsertBudget(
+                    categoryId: catId,
+                    amount: amount,
+                    month: currentDate.value.month,
+                    year: currentDate.value.year,
+                  );
+                  Get.back();
+                  loadData();
+                  Get.snackbar('Berhasil', 'Anggaran disimpan',
+                      snackPosition: SnackPosition.BOTTOM);
+                } finally {
+                  isWorking.value = false;
+                }
               }
             },
             child: const Text('Simpan',
@@ -221,6 +234,10 @@ class BudgetController extends GetxController {
             enabledBorder: UnderlineInputBorder(
                 borderSide: BorderSide(color: Colors.grey)),
           ),
+          inputFormatters: [
+            LengthLimitingTextInputFormatter(12),
+            FilteringTextInputFormatter.digitsOnly,
+          ],
         ),
         actions: [
           TextButton(
@@ -232,16 +249,22 @@ class BudgetController extends GetxController {
             style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFCA28)),
             onPressed: () async {
+              if (isWorking.value) return;
               final amount = int.tryParse(amountCtrl.text) ?? 0;
               if (amount > 0) {
-                await DatabaseHelper.instance.upsertBudget(
-                  categoryId: item['category_id'] as int,
-                  amount: amount,
-                  month: currentDate.value.month,
-                  year: currentDate.value.year,
-                );
-                Get.back();
-                loadData();
+                isWorking.value = true;
+                try {
+                  await DatabaseHelper.instance.upsertBudget(
+                    categoryId: item['category_id'] as int,
+                    amount: amount,
+                    month: currentDate.value.month,
+                    year: currentDate.value.year,
+                  );
+                  Get.back();
+                  loadData();
+                } finally {
+                  isWorking.value = false;
+                }
               }
             },
             child: const Text('Simpan',
@@ -253,7 +276,13 @@ class BudgetController extends GetxController {
   }
 
   Future<void> deleteBudget(int id) async {
-    await DatabaseHelper.instance.deleteBudget(id);
-    loadData();
+    if (isWorking.value) return;
+    isWorking.value = true;
+    try {
+      await DatabaseHelper.instance.deleteBudget(id);
+      loadData();
+    } finally {
+      isWorking.value = false;
+    }
   }
 }
