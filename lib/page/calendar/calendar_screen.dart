@@ -168,7 +168,7 @@ class CalendarScreen extends GetView<CalendarController> {
                     children: [
                       Icon(Icons.event_note_rounded,
                           size: 48,
-                          color: colorGrey.withOpacity(0.3)),
+                          color: colorGrey.withValues(alpha: 0.3)),
                       const SizedBox(height: 12),
                       Obx(() => Text(
                             'Tidak ada transaksi pada ${DateFormat('dd MMM', 'id_ID').format(controller.selectedDay.value)}',
@@ -252,7 +252,7 @@ class CalendarScreen extends GetView<CalendarController> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
+            color: color.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: color, size: 20),

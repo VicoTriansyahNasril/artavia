@@ -135,7 +135,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
               width: 36,
               height: 3,
               decoration: BoxDecoration(
-                color: colorGrey.withOpacity(0.4),
+                color: colorGrey.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -346,7 +346,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
         decoration: BoxDecoration(
           color: colorBackground,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colorGrey.withOpacity(0.3)),
+          border: Border.all(color: colorGrey.withValues(alpha: 0.3)),
         ),
         child: Text(text,
             style: const TextStyle(color: colorGrey, fontSize: 11)),
@@ -373,7 +373,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                   color: colorCard,
                   borderRadius: BorderRadius.circular(4),
                   border: Border.all(
-                      color: colorGrey.withOpacity(0.2)),
+                      color: colorGrey.withValues(alpha: 0.2)),
                 ),
                 child: Text(
                   '+${CurrencyService.to.compact(amount)}',
@@ -442,7 +442,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
           decoration: BoxDecoration(
             color: colorCard,
             border: Border.all(
-                color: colorBackground.withOpacity(0.6), width: 0.5),
+                color: colorBackground.withValues(alpha: 0.6), width: 0.5),
           ),
           child: Center(
             child: Text(label,
@@ -465,7 +465,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
           decoration: BoxDecoration(
             color: colorCard,
             border: Border.all(
-                color: colorBackground.withOpacity(0.6), width: 0.5),
+                color: colorBackground.withValues(alpha: 0.6), width: 0.5),
           ),
           child: Center(child: Icon(icon, color: color, size: 20)),
         ),

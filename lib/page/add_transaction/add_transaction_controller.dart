@@ -70,8 +70,8 @@ class AddTransactionController extends GetxController {
       if (c['type'] == type) {
         IconData iconData = Icons.category;
         if (c['icon_code'] != null) {
-          // ignore: non_const_argument_for_const_parameter
           iconData =
+              // ignore: non_const_argument_for_const_parameter
               IconData(c['icon_code'] as int, fontFamily: 'MaterialIcons');
         }
         Color colorData = Colors.grey;

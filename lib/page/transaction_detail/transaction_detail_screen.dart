@@ -68,7 +68,7 @@ class TransactionDetailScreen extends StatelessWidget {
             width: double.infinity,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [themeColor.withOpacity(0.85), themeColor.withOpacity(0.3)],
+                colors: [themeColor.withValues(alpha: 0.85), themeColor.withValues(alpha: 0.3)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -114,7 +114,7 @@ class TransactionDetailScreen extends StatelessWidget {
                     width: 72,
                     height: 72,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(iconData, color: colorWhite, size: 36),
@@ -247,7 +247,7 @@ class TransactionDetailScreen extends StatelessWidget {
   }
 
   Widget _divider() => Divider(
-        color: colorGrey.withOpacity(0.08),
+        color: colorGrey.withValues(alpha: 0.08),
         height: 1,
         indent: 16,
       );

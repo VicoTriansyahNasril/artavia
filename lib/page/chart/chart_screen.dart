@@ -43,7 +43,7 @@ class ChartScreen extends GetView<ChartController> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.bar_chart, size: 64, color: colorGrey.withOpacity(0.4)),
+          Icon(Icons.bar_chart, size: 64, color: colorGrey.withValues(alpha: 0.4)),
           const SizedBox(height: 16),
           const Text('Belum ada data transaksi',
               style: TextStyle(color: colorGrey, fontSize: 16)),
@@ -244,7 +244,7 @@ class ChartScreen extends GetView<ChartController> {
                       dotData: const FlDotData(show: true),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: colorExpense.withOpacity(0.1),
+                        color: colorExpense.withValues(alpha: 0.1),
                       ),
                     ),
                   ],
@@ -267,7 +267,7 @@ class ChartScreen extends GetView<ChartController> {
             final icon = ex['icon'] as IconData;
             return ListTile(
               leading: CircleAvatar(
-                backgroundColor: color.withOpacity(0.2),
+                backgroundColor: color.withValues(alpha: 0.2),
                 child: Icon(icon, color: color, size: 20),
               ),
               title: Text(ex['name'] as String,

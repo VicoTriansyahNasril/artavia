@@ -71,7 +71,7 @@ class TransferScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorGrey.withOpacity(0.1)),
+        border: Border.all(color: colorGrey.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -214,7 +214,7 @@ class TransferScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: colorBackground,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colorGrey.withOpacity(0.3)),
+          border: Border.all(color: colorGrey.withValues(alpha: 0.3)),
         ),
         child: Text(text, style: const TextStyle(color: colorGrey, fontSize: 12)),
       ),

@@ -95,7 +95,7 @@ class SearchScreen extends GetView<app_search.SearchController> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.search,
-                  size: 64, color: colorGrey.withOpacity(0.3)),
+                  size: 64, color: colorGrey.withValues(alpha: 0.3)),
               const SizedBox(height: 16),
               const Text('Ketik untuk mencari transaksi',
                   style: TextStyle(color: colorGrey)),
@@ -110,7 +110,7 @@ class SearchScreen extends GetView<app_search.SearchController> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.search_off,
-                  size: 64, color: colorGrey.withOpacity(0.3)),
+                  size: 64, color: colorGrey.withValues(alpha: 0.3)),
               const SizedBox(height: 16),
               Text(
                 'Tidak ada hasil untuk\n"${controller.searchQuery.value}"',
@@ -221,7 +221,7 @@ class SearchScreen extends GetView<app_search.SearchController> {
         });
       },
       leading: CircleAvatar(
-        backgroundColor: bgColor.withOpacity(0.2),
+        backgroundColor: bgColor.withValues(alpha: 0.2),
         child: Icon(iconData, color: bgColor, size: 20),
       ),
       title: Text(

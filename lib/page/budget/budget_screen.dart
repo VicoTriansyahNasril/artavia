@@ -100,7 +100,7 @@ class BudgetScreen extends StatelessWidget {
         child: Column(
           children: [
             Icon(Icons.pie_chart_outline,
-                size: 48, color: colorGrey.withOpacity(0.4)),
+                size: 48, color: colorGrey.withValues(alpha: 0.4)),
             const SizedBox(height: 12),
             const Text('Belum ada anggaran bulan ini',
                 style: TextStyle(color: colorGrey)),
@@ -125,7 +125,7 @@ class BudgetScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: colorCard,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colorGrey.withOpacity(0.1)),
+          border: Border.all(color: colorGrey.withValues(alpha: 0.1)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,7 +212,7 @@ class BudgetScreen extends StatelessWidget {
         padding: const EdgeInsets.only(right: 16),
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: colorExpense.withOpacity(0.2),
+          color: colorExpense.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(16),
         ),
         child: const Icon(Icons.delete_outline, color: colorExpense),
@@ -251,7 +251,7 @@ class BudgetScreen extends StatelessWidget {
           color: colorCard,
           borderRadius: BorderRadius.circular(16),
           border: isOverBudget
-              ? Border.all(color: colorExpense.withOpacity(0.4))
+              ? Border.all(color: colorExpense.withValues(alpha: 0.4))
               : null,
         ),
         child: Column(
@@ -259,7 +259,7 @@ class BudgetScreen extends StatelessWidget {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: color.withOpacity(0.2),
+                  backgroundColor: color.withValues(alpha: 0.2),
                   radius: 20,
                   child: Icon(icon, color: color, size: 20),
                 ),

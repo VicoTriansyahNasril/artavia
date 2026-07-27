@@ -33,9 +33,14 @@ class HomeScreen extends GetView<HomeController> {
         onPressed: () => Get.toNamed('/ledger'),
         tooltip: 'Buku Kas',
       ),
-      title: const Text('Artavia',
-          style: TextStyle(
-              color: colorWhite, fontSize: 18, fontWeight: FontWeight.bold)),
+      title: const Text(
+        'Artavia',
+        style: TextStyle(
+          color: colorWhite,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
       centerTitle: true,
       actions: [
         IconButton(
@@ -102,14 +107,21 @@ class HomeScreen extends GetView<HomeController> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.receipt_long_outlined,
-                    size: 64, color: colorGrey),
+                Icon(Icons.receipt_long_outlined, size: 56, color: colorGrey),
                 SizedBox(height: 16),
-                Text('Belum ada transaksi bulan ini',
-                    style: TextStyle(color: colorWhite, fontSize: 16)),
-                SizedBox(height: 8),
-                Text('Ketuk + untuk mulai mencatat',
-                    style: TextStyle(color: colorGrey, fontSize: 13)),
+                Text(
+                  'Belum ada transaksi bulan ini',
+                  style: TextStyle(
+                    color: colorWhite,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Ketuk + untuk mulai mencatat',
+                  style: TextStyle(color: colorGrey, fontSize: 13),
+                ),
               ],
             ),
           ),
@@ -123,70 +135,90 @@ class HomeScreen extends GetView<HomeController> {
   Widget _buildSummaryHeader() {
     return Container(
       color: colorBackground,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
       child: Column(
         children: [
-          // Month nav
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Stack(
+            alignment: Alignment.center,
             children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left, color: colorGrey, size: 22),
-                onPressed: controller.prevMonth,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 8),
-              Obx(() => Column(
-                    children: [
-                      Text(controller.currentYear,
-                          style: const TextStyle(color: colorGrey, fontSize: 11)),
-                      Text(controller.currentMonth,
-                          style: const TextStyle(
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left, color: colorGrey, size: 24),
+                    onPressed: controller.prevMonth,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 16),
+                  Obx(() => Column(
+                        children: [
+                          Text(
+                            controller.currentYear,
+                            style: const TextStyle(color: colorGrey, fontSize: 11),
+                          ),
+                          Text(
+                            controller.currentMonth,
+                            style: const TextStyle(
                               color: colorWhite,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold)),
-                    ],
-                  )),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.chevron_right, color: colorGrey, size: 22),
-                onPressed: controller.nextMonth,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      )),
+                  const SizedBox(width: 16),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right, color: colorGrey, size: 24),
+                    onPressed: controller.nextMonth,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
               ),
-              const Spacer(),
-              // Hide/show balance
-              GestureDetector(
-                onTap: controller.toggleHideBalance,
-                child: Obx(() => Icon(
-                      controller.hideBalance.value
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: colorGrey,
-                      size: 18,
-                    )),
+              Positioned(
+                right: 0,
+                child: GestureDetector(
+                  onTap: controller.toggleHideBalance,
+                  child: Obx(() => Icon(
+                        controller.hideBalance.value
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: colorGrey,
+                        size: 22,
+                      )),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          // 3 stat cards — same card color, single accent line
+          const SizedBox(height: 14),
+          // 3 stat cards in a single row card
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             decoration: BoxDecoration(
               color: colorCard,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                _buildStat('Pengeluaran', () => controller.totalPengeluaran.value,
-                    colorExpense),
+                _buildStat(
+                  'Pengeluaran',
+                  () => controller.totalPengeluaran.value,
+                  colorExpense,
+                ),
                 _buildDivider(),
-                _buildStat('Pemasukan', () => controller.totalPemasukan.value,
-                    colorIncome),
+                _buildStat(
+                  'Pemasukan',
+                  () => controller.totalPemasukan.value,
+                  colorIncome,
+                ),
                 _buildDivider(),
-                _buildStat('Saldo', () => controller.saldoTotal.value,
-                    colorAccent, alignRight: true),
+                _buildStat(
+                  'Saldo',
+                  () => controller.saldoTotal.value,
+                  colorAccent,
+                  alignRight: true,
+                ),
               ],
             ),
           ),
@@ -195,24 +227,31 @@ class HomeScreen extends GetView<HomeController> {
     );
   }
 
-  Widget _buildStat(String label, int Function() getValue, Color color,
-      {bool alignRight = false}) {
+  Widget _buildStat(
+    String label,
+    int Function() getValue,
+    Color color, {
+    bool alignRight = false,
+  }) {
     return Expanded(
       child: Column(
         crossAxisAlignment:
             alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: const TextStyle(color: colorGrey, fontSize: 11)),
-          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(color: colorGrey, fontSize: 11),
+          ),
+          const SizedBox(height: 5),
           Obx(() => Text(
                 controller.hideBalance.value
                     ? '•••••'
                     : CurrencyService.to.formatWithoutSymbol(getValue()),
                 style: TextStyle(
-                    color: color,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold),
+                  color: color,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               )),
@@ -223,9 +262,9 @@ class HomeScreen extends GetView<HomeController> {
 
   Widget _buildDivider() {
     return Container(
-      height: 32,
+      height: 36,
       width: 1,
-      color: colorGrey.withOpacity(0.15),
+      color: colorGrey.withValues(alpha: 0.15),
       margin: const EdgeInsets.symmetric(horizontal: 12),
     );
   }
@@ -236,7 +275,7 @@ class HomeScreen extends GetView<HomeController> {
     final Map<String, List<TransactionModel>> grouped = {};
     for (var tx in controller.transactions) {
       if (tx.date == null) continue;
-      final dateStr = DateFormat('d MMMM EEEE', 'id_ID').format(tx.date!);
+      final dateStr = DateFormat('d MMM · EEEE', 'id_ID').format(tx.date!);
       grouped.putIfAbsent(dateStr, () => []).add(tx);
     }
 
@@ -259,33 +298,52 @@ class HomeScreen extends GetView<HomeController> {
           children: [
             // Date header
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(dateKey,
+                  // Accent line
+                  Container(
+                    width: 3,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: colorAccent,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    dateKey,
+                    style: const TextStyle(
+                      color: colorGrey,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (dailyIncome > 0)
+                    Text(
+                      '+${CurrencyService.to.formatWithoutSymbol(dailyIncome)}',
                       style: const TextStyle(
-                          color: colorGrey,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500)),
-                  Row(children: [
-                    if (dailyIncome > 0)
-                      Text(
-                          '+${CurrencyService.to.formatWithoutSymbol(dailyIncome)}',
-                          style: const TextStyle(
-                              color: colorIncome, fontSize: 11)),
-                    if (dailyIncome > 0 && dailyExpense > 0)
-                      const SizedBox(width: 8),
-                    if (dailyExpense > 0)
-                      Text(
-                          '-${CurrencyService.to.formatWithoutSymbol(dailyExpense)}',
-                          style: const TextStyle(
-                              color: colorExpense, fontSize: 11)),
-                  ]),
+                        color: colorIncome,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  if (dailyIncome > 0 && dailyExpense > 0)
+                    const SizedBox(width: 8),
+                  if (dailyExpense > 0)
+                    Text(
+                      '-${CurrencyService.to.formatWithoutSymbol(dailyExpense)}',
+                      style: const TextStyle(
+                        color: colorExpense,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                 ],
               ),
             ),
-            Container(
+            Material(
               color: colorCard,
               child: Column(
                 children: txList.asMap().entries.map((e) {
@@ -295,9 +353,10 @@ class HomeScreen extends GetView<HomeController> {
                     children: [
                       if (i > 0)
                         const Divider(
-                            color: colorBackground,
-                            height: 1,
-                            indent: 64),
+                          color: colorBackground,
+                          height: 1,
+                          indent: 64,
+                        ),
                       _buildTransactionItem(tx),
                     ],
                   );
@@ -314,38 +373,33 @@ class HomeScreen extends GetView<HomeController> {
     final isExpense = tx.type == 'pengeluaran';
     final isTransfer = tx.type == 'transfer';
 
-    // Icon per category — SAME color (colorAccent for income, colorExpense for expense)
-    final iconColor =
-        isTransfer ? colorGrey : isExpense ? colorExpense : colorIncome;
-    final iconBg = iconColor.withOpacity(0.1);
+    // Use category color from DB if available, else fallback to type color
+    final Color iconColor;
+    final IconData iconData;
 
-    IconData iconData;
-    final cat = tx.categoryName?.toLowerCase() ?? '';
     if (isTransfer) {
+      iconColor = colorGrey;
       iconData = Icons.swap_horiz;
-    } else if (cat.contains('makan') || cat.contains('minum')) {
-      iconData = Icons.restaurant_outlined;
-    } else if (cat.contains('belanja')) {
-      iconData = Icons.shopping_bag_outlined;
-    } else if (cat.contains('transport') || cat.contains('bensin')) {
-      iconData = Icons.directions_car_outlined;
-    } else if (cat.contains('gaji') || cat.contains('bonus')) {
-      iconData = Icons.attach_money;
-    } else if (cat.contains('kesehatan')) {
-      iconData = Icons.medical_services_outlined;
-    } else if (cat.contains('tagihan') || cat.contains('listrik')) {
-      iconData = Icons.receipt_outlined;
+    } else if (tx.categoryColorVal != null && tx.categoryColorVal != 0) {
+      iconColor = Color(tx.categoryColorVal!);
+      // Use category icon from DB if available
+      iconData = tx.categoryIconCode != null && tx.categoryIconCode != 0
+          // ignore: non_const_argument_for_const_parameter
+          ? IconData(tx.categoryIconCode!, fontFamily: 'MaterialIcons')
+          : (isExpense ? Icons.arrow_upward : Icons.arrow_downward);
     } else {
+      iconColor = isExpense ? colorExpense : colorIncome;
       iconData = isExpense ? Icons.arrow_upward : Icons.arrow_downward;
     }
 
+    final iconBg = iconColor.withValues(alpha: 0.15);
     final displayAmount = (tx.amount ?? 0).abs();
     final amountColor =
         isTransfer ? colorGrey : isExpense ? colorExpense : colorIncome;
     final prefix = isTransfer ? '' : isExpense ? '-' : '+';
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       onTap: () => Get.toNamed('/transaction-detail', arguments: {
         'id': tx.id,
         'type': tx.type,
@@ -359,20 +413,28 @@ class HomeScreen extends GetView<HomeController> {
         'date': tx.date,
       }),
       leading: CircleAvatar(
-        radius: 20,
+        radius: 22,
         backgroundColor: iconBg,
-        child: Icon(iconData, color: iconColor, size: 18),
+        child: Icon(iconData, color: iconColor, size: 19),
       ),
       title: Text(
         tx.note?.isNotEmpty == true ? tx.note! : (tx.categoryName ?? '-'),
         style: const TextStyle(
-            color: colorWhite, fontSize: 14, fontWeight: FontWeight.w500),
+          color: colorWhite,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: Text(
-        tx.categoryName ?? '',
-        style: const TextStyle(color: colorGrey, fontSize: 11),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text(
+          isTransfer
+              ? '${tx.accountName ?? ''} → ${tx.destinationAccountName ?? ''}'
+              : (tx.categoryName ?? ''),
+          style: const TextStyle(color: colorGrey, fontSize: 11),
+        ),
       ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -381,12 +443,16 @@ class HomeScreen extends GetView<HomeController> {
           Text(
             '$prefix${CurrencyService.to.formatWithoutSymbol(displayAmount)}',
             style: TextStyle(
-                color: amountColor,
-                fontSize: 14,
-                fontWeight: FontWeight.bold),
+              color: amountColor,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          Text(isTransfer ? '${tx.accountName ?? ''} -> ${tx.destinationAccountName ?? ''}' : (tx.accountName ?? ''),
-              style: const TextStyle(color: colorGrey, fontSize: 10)),
+          const SizedBox(height: 2),
+          Text(
+            tx.accountName ?? '',
+            style: const TextStyle(color: colorGrey, fontSize: 10),
+          ),
         ],
       ),
     );
@@ -395,81 +461,12 @@ class HomeScreen extends GetView<HomeController> {
   // ─── FAB — speed dial ────────────────────────────────────────────────────
 
   Widget _buildFAB() {
-    return Obx(() {
-      final isOpen = controller.isFabOpen.value;
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (isOpen) ...[
-            _fabOption('Transfer', Icons.swap_horiz, () {
-              controller.isFabOpen.value = false;
-              Get.toNamed('/transfer');
-            }),
-            const SizedBox(height: 10),
-            _fabOption('Pemasukan', Icons.add, () {
-              controller.isFabOpen.value = false;
-              Get.toNamed('/add-transaction',
-                  arguments: {'initialTab': 'Pemasukan'});
-            }),
-            const SizedBox(height: 10),
-            _fabOption('Pengeluaran', Icons.remove, () {
-              controller.isFabOpen.value = false;
-              Get.toNamed('/add-transaction',
-                  arguments: {'initialTab': 'Pengeluaran'});
-            }),
-            const SizedBox(height: 14),
-          ],
-          FloatingActionButton(
-            onPressed: () {
-              if (controller.currentIndex.value == 0) {
-                controller.isFabOpen.value = !isOpen;
-              } else {
-                controller.isFabOpen.value = false;
-                Get.toNamed('/add-transaction');
-              }
-            },
-            backgroundColor: colorAccent,
-            elevation: 2,
-            shape: const CircleBorder(),
-            child: Icon(
-              isOpen ? Icons.close : Icons.add,
-              color: colorBlack,
-              size: 28,
-            ),
-          ),
-        ],
-      );
-    });
-  }
-
-  Widget _fabOption(String label, IconData icon, VoidCallback onTap) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: colorCard,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(label,
-              style: const TextStyle(color: colorWhite, fontSize: 12)),
-        ),
-        const SizedBox(width: 10),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              color: colorCard,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: colorWhite, size: 18),
-          ),
-        ),
-      ],
+    return FloatingActionButton(
+      onPressed: () => Get.toNamed('/add-transaction'),
+      backgroundColor: colorAccent,
+      elevation: 2,
+      shape: const CircleBorder(),
+      child: const Icon(Icons.add, color: colorBlack, size: 28),
     );
   }
 
@@ -493,8 +490,7 @@ class HomeScreen extends GetView<HomeController> {
     );
   }
 
-  Widget _navItem(
-      IconData unsel, IconData sel, String label, int index) {
+  Widget _navItem(IconData unsel, IconData sel, String label, int index) {
     return Obx(() {
       final active = controller.currentIndex.value == index;
       return InkWell(
@@ -508,16 +504,20 @@ class HomeScreen extends GetView<HomeController> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(active ? sel : unsel,
-                  color: active ? colorAccent : colorGrey, size: 22),
+              Icon(
+                active ? sel : unsel,
+                color: active ? colorAccent : colorGrey,
+                size: 22,
+              ),
               const SizedBox(height: 2),
-              Text(label,
-                  style: TextStyle(
-                      color: active ? colorAccent : colorGrey,
-                      fontSize: 10,
-                      fontWeight: active
-                          ? FontWeight.bold
-                          : FontWeight.normal)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: active ? colorAccent : colorGrey,
+                  fontSize: 10,
+                  fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
             ],
           ),
         ),

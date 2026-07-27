@@ -77,7 +77,7 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: isExpense
-                      ? colorExpense.withOpacity(0.85)
+                      ? colorExpense.withValues(alpha: 0.85)
                       : colorCard,
                   borderRadius: const BorderRadius.horizontal(
                       left: Radius.circular(8)),
@@ -98,7 +98,7 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: !isExpense
-                      ? colorIncome.withOpacity(0.85)
+                      ? colorIncome.withValues(alpha: 0.85)
                       : colorCard,
                   borderRadius: const BorderRadius.horizontal(
                       right: Radius.circular(8)),
@@ -127,7 +127,7 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
         children: [
           Obx(() => CircleAvatar(
                 backgroundColor:
-                    controller.selectedColor.value.withOpacity(0.2),
+                    controller.selectedColor.value.withValues(alpha: 0.2),
                 child: Icon(controller.selectedIcon.value,
                     color: controller.selectedColor.value),
               )),
@@ -179,7 +179,7 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                              color: color.withOpacity(0.6),
+                              color: color.withValues(alpha: 0.6),
                               blurRadius: 8)
                         ]
                       : null,
@@ -220,7 +220,7 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
                     border: isSelected
                         ? null
                         : Border.all(
-                            color: colorGrey.withOpacity(0.2)),
+                            color: colorGrey.withValues(alpha: 0.2)),
                   ),
                   child: Icon(
                     icon,

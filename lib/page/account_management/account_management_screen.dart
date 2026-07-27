@@ -14,8 +14,16 @@ class AccountManagementScreen
       backgroundColor: colorBackground,
       appBar: AppBar(
         backgroundColor: colorBackground,
-        title: const Text('Manajemen Rekening',
-            style: TextStyle(color: colorWhite, fontSize: 18)),
+        elevation: 0,
+        title: const Text(
+          'Mengelola Rekening',
+          style: TextStyle(
+            color: colorWhite,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: colorWhite),
           onPressed: () => Get.back(),
@@ -27,14 +35,20 @@ class AccountManagementScreen
         }
         return _buildAccountList();
       }),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           controller.resetForm();
           Get.toNamed('/add-account');
         },
         backgroundColor: colorAccent,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add, color: colorBlack),
+        icon: const Icon(Icons.add, color: colorBlack),
+        label: const Text(
+          'Tambahkan',
+          style: TextStyle(
+            color: colorBlack,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }
@@ -44,14 +58,25 @@ class AccountManagementScreen
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.account_balance_wallet_outlined,
-              size: 64, color: colorGrey.withOpacity(0.4)),
+          Icon(
+            Icons.account_balance_wallet_outlined,
+            size: 64,
+            color: colorGrey.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: 16),
-          const Text('Belum ada rekening',
-              style: TextStyle(color: colorGrey, fontSize: 16)),
-          const SizedBox(height: 8),
-          const Text('Ketuk + untuk menambah rekening baru',
-              style: TextStyle(color: colorGrey, fontSize: 12)),
+          const Text(
+            'Belum ada rekening',
+            style: TextStyle(
+              color: colorWhite,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Ketuk + untuk menambah rekening baru',
+            style: TextStyle(color: colorGrey, fontSize: 13),
+          ),
         ],
       ),
     );
@@ -59,39 +84,38 @@ class AccountManagementScreen
 
   Widget _buildAccountList() {
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 80),
+      padding: const EdgeInsets.only(bottom: 96),
       itemCount: controller.accountGroups.length,
-      itemBuilder: (context, index) {
-        final group = controller.accountGroups[index];
+      itemBuilder: (context, groupIndex) {
+        final group = controller.accountGroups[groupIndex];
         final accounts = group['accounts'] as List;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Group header
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
               child: Text(
-                group['groupName'] as String,
+                (group['groupName'] as String).toUpperCase(),
                 style: const TextStyle(
-                    color: colorGrey,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1),
+                  color: colorGrey,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
               ),
             ),
-            Container(
+            Material(
               color: colorCard,
               child: Column(
                 children: accounts.asMap().entries.map((entry) {
                   final i = entry.key;
                   final acc = entry.value as Map<String, dynamic>;
-                  final iconCode =
-                      acc['icon_code'] as int? ?? 0xe4fc;
-                  final colorVal =
-                      acc['color_val'] as int? ?? 0xFFFFCA28;
-                  final iconData =
-                      IconData(iconCode, fontFamily: 'MaterialIcons');
+                  final iconCode = acc['icon_code'] as int? ?? 0xe4fc;
+                  final colorVal = acc['color_val'] as int? ?? 0xFFFFCA28;
+                  // ignore: non_const_argument_for_const_parameter
+                  final iconData = IconData(iconCode, fontFamily: 'MaterialIcons');
                   final color = Color(colorVal);
                   final isExcluded = acc['is_excluded'] as bool? ?? false;
 
@@ -100,52 +124,91 @@ class AccountManagementScreen
                       if (i > 0)
                         const Divider(color: colorBackground, height: 1),
                       ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: color.withOpacity(0.2),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 5),
+                        leading: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           child: Icon(iconData, color: color, size: 22),
                         ),
                         title: Row(
                           children: [
-                            Text(acc['name'] as String,
-                                style: const TextStyle(
-                                    color: colorWhite,
-                                    fontWeight: FontWeight.w600)),
+                            Text(
+                              acc['name'] as String,
+                              style: const TextStyle(
+                                color: colorWhite,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
                             if (isExcluded) ...[
                               const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: colorGrey.withOpacity(0.2),
+                                  color: colorGrey.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text('Dikecualikan',
-                                    style: TextStyle(
-                                        color: colorGrey, fontSize: 9)),
+                                child: const Text(
+                                  'Dikecualikan',
+                                  style: TextStyle(
+                                    color: colorGrey,
+                                    fontSize: 9,
+                                  ),
+                                ),
                               ),
                             ],
                           ],
                         ),
-                        subtitle: Text(
-                          CurrencyService.to
-                              .formatWithoutSymbol(acc['balance']),
-                          style: const TextStyle(
-                              color: colorGrey, fontSize: 13),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Row(
+                            children: [
+                              Text(
+                                acc['currency_code'] as String? ?? 'IDR',
+                                style: const TextStyle(
+                                  color: colorAccent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                CurrencyService.to.formatWithoutSymbol(acc['balance']),
+                                style: const TextStyle(
+                                  color: colorGrey,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.edit_outlined,
-                                  color: colorGrey, size: 20),
+                              icon: const Icon(
+                                Icons.edit_outlined,
+                                color: colorGrey,
+                                size: 20,
+                              ),
                               onPressed: () {
                                 controller.startEditAccount(acc);
                                 Get.toNamed('/add-account');
                               },
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline,
-                                  color: colorExpense, size: 20),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: colorExpense,
+                                size: 20,
+                              ),
                               onPressed: () => controller.deleteAccount(
                                   acc['id'] as int, acc['name'] as String),
                             ),

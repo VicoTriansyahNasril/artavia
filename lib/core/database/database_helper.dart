@@ -20,7 +20,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 6,
+      version: 8,
       onConfigure: _onConfigure,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
@@ -58,6 +58,7 @@ CREATE TABLE accounts (
   name $textType,
   type $textType,
   balance $intType,
+  currency_code TEXT NOT NULL DEFAULT "IDR",
   icon_code INTEGER,
   color_val INTEGER,
   is_excluded INTEGER NOT NULL DEFAULT 0
@@ -178,6 +179,24 @@ CREATE TABLE IF NOT EXISTS settings (
             'ALTER TABLE accounts ADD COLUMN is_excluded INTEGER NOT NULL DEFAULT 0');
       } catch (_) {}
     }
+    if (oldVersion < 7) {
+      try {
+        await db.execute('ALTER TABLE transactions ADD COLUMN category_id INTEGER');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE transactions ADD COLUMN account_id INTEGER');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE transactions ADD COLUMN destination_account_id INTEGER');
+      } catch (_) {}
+    }
+    if (oldVersion < 8) {
+      // Add currency support to accounts
+      try {
+        await db.execute(
+            'ALTER TABLE accounts ADD COLUMN currency_code TEXT NOT NULL DEFAULT "IDR"');
+      } catch (_) {}
+    }
   }
 
   // ─── Transactions CRUD ───────────────────────────────────────────────────
@@ -247,7 +266,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
   Future<List<Map<String, dynamic>>> readAllAccounts() async {
     final db = await instance.database;
-    return await db.query('accounts');
+    return await db.query('accounts', orderBy: 'type ASC, name ASC');
   }
 
   Future<int> insertAccount(Map<String, dynamic> account) async {
