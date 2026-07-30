@@ -136,87 +136,57 @@ class HomeScreen extends GetView<HomeController> {
     return Container(
       color: colorBackground,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left, color: colorGrey, size: 24),
-                    onPressed: controller.prevMonth,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                  const SizedBox(width: 16),
-                  Obx(() => Column(
-                        children: [
-                          Text(
-                            controller.currentYear,
-                            style: const TextStyle(color: colorGrey, fontSize: 11),
+          // Month Year Picker
+          GestureDetector(
+            onTap: () => _showMonthPicker(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Obx(() => Text(
+                      controller.currentYear,
+                      style: const TextStyle(color: colorGrey, fontSize: 11),
+                    )),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Obx(() => Text(
+                          controller.currentMonth,
+                          style: const TextStyle(
+                            color: colorWhite,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
-                          Text(
-                            controller.currentMonth,
-                            style: const TextStyle(
-                              color: colorWhite,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      )),
-                  const SizedBox(width: 16),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right, color: colorGrey, size: 24),
-                    onPressed: controller.nextMonth,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-              Positioned(
-                right: 0,
-                child: GestureDetector(
-                  onTap: controller.toggleHideBalance,
-                  child: Obx(() => Icon(
-                        controller.hideBalance.value
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        color: colorGrey,
-                        size: 22,
-                      )),
+                        )),
+                    const Icon(Icons.keyboard_arrow_down,
+                        color: colorWhite, size: 16),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          // 3 stat cards in a single row card
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-            decoration: BoxDecoration(
-              color: colorCard,
-              borderRadius: BorderRadius.circular(10),
+              ],
             ),
+          ),
+          const SizedBox(width: 24),
+          // Stats
+          Expanded(
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _buildStat(
                   'Pengeluaran',
                   () => controller.totalPengeluaran.value,
-                  colorExpense,
+                  colorWhite,
                 ),
-                _buildDivider(),
                 _buildStat(
                   'Pemasukan',
                   () => controller.totalPemasukan.value,
-                  colorIncome,
+                  colorWhite,
                 ),
-                _buildDivider(),
                 _buildStat(
-                  'Saldo',
+                  'Saldo total',
                   () => controller.saldoTotal.value,
-                  colorAccent,
+                  colorWhite,
                   alignRight: true,
                 ),
               ],
@@ -227,45 +197,117 @@ class HomeScreen extends GetView<HomeController> {
     );
   }
 
+  void _showMonthPicker() {
+    // Temporary year state for the picker
+    final RxInt selectedYear = controller.currentDate.value.year.obs;
+    final List<String> months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: const BoxDecoration(
+          color: colorCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left, color: colorWhite),
+                  onPressed: () => selectedYear.value--,
+                ),
+                Obx(() => Text(
+                      '${selectedYear.value}',
+                      style: const TextStyle(
+                        color: colorWhite,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right, color: colorWhite),
+                  onPressed: () => selectedYear.value++,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                childAspectRatio: 2,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemCount: 12,
+              itemBuilder: (context, index) {
+                return Obx(() {
+                  final isCurrentMonth = controller.currentDate.value.year == selectedYear.value && 
+                                         controller.currentDate.value.month == index + 1;
+                  return InkWell(
+                    onTap: () {
+                      controller.currentDate.value = DateTime(selectedYear.value, index + 1);
+                      controller.loadData();
+                      Get.back();
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isCurrentMonth ? colorAccent : colorBackground,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        months[index],
+                        style: TextStyle(
+                          color: isCurrentMonth ? colorBlack : colorWhite,
+                          fontWeight: isCurrentMonth ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  );
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStat(
     String label,
     int Function() getValue,
     Color color, {
     bool alignRight = false,
   }) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment:
-            alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(color: colorGrey, fontSize: 11),
-          ),
-          const SizedBox(height: 5),
-          Obx(() => Text(
-                controller.hideBalance.value
-                    ? '•••••'
-                    : CurrencyService.to.formatWithoutSymbol(getValue()),
-                style: TextStyle(
-                  color: color,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Container(
-      height: 36,
-      width: 1,
-      color: colorGrey.withValues(alpha: 0.15),
-      margin: const EdgeInsets.symmetric(horizontal: 12),
+    return Column(
+      crossAxisAlignment:
+          alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: colorGrey, fontSize: 11),
+        ),
+        const SizedBox(height: 2),
+        Obx(() => Text(
+              controller.hideBalance.value
+                  ? '•••••'
+                  : CurrencyService.to.formatWithoutSymbol(getValue()),
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            )),
+      ],
     );
   }
 
