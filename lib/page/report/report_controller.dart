@@ -124,6 +124,7 @@ class ReportController extends GetxController {
         'name': acc['name'],
         'balance': balance,
         'icon_code': acc['icon_code'] ?? 0xe4fc,
+        'icon_path': acc['icon_path'],
         'color_val': acc['color_val'] ?? 0xFFFFCA28,
       });
     }

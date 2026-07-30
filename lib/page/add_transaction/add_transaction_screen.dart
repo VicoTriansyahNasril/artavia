@@ -221,8 +221,9 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                     backgroundColor: isSelected
                         ? colorAccent
                         : colorCard,
-                    child: Icon(
-                      cat['icon'] as IconData,
+                    child: CategoryIcon(
+                      iconCode: cat['icon_code'] as int?,
+                      iconPath: cat['icon_path'] as String?,
                       color: isSelected ? colorBlack : colorGrey,
                       size: 22,
                     ),

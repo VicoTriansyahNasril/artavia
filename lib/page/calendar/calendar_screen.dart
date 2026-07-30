@@ -199,30 +199,24 @@ class CalendarScreen extends GetView<CalendarController> {
   Widget _buildTxItem(TransactionModel tx) {
     final isExpense = tx.type == 'pengeluaran';
     final isTransfer = tx.type == 'transfer';
-    final cat = tx.categoryName?.toLowerCase() ?? '';
 
-    IconData icon;
-    Color color;
+    int? iconCode;
+    String? iconPath;
+    Color bgColor = colorGrey;
+
     if (isTransfer) {
-      icon = Icons.swap_horiz_rounded;
-      color = Colors.blue;
-    } else if (cat.contains('makan')) {
-      icon = Icons.restaurant_rounded;
-      color = Colors.orange;
-    } else if (cat.contains('belanja')) {
-      icon = Icons.shopping_bag_rounded;
-      color = Colors.purple;
-    } else if (cat.contains('transport')) {
-      icon = Icons.directions_car_rounded;
-      color = Colors.teal;
-    } else if (cat.contains('gaji') || cat.contains('bonus')) {
-      icon = Icons.attach_money_rounded;
-      color = colorIncome;
+      iconCode = Icons.swap_horiz.codePoint;
+      bgColor = Colors.blue;
+    } else if (tx.categoryColorVal != null && tx.categoryColorVal != 0) {
+      bgColor = Color(tx.categoryColorVal!);
+      iconCode = tx.categoryIconCode;
+      iconPath = tx.categoryIconPath;
+      if (iconCode == null && iconPath == null) {
+        iconCode = isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint;
+      }
     } else {
-      icon = isExpense
-          ? Icons.arrow_upward_rounded
-          : Icons.arrow_downward_rounded;
-      color = isExpense ? colorExpense : colorIncome;
+      bgColor = isExpense ? colorExpense : colorIncome;
+      iconCode = isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint;
     }
 
     final amount = (tx.amount ?? 0).abs();
@@ -247,15 +241,23 @@ class CalendarScreen extends GetView<CalendarController> {
           'destination_account': tx.destinationAccountName,
           'destination_account_id': tx.destinationAccountId,
           'date': tx.date,
+          'icon_code': iconCode,
+          'icon_path': iconPath,
+          'color_val': bgColor.toARGB32(),
         }),
         leading: Container(
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
+            color: bgColor.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: color, size: 20),
+          child: CategoryIcon(
+            iconCode: iconCode,
+            iconPath: iconPath,
+            color: bgColor,
+            size: 20,
+          ),
         ),
         title: Text(
           tx.note?.isNotEmpty == true ? tx.note! : (tx.categoryName ?? '-'),

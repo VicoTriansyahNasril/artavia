@@ -112,10 +112,9 @@ class AccountManagementScreen
                 children: accounts.asMap().entries.map((entry) {
                   final i = entry.key;
                   final acc = entry.value as Map<String, dynamic>;
-                  final iconCode = acc['icon_code'] as int? ?? 0xe4fc;
+                  final iconCode = acc['icon_code'] as int?;
+                  final iconPath = acc['icon_path'] as String?;
                   final colorVal = acc['color_val'] as int? ?? 0xFFFFCA28;
-                  // ignore: non_const_argument_for_const_parameter
-                  final iconData = IconData(iconCode, fontFamily: 'MaterialIcons');
                   final color = Color(colorVal);
                   final isExcluded = acc['is_excluded'] as bool? ?? false;
 
@@ -133,7 +132,12 @@ class AccountManagementScreen
                             color: color.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Icon(iconData, color: color, size: 22),
+                          child: CategoryIcon(
+                            iconCode: iconCode,
+                            iconPath: iconPath,
+                            color: color,
+                            size: 22,
+                          ),
                         ),
                         title: Row(
                           children: [

@@ -11,6 +11,7 @@ class TransactionModel {
   int? destinationAccountId;
   String? destinationAccountName;
   int? categoryIconCode;
+  String? categoryIconPath;
   int? categoryColorVal;
 
   TransactionModel({
@@ -26,6 +27,7 @@ class TransactionModel {
     this.destinationAccountId,
     this.destinationAccountName,
     this.categoryIconCode,
+    this.categoryIconPath,
     this.categoryColorVal,
   });
 
@@ -42,6 +44,7 @@ class TransactionModel {
     destinationAccountId = json['destination_account_id'];
     destinationAccountName = json['destinationAccountName']; // Filled via JOIN
     categoryIconCode = json['categoryIconCode'];
+    categoryIconPath = json['categoryIconPath'];
     categoryColorVal = json['categoryColorVal'];
   }
 

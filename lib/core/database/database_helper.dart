@@ -20,7 +20,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 8,
+      version: 9,
       onConfigure: _onConfigure,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
@@ -60,6 +60,7 @@ CREATE TABLE accounts (
   balance $intType,
   currency_code TEXT NOT NULL DEFAULT "IDR",
   icon_code INTEGER,
+  icon_path TEXT,
   color_val INTEGER,
   is_excluded INTEGER NOT NULL DEFAULT 0
 )
@@ -71,6 +72,7 @@ CREATE TABLE categories (
   name $textType,
   type $textType,
   icon_code INTEGER,
+  icon_path TEXT,
   color_val INTEGER
 )
 ''');
@@ -95,15 +97,14 @@ CREATE TABLE settings (
 
     // Seed Categories
     final initialCategories = [
-      {'name': 'Makanan', 'type': 'pengeluaran', 'icon_code': 0xe57a, 'color_val': 0xFF4CAF50},
-      {'name': 'Minuman', 'type': 'pengeluaran', 'icon_code': 0xe44f, 'color_val': 0xFF2196F3},
-      {'name': 'Belanja', 'type': 'pengeluaran', 'icon_code': 0xe549, 'color_val': 0xFFFF9800},
-      {'name': 'Transportasi', 'type': 'pengeluaran', 'icon_code': 0xe1d0, 'color_val': 0xFF9C27B0},
-      {'name': 'Kesehatan', 'type': 'pengeluaran', 'icon_code': 0xe3f3, 'color_val': 0xFFF44336},
-      {'name': 'Hiburan', 'type': 'pengeluaran', 'icon_code': 0xe40c, 'color_val': 0xFFE91E63},
-      {'name': 'Gaji', 'type': 'pemasukan', 'icon_code': 0xe263, 'color_val': 0xFF4CAF50},
-      {'name': 'Bonus', 'type': 'pemasukan', 'icon_code': 0xe263, 'color_val': 0xFF8BC34A},
-      {'name': 'Investasi', 'type': 'pemasukan', 'icon_code': 0xe263, 'color_val': 0xFF00BCD4},
+      {'name': 'Makanan', 'type': 'pengeluaran', 'icon_code': 0xe57a, 'icon_path': 'assets/makanan/bowl.png', 'color_val': 0xFF4CAF50},
+      {'name': 'Belanja', 'type': 'pengeluaran', 'icon_code': 0xe549, 'icon_path': 'assets/belanja/shopping.png', 'color_val': 0xFFFF9800},
+      {'name': 'Transportasi', 'type': 'pengeluaran', 'icon_code': 0xe1d0, 'icon_path': 'assets/transportasi/car.png', 'color_val': 0xFF9C27B0},
+      {'name': 'Kesehatan', 'type': 'pengeluaran', 'icon_code': 0xe3f3, 'icon_path': 'assets/kesehatan/health-care.png', 'color_val': 0xFFF44336},
+      {'name': 'Hiburan', 'type': 'pengeluaran', 'icon_code': 0xe40c, 'icon_path': 'assets/hiburan/entertainment.png', 'color_val': 0xFFE91E63},
+      {'name': 'Gaji', 'type': 'pemasukan', 'icon_code': 0xe263, 'icon_path': 'assets/keuangan/uang.png', 'color_val': 0xFF4CAF50},
+      {'name': 'Bonus', 'type': 'pemasukan', 'icon_code': 0xe263, 'icon_path': 'assets/keuangan/coin.png', 'color_val': 0xFF8BC34A},
+      {'name': 'Investasi', 'type': 'pemasukan', 'icon_code': 0xe263, 'icon_path': 'assets/keuangan/stock.png', 'color_val': 0xFF00BCD4},
     ];
     for (var cat in initialCategories) {
       await db.insert('categories', cat);
@@ -115,6 +116,7 @@ CREATE TABLE settings (
       'type': 'Kas Pribadi',
       'balance': 0,
       'icon_code': 0xe4fc,
+      'icon_path': 'assets/keuangan/dompet.png',
       'color_val': 0xFFFFCA28,
       'is_excluded': 0,
     });
@@ -197,6 +199,14 @@ CREATE TABLE IF NOT EXISTS settings (
             'ALTER TABLE accounts ADD COLUMN currency_code TEXT NOT NULL DEFAULT "IDR"');
       } catch (_) {}
     }
+    if (oldVersion < 9) {
+      try {
+        await db.execute('ALTER TABLE categories ADD COLUMN icon_path TEXT');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE accounts ADD COLUMN icon_path TEXT');
+      } catch (_) {}
+    }
   }
 
   // ─── Transactions CRUD ───────────────────────────────────────────────────
@@ -209,7 +219,7 @@ CREATE TABLE IF NOT EXISTS settings (
   Future<List<Map<String, dynamic>>> readAllTransactions() async {
     final db = await instance.database;
     return await db.rawQuery('''
-      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.color_val as categoryColorVal, 
+      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal, 
              a.name as accountName, da.name as destinationAccountName 
       FROM transactions t 
       LEFT JOIN categories c ON t.category_id = c.id 
@@ -225,7 +235,7 @@ CREATE TABLE IF NOT EXISTS settings (
     final startDate = DateTime(year, month, 1).toIso8601String();
     final endDate = DateTime(year, month + 1, 1).toIso8601String();
     return await db.rawQuery('''
-      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.color_val as categoryColorVal, 
+      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal, 
              a.name as accountName, da.name as destinationAccountName
       FROM transactions t 
       LEFT JOIN categories c ON t.category_id = c.id 
@@ -323,7 +333,7 @@ CREATE TABLE IF NOT EXISTS settings (
   Future<List<Map<String, dynamic>>> searchTransactions(String query) async {
     final db = await instance.database;
     return await db.rawQuery('''
-      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.color_val as categoryColorVal, 
+      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal, 
              a.name as accountName, da.name as destinationAccountName
       FROM transactions t 
       LEFT JOIN categories c ON t.category_id = c.id 
@@ -401,7 +411,7 @@ CREATE TABLE IF NOT EXISTS settings (
       int year, int month) async {
     final db = await instance.database;
     return await db.rawQuery('''
-      SELECT b.*, c.name as categoryName, c.type as categoryType, c.icon_code as categoryIconCode, c.color_val as categoryColorVal 
+      SELECT b.*, c.name as categoryName, c.type as categoryType, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal 
       FROM budgets b
       INNER JOIN categories c ON b.category_id = c.id
       WHERE b.year = ? AND b.month = ?

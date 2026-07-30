@@ -9,33 +9,8 @@ import 'package:artavia/core/utils/data_refresh.dart';
 class TransactionDetailScreen extends StatelessWidget {
   const TransactionDetailScreen({super.key});
 
-  // Resolve icon and color from category name
-  static IconData _resolveIcon(String? cat) {
-    final c = cat?.toLowerCase() ?? '';
-    if (c.contains('makan')) { return Icons.restaurant_rounded; }
-    if (c.contains('minum') || c.contains('kopi')) { return Icons.local_cafe_rounded; }
-    if (c.contains('belanja')) { return Icons.shopping_bag_rounded; }
-    if (c.contains('transport') || c.contains('bensin')) { return Icons.directions_car_rounded; }
-    if (c.contains('gaji') || c.contains('bonus')) { return Icons.attach_money_rounded; }
-    if (c.contains('invest')) { return Icons.trending_up_rounded; }
-    if (c.contains('kesehatan')) { return Icons.medical_services_rounded; }
-    if (c.contains('hiburan')) { return Icons.sports_esports_rounded; }
-    if (c.contains('tagihan') || c.contains('listrik')) { return Icons.receipt_long_rounded; }
-    if (c.contains('transfer')) { return Icons.swap_horiz_rounded; }
-    return Icons.category_rounded;
-  }
-
   static Color _resolveColor(String? cat, bool isExpense, bool isTransfer) {
-    final c = cat?.toLowerCase() ?? '';
-    if (isTransfer) { return Colors.blue; }
-    if (c.contains('makan')) { return Colors.orange; }
-    if (c.contains('minum') || c.contains('kopi')) { return Colors.brown; }
-    if (c.contains('belanja')) { return Colors.purple; }
-    if (c.contains('transport') || c.contains('bensin')) { return Colors.teal; }
-    if (c.contains('gaji') || c.contains('bonus') || c.contains('invest')) { return colorIncome; }
-    if (c.contains('kesehatan')) { return Colors.red; }
-    if (c.contains('hiburan')) { return Colors.pink; }
-    if (c.contains('tagihan') || c.contains('listrik')) { return Colors.indigo; }
+    if (isTransfer) return Colors.blue;
     return isExpense ? colorExpense : colorIncome;
   }
 
@@ -56,8 +31,13 @@ class TransactionDetailScreen extends StatelessWidget {
     final isExpense = type == 'pengeluaran';
     final isTransfer = type == 'transfer';
 
-    final iconData = _resolveIcon(category);
-    final themeColor = _resolveColor(category, isExpense, isTransfer);
+    final iconCode = arg?['icon_code'] as int?;
+    final iconPath = arg?['icon_path'] as String?;
+    final colorVal = arg?['color_val'] as int?;
+
+    final themeColor = colorVal != null
+        ? Color(colorVal)
+        : _resolveColor(category, isExpense, isTransfer);
 
     return Scaffold(
       backgroundColor: colorBackground,
@@ -117,7 +97,12 @@ class TransactionDetailScreen extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(iconData, color: colorWhite, size: 36),
+                    child: CategoryIcon(
+                      iconCode: iconCode ?? (isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint),
+                      iconPath: iconPath,
+                      color: colorWhite,
+                      size: 36,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(

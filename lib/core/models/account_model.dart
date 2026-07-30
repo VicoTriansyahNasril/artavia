@@ -6,6 +6,7 @@ class AccountModel {
   final int balance;
   final String currencyCode;
   final int iconCode;
+  final String? iconPath;
   final int colorVal;
   final bool isExcluded;
 
@@ -16,6 +17,7 @@ class AccountModel {
     this.balance = 0,
     this.currencyCode = 'IDR',
     required this.iconCode,
+    this.iconPath,
     required this.colorVal,
     this.isExcluded = false,
   });
@@ -28,6 +30,7 @@ class AccountModel {
       balance: json['balance'] as int? ?? 0,
       currencyCode: json['currency_code'] as String? ?? 'IDR',
       iconCode: json['icon_code'] as int? ?? 0xe4fc,
+      iconPath: json['icon_path'] as String?,
       colorVal: json['color_val'] as int? ?? 0xFFFFCA28,
       isExcluded: (json['is_excluded'] as int? ?? 0) == 1,
     );
@@ -41,6 +44,7 @@ class AccountModel {
       'balance': balance,
       'currency_code': currencyCode,
       'icon_code': iconCode,
+      'icon_path': iconPath,
       'color_val': colorVal,
       'is_excluded': isExcluded ? 1 : 0,
     };
@@ -53,6 +57,7 @@ class AccountModel {
     int? balance,
     String? currencyCode,
     int? iconCode,
+    String? iconPath,
     int? colorVal,
     bool? isExcluded,
   }) {
@@ -63,6 +68,7 @@ class AccountModel {
       balance: balance ?? this.balance,
       currencyCode: currencyCode ?? this.currencyCode,
       iconCode: iconCode ?? this.iconCode,
+      iconPath: iconPath ?? this.iconPath,
       colorVal: colorVal ?? this.colorVal,
       isExcluded: isExcluded ?? this.isExcluded,
     );

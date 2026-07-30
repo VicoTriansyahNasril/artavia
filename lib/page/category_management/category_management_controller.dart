@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
+import 'package:artavia/widgets/commons/common.dart';
 
 class CategoryManagementController extends GetxController {
   final currentTab = 'Pengeluaran'.obs;
@@ -14,21 +15,27 @@ class CategoryManagementController extends GetxController {
   final RxBool isWorking = false.obs;
 
   final categoryName = ''.obs;
-  final selectedIcon = Icons.category.obs;
+  final selectedIconPath = Rx<String?>(null);
+  final selectedIconCode = Rx<int?>(null);
   final selectedColor = (Colors.grey as Color).obs;
 
   // Edit mode
   final editingId = Rx<int?>(null);
   bool get isEditMode => editingId.value != null;
 
-  final presetIcons = <IconData>[
-    Icons.restaurant, Icons.local_drink, Icons.shopping_cart, Icons.directions_bus,
-    Icons.home, Icons.electrical_services, Icons.phone_android, Icons.movie,
-    Icons.medical_services, Icons.school, Icons.pets, Icons.flight,
-    Icons.fitness_center, Icons.local_gas_station, Icons.child_care, Icons.category,
-    Icons.sports_esports, Icons.coffee, Icons.local_taxi, Icons.beach_access,
-    Icons.attach_money, Icons.trending_up, Icons.savings, Icons.card_giftcard,
-  ];
+  final categorizedIcons = {
+    'Keuangan': AppIcons.keuangan,
+    'Makanan': AppIcons.makanan,
+    'Belanja': AppIcons.belanja,
+    'Transportasi': AppIcons.transportasi,
+    'Hiburan': AppIcons.hiburan,
+    'Kesehatan': AppIcons.kesehatan,
+    'Pendidikan': AppIcons.pendidikan,
+    'Olahraga': AppIcons.olahraga,
+    'Berpergian': AppIcons.berpergian,
+    'Kehidupan': AppIcons.kehidupan,
+    'Pribadi': AppIcons.pribadi,
+  };
 
   final presetColors = <Color>[
     Colors.red, Colors.pink, Colors.purple, Colors.deepPurple,
@@ -47,7 +54,8 @@ class CategoryManagementController extends GetxController {
   void resetForm() {
     editingId.value = null;
     categoryName.value = '';
-    selectedIcon.value = Icons.category;
+    selectedIconPath.value = null;
+    selectedIconCode.value = null;
     selectedColor.value = Colors.grey;
   }
 
@@ -59,13 +67,8 @@ class CategoryManagementController extends GetxController {
     for (var c in cats) {
       final type = c['type'];
       final codePoint = c['icon_code'];
+      final iconPath = c['icon_path'];
       final colorVal = c['color_val'];
-
-      IconData iconData = Icons.category;
-      if (codePoint != null) {
-        // ignore: non_const_argument_for_const_parameter
-        iconData = IconData(codePoint as int, fontFamily: 'MaterialIcons');
-      }
 
       Color colorData = Colors.grey;
       if (colorVal != null) {
@@ -75,7 +78,8 @@ class CategoryManagementController extends GetxController {
       final item = {
         'id': c['id'],
         'name': c['name'],
-        'icon': iconData,
+        'icon_code': codePoint,
+        'icon_path': iconPath,
         'color': colorData,
       };
 
@@ -103,12 +107,12 @@ class CategoryManagementController extends GetxController {
 
     isWorking.value = true;
     try {
-      // ignore: deprecated_member_use
-      final cVal = selectedColor.value.value;
+      final cVal = selectedColor.value.toARGB32();
       final data = {
         'name': categoryName.value.trim(),
         'type': isExpenseForm.value ? 'pengeluaran' : 'pemasukan',
-        'icon_code': selectedIcon.value.codePoint,
+        'icon_code': selectedIconCode.value,
+        'icon_path': selectedIconPath.value,
         'color_val': cVal,
       };
 

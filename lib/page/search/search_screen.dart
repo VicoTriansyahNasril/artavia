@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:artavia/page/search/search_controller.dart' as app_search;
-import 'package:artavia/model/transaction_model.dart';
 import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/model/transaction_model.dart';
+import 'package:artavia/page/search/search_controller.dart' as app_search;
 
 class SearchScreen extends GetView<app_search.SearchController> {
   const SearchScreen({super.key});
@@ -156,46 +156,26 @@ class SearchScreen extends GetView<app_search.SearchController> {
   }
 
   Widget _buildTransactionItem(TransactionModel tx) {
-    final cat = tx.categoryName?.toLowerCase() ?? '';
     final isExpense = tx.type == 'pengeluaran';
     final isTransfer = tx.type == 'transfer';
 
-    IconData iconData = Icons.category;
+    int? iconCode;
+    String? iconPath;
     Color bgColor = colorGrey;
 
-    if (cat.contains('makan')) {
-      iconData = Icons.restaurant;
-      bgColor = Colors.orange;
-    } else if (cat.contains('minum')) {
-      iconData = Icons.local_cafe;
+    if (isTransfer) {
+      iconCode = Icons.swap_horiz.codePoint;
       bgColor = Colors.blue;
-    } else if (cat.contains('belanja')) {
-      iconData = Icons.shopping_cart;
-      bgColor = Colors.purple;
-    } else if (cat.contains('transport')) {
-      iconData = Icons.directions_bus;
-      bgColor = Colors.teal;
-    } else if (cat.contains('gaji') || cat.contains('bonus')) {
-      iconData = Icons.attach_money;
-      bgColor = Colors.green;
-    } else if (cat.contains('invest')) {
-      iconData = Icons.trending_up;
-      bgColor = Colors.cyan;
-    } else if (cat.contains('kesehatan')) {
-      iconData = Icons.medical_services;
-      bgColor = Colors.red;
-    } else if (cat.contains('hiburan')) {
-      iconData = Icons.sports_esports;
-      bgColor = Colors.pink;
-    } else if (isTransfer) {
-      iconData = Icons.swap_horiz;
-      bgColor = Colors.blue;
-    } else if (!isExpense) {
-      iconData = Icons.arrow_downward;
-      bgColor = colorIncome;
+    } else if (tx.categoryColorVal != null && tx.categoryColorVal != 0) {
+      bgColor = Color(tx.categoryColorVal!);
+      iconCode = tx.categoryIconCode;
+      iconPath = tx.categoryIconPath;
+      if (iconCode == null && iconPath == null) {
+        iconCode = isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint;
+      }
     } else {
-      iconData = Icons.arrow_upward;
-      bgColor = colorExpense;
+      bgColor = isExpense ? colorExpense : colorIncome;
+      iconCode = isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint;
     }
 
     final displayAmount = (tx.amount ?? 0).abs();
@@ -218,11 +198,19 @@ class SearchScreen extends GetView<app_search.SearchController> {
           'destination_account': tx.destinationAccountName,
           'destination_account_id': tx.destinationAccountId,
           'date': tx.date,
+          'icon_code': iconCode,
+          'icon_path': iconPath,
+          'color_val': bgColor.toARGB32(),
         });
       },
       leading: CircleAvatar(
         backgroundColor: bgColor.withValues(alpha: 0.2),
-        child: Icon(iconData, color: bgColor, size: 20),
+        child: CategoryIcon(
+          iconCode: iconCode,
+          iconPath: iconPath,
+          color: bgColor,
+          size: 20,
+        ),
       ),
       title: Text(
         tx.note?.isNotEmpty == true

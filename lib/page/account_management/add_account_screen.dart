@@ -120,9 +120,8 @@ class _AccountPreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       final color = Color(controller.selectedColorVal.value);
-      // ignore: non_const_argument_for_const_parameter
-      final icon = IconData(controller.selectedIconCode.value,
-          fontFamily: 'MaterialIcons');
+      final iconCode = controller.selectedIconCode.value;
+      final iconPath = controller.selectedIconPath.value;
       final name = controller.accountName.value.isEmpty
           ? 'Nama Rekening'
           : controller.accountName.value;
@@ -151,7 +150,12 @@ class _AccountPreviewCard extends StatelessWidget {
                 color: color.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: color, size: 26),
+              child: CategoryIcon(
+                iconCode: iconCode,
+                iconPath: iconPath,
+                color: color,
+                size: 26,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -448,7 +452,6 @@ class _IconPickerGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final selectedCode = controller.selectedIconCode.value;
       final selectedColor = Color(controller.selectedColorVal.value);
 
       return Container(
@@ -463,10 +466,10 @@ class _IconPickerGrid extends StatelessWidget {
           crossAxisCount: 6,
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
-          children: AccountManagementController.iconOptions.map((icon) {
-            final isSelected = selectedCode == icon.codePoint;
+          children: AccountManagementController.keuanganIcons.map((iconPath) {
+            final isSelected = controller.selectedIconPath.value == iconPath;
             return GestureDetector(
-              onTap: () => controller.onIconSelected(icon),
+              onTap: () => controller.onIconSelected(iconPath),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 decoration: BoxDecoration(
@@ -479,10 +482,10 @@ class _IconPickerGrid extends StatelessWidget {
                     width: 1.5,
                   ),
                 ),
-                child: Icon(
-                  icon,
+                padding: const EdgeInsets.all(8),
+                child: Image.asset(
+                  iconPath,
                   color: isSelected ? selectedColor : colorGrey,
-                  size: 22,
                 ),
               ),
             );

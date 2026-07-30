@@ -69,12 +69,9 @@ class AddTransactionController extends GetxController {
       final type =
           currentTab.value == 'Pengeluaran' ? 'pengeluaran' : 'pemasukan';
       if (c['type'] == type) {
-        IconData iconData = Icons.category;
-        if (c['icon_code'] != null) {
-          iconData =
-              // ignore: non_const_argument_for_const_parameter
-              IconData(c['icon_code'] as int, fontFamily: 'MaterialIcons');
-        }
+        final iconCode = c['icon_code'] as int?;
+        final iconPath = c['icon_path'] as String?;
+        
         Color colorData = Colors.grey;
         if (c['color_val'] != null) {
           colorData = Color(c['color_val'] as int);
@@ -82,7 +79,8 @@ class AddTransactionController extends GetxController {
         parsedCats.add({
           'id': c['id'],
           'name': c['name'],
-          'icon': iconData,
+          'icon_code': iconCode,
+          'icon_path': iconPath,
           'color': colorData,
         });
       }

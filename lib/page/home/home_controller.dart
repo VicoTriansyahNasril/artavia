@@ -79,6 +79,7 @@ class HomeController extends GetxController {
           destinationAccountId: row['destination_account_id'] as int?,
           destinationAccountName: row['destinationAccountName'] as String?,
           categoryIconCode: row['categoryIconCode'] as int?,
+          categoryIconPath: row['categoryIconPath'] as String?,
           categoryColorVal: row['categoryColorVal'] as int?,
         ));
       }

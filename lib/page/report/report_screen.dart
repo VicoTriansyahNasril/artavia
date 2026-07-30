@@ -564,10 +564,9 @@ class ReportScreen extends GetView<ReportController> {
                   children: accounts.asMap().entries.map((entry) {
                     final i = entry.key;
                     final acc = entry.value as Map<String, dynamic>;
-                    final iconCode = acc['icon_code'] as int? ?? 0xe4fc;
+                    final iconCode = acc['icon_code'] as int?;
+                    final iconPath = acc['icon_path'] as String?;
                     final colorVal = acc['color_val'] as int? ?? 0xFFFFCA28;
-                    // ignore: non_const_argument_for_const_parameter
-                    final iconData = IconData(iconCode, fontFamily: 'MaterialIcons');
                     final color = Color(colorVal);
                     final balance = acc['balance'] as int;
 
@@ -585,7 +584,12 @@ class ReportScreen extends GetView<ReportController> {
                               color: color.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Icon(iconData, color: color, size: 20),
+                            child: CategoryIcon(
+                              iconCode: iconCode,
+                              iconPath: iconPath,
+                              color: color,
+                              size: 20,
+                            ),
                           ),
                           title: Text(
                             acc['name'] as String,

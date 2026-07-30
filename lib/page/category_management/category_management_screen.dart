@@ -144,7 +144,8 @@ class CategoryManagementScreen
         itemBuilder: (context, index) {
           final cat = list[index];
           final color = cat['color'] as Color;
-          final icon = cat['icon'] as IconData;
+          final iconCode = cat['icon_code'] as int?;
+          final iconPath = cat['icon_path'] as String?;
           final id = cat['id'] as int;
 
           return Column(
@@ -163,7 +164,12 @@ class CategoryManagementScreen
                   leading: CircleAvatar(
                     radius: 22,
                     backgroundColor: color.withValues(alpha: 0.18),
-                    child: Icon(icon, color: color, size: 20),
+                    child: CategoryIcon(
+                      iconCode: iconCode,
+                      iconPath: iconPath,
+                      color: color,
+                      size: 20,
+                    ),
                   ),
                   title: Text(
                     cat['name'] as String,
@@ -187,8 +193,8 @@ class CategoryManagementScreen
                           controller.editingId.value = id;
                           controller.categoryName.value =
                               cat['name'] as String;
-                          controller.selectedIcon.value =
-                              cat['icon'] as IconData;
+                          controller.selectedIconCode.value = iconCode;
+                          controller.selectedIconPath.value = iconPath;
                           controller.selectedColor.value =
                               cat['color'] as Color;
                           Get.toNamed('/add-category');

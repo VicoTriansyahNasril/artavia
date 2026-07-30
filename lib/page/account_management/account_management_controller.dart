@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/models/account_model.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
+import 'package:artavia/widgets/commons/common.dart';
 
 /// Defines account type metadata for the type selector grid
 class AccountType {
@@ -81,52 +82,7 @@ class AccountManagementController extends GetxController {
     ),
   ];
 
-  // ─── Curated icon options for the icon picker ─────────────────────────────
-
-  static const List<IconData> iconOptions = [
-    // Money / Finance
-    Icons.payments_outlined,
-    Icons.account_balance_outlined,
-    Icons.credit_card_outlined,
-    Icons.savings_outlined,
-    Icons.trending_up_rounded,
-    Icons.account_balance_wallet_outlined,
-    Icons.attach_money,
-    Icons.currency_exchange,
-    Icons.monetization_on_outlined,
-    Icons.receipt_long_outlined,
-    Icons.real_estate_agent_outlined,
-    Icons.store_outlined,
-    // Digital / Tech
-    Icons.phone_android_outlined,
-    Icons.qr_code_scanner_outlined,
-    Icons.wifi_outlined,
-    Icons.laptop_outlined,
-    // Transport
-    Icons.directions_car_outlined,
-    Icons.flight_outlined,
-    Icons.train_outlined,
-    // Life
-    Icons.home_outlined,
-    Icons.medical_services_outlined,
-    Icons.school_outlined,
-    Icons.shopping_bag_outlined,
-    Icons.restaurant_outlined,
-    Icons.fitness_center_outlined,
-    // Work
-    Icons.work_outline,
-    Icons.business_center_outlined,
-    Icons.bar_chart,
-    Icons.analytics_outlined,
-    Icons.handshake_outlined,
-    // Misc
-    Icons.star_outline_rounded,
-    Icons.favorite_outline,
-    Icons.emoji_events_outlined,
-    Icons.card_giftcard_outlined,
-    Icons.lock_outline,
-    Icons.security,
-  ];
+  static const List<String> keuanganIcons = AppIcons.keuangan;
 
   // ─── Supported Currencies ─────────────────────────────────────────────────
 
@@ -170,7 +126,8 @@ class AccountManagementController extends GetxController {
 
   final RxBool isWorking = false.obs;
 
-  final selectedIconCode = Icons.payments_outlined.codePoint.obs;
+  final selectedIconCode = Rx<int?>(Icons.payments_outlined.codePoint);
+  final selectedIconPath = Rx<String?>(null);
   final selectedColorVal = 0xFFF5C842.obs;
 
   // Edit mode
@@ -185,11 +142,13 @@ class AccountManagementController extends GetxController {
   void onTypeSelected(AccountType type) {
     typeValue.value = type.label;
     selectedIconCode.value = type.defaultIconCode;
+    selectedIconPath.value = null;
     selectedColorVal.value = type.defaultColorVal;
   }
 
-  void onIconSelected(IconData icon) {
-    selectedIconCode.value = icon.codePoint;
+  void onIconSelected(String path) {
+    selectedIconPath.value = path;
+    selectedIconCode.value = null;
   }
 
   void onColorSelected(Color color) {
@@ -229,6 +188,7 @@ class AccountManagementController extends GetxController {
         'balance': account.balance,
         'currency_code': account.currencyCode,
         'icon_code': account.iconCode,
+        'icon_path': account.iconPath,
         'color_val': account.colorVal,
         'is_excluded': account.isExcluded,
       });
@@ -251,6 +211,7 @@ class AccountManagementController extends GetxController {
     excludeFromTotal.value = acc['is_excluded'] as bool? ?? false;
     selectedIconCode.value =
         acc['icon_code'] as int? ?? Icons.payments_outlined.codePoint;
+    selectedIconPath.value = acc['icon_path'] as String?;
     selectedColorVal.value = acc['color_val'] as int? ?? 0xFFF5C842;
     
     nameController.text = accountName.value;
@@ -265,6 +226,7 @@ class AccountManagementController extends GetxController {
     currencyCode.value = 'IDR';
     excludeFromTotal.value = false;
     selectedIconCode.value = Icons.payments_outlined.codePoint;
+    selectedIconPath.value = null;
     selectedColorVal.value = 0xFFF5C842;
 
     nameController.clear();
@@ -296,7 +258,8 @@ class AccountManagementController extends GetxController {
         type: typeValue.value,
         balance: balance.value,
         currencyCode: currencyCode.value,
-        iconCode: selectedIconCode.value,
+        iconCode: selectedIconCode.value ?? Icons.payments_outlined.codePoint,
+        iconPath: selectedIconPath.value,
         colorVal: selectedColorVal.value,
         isExcluded: excludeFromTotal.value,
       );

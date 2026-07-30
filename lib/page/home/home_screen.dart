@@ -375,21 +375,23 @@ class HomeScreen extends GetView<HomeController> {
 
     // Use category color from DB if available, else fallback to type color
     final Color iconColor;
-    final IconData iconData;
+
+    int? iconCode;
+    String? iconPath;
 
     if (isTransfer) {
       iconColor = colorGrey;
-      iconData = Icons.swap_horiz;
+      iconCode = Icons.swap_horiz.codePoint;
     } else if (tx.categoryColorVal != null && tx.categoryColorVal != 0) {
       iconColor = Color(tx.categoryColorVal!);
-      // Use category icon from DB if available
-      iconData = tx.categoryIconCode != null && tx.categoryIconCode != 0
-          // ignore: non_const_argument_for_const_parameter
-          ? IconData(tx.categoryIconCode!, fontFamily: 'MaterialIcons')
-          : (isExpense ? Icons.arrow_upward : Icons.arrow_downward);
+      iconCode = tx.categoryIconCode;
+      iconPath = tx.categoryIconPath;
+      if (iconCode == null && iconPath == null) {
+        iconCode = isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint;
+      }
     } else {
       iconColor = isExpense ? colorExpense : colorIncome;
-      iconData = isExpense ? Icons.arrow_upward : Icons.arrow_downward;
+      iconCode = isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint;
     }
 
     final iconBg = iconColor.withValues(alpha: 0.15);
@@ -411,11 +413,19 @@ class HomeScreen extends GetView<HomeController> {
         'destination_account': tx.destinationAccountName,
         'destination_account_id': tx.destinationAccountId,
         'date': tx.date,
+        'icon_code': iconCode,
+        'icon_path': iconPath,
+        'color_val': iconColor.toARGB32(),
       }),
       leading: CircleAvatar(
         radius: 22,
         backgroundColor: iconBg,
-        child: Icon(iconData, color: iconColor, size: 19),
+        child: CategoryIcon(
+          iconCode: iconCode,
+          iconPath: iconPath,
+          color: iconColor,
+          size: 20,
+        ),
       ),
       title: Text(
         tx.note?.isNotEmpty == true ? tx.note! : (tx.categoryName ?? '-'),
