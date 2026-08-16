@@ -122,7 +122,7 @@ class BudgetScreen extends GetView<BudgetController> {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: colorCard,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(color: colorGrey.withValues(alpha: 0.1)),
         ),
         child: Column(
@@ -143,7 +143,7 @@ class BudgetScreen extends GetView<BudgetController> {
             if (total > 0) ...[
               const SizedBox(height: 16),
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(16),
                 child: LinearProgressIndicator(
                   value: percent.clamp(0.0, 1.0),
                   minHeight: 12,
@@ -247,7 +247,7 @@ class BudgetScreen extends GetView<BudgetController> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: colorCard,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24),
           border: isOverBudget
               ? Border.all(color: colorExpense.withValues(alpha: 0.4))
               : null,
@@ -300,7 +300,7 @@ class BudgetScreen extends GetView<BudgetController> {
             ),
             const SizedBox(height: 12),
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(12),
               child: LinearProgressIndicator(
                 value: percent.clamp(0.0, 1.0),
                 minHeight: 8,

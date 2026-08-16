@@ -6,6 +6,7 @@ import 'package:artavia/page/chart/chart_screen.dart';
 import 'package:artavia/page/report/report_screen.dart';
 import 'package:artavia/page/profile/profile_screen.dart';
 import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/widgets/components/bouncy_button.dart';
 import 'package:artavia/model/transaction_model.dart';
 
 class HomeScreen extends GetView<HomeController> {
@@ -69,12 +70,24 @@ class HomeScreen extends GetView<HomeController> {
     // ─── FAB — speed dial ────────────────────────────────────────────────────
 
   Widget _buildFAB() {
-    return FloatingActionButton(
+    return BouncyButton(
       onPressed: () => Get.toNamed('/add-transaction'),
-      backgroundColor: colorAccent,
-      elevation: 2,
-      shape: const CircleBorder(),
-      child: const Icon(Icons.add, color: colorOnAccent, size: 28),
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: colorAccent,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: colorAccent.withValues(alpha: 0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            )
+          ]
+        ),
+        child: const Icon(Icons.add, color: colorOnAccent, size: 28),
+      ),
     );
   }
 
@@ -101,14 +114,14 @@ class HomeScreen extends GetView<HomeController> {
   Widget _navItem(IconData unsel, IconData sel, String label, int index) {
     return Obx(() {
       final active = controller.currentIndex.value == index;
-      return InkWell(
-        onTap: () {
+      return BouncyButton(
+        onPressed: () {
           controller.isFabOpen.value = false;
           controller.changePage(index);
         },
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Container(
+          color: Colors.transparent, // Ensure full hit area
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
