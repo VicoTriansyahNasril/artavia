@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:get/get.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:artavia/page/report/report_controller.dart';
 import 'package:artavia/widgets/commons/common.dart';
 
@@ -574,51 +575,92 @@ class ReportScreen extends GetView<ReportController> {
                       children: [
                         if (i > 0)
                           const Divider(color: colorBackground, height: 1),
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 4),
-                          leading: Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: CategoryIcon(
-                              iconCode: iconCode,
-                              iconPath: iconPath,
-                              color: color,
-                              size: 20,
-                            ),
-                          ),
-                          title: Text(
-                            acc['name'] as String,
-                            style: const TextStyle(
-                              color: colorWhite,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        Slidable(
+                          key: ValueKey(acc['id']),
+                          endActionPane: ActionPane(
+                            motion: const DrawerMotion(),
                             children: [
-                              Text(
-                                CurrencyService.to.formatWithoutSymbol(balance),
-                                style: TextStyle(
-                                  color: balance < 0 ? colorExpense : colorWhite,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.chevron_right,
-                                color: colorGrey,
-                                size: 18,
+                              SlidableAction(
+                                onPressed: (context) {
+                                  Get.toNamed('/add-account', arguments: {
+                                    'isEdit': true,
+                                    'id': acc['id'],
+                                    'name': acc['name'],
+                                    'balance': acc['balance'],
+                                    'type': acc['type'],
+                                    'currency': acc['currency'],
+                                    'icon_code': acc['icon_code'],
+                                    'icon_path': acc['icon_path'],
+                                    'color_val': acc['color_val'],
+                                    'exclude_from_total': acc['exclude_from_total'],
+                                  });
+                                },
+                                backgroundColor: colorAccent,
+                                foregroundColor: colorOnAccent,
+                                icon: Icons.edit,
+                                label: 'Edit',
                               ),
                             ],
                           ),
-                          onTap: () {},
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 4),
+                            onTap: () {
+                              Get.toNamed('/add-account', arguments: {
+                                'isEdit': true,
+                                'id': acc['id'],
+                                'name': acc['name'],
+                                'balance': acc['balance'],
+                                'type': acc['type'],
+                                'currency': acc['currency'],
+                                'icon_code': acc['icon_code'],
+                                'icon_path': acc['icon_path'],
+                                'color_val': acc['color_val'],
+                                'exclude_from_total': acc['exclude_from_total'],
+                              });
+                            },
+                            leading: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: CategoryIcon(
+                                iconCode: iconCode,
+                                iconPath: iconPath,
+                                color: color,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              acc['name'] as String,
+                              style: const TextStyle(
+                                color: colorWhite,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  CurrencyService.to.formatWithoutSymbol(balance),
+                                  style: TextStyle(
+                                    color: balance < 0 ? colorExpense : colorWhite,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  color: colorGrey,
+                                  size: 18,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     );

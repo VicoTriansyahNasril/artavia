@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'dart:math';
 
 /// Set this to true to generate dummy data on database creation
-const bool useDummyData = true;
+const bool useDummyData = false;
 
 class DummyDataGenerator {
   static Future<void> generate(Database db) async {
@@ -17,8 +17,10 @@ class DummyDataGenerator {
       {'name': 'Gopay', 'type': 'E-Wallet', 'balance': 300000, 'currency_code': 'IDR', 'icon_code': null, 'icon_path': 'assets/keuangan/dompet.png', 'color_val': 0xFF388E3C, 'is_excluded': 0},
     ];
 
+    final batch = db.batch();
+
     for (var acc in accounts) {
-      await db.insert('accounts', acc);
+      batch.insert('accounts', acc);
     }
 
     final DateFormat formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
@@ -56,7 +58,7 @@ class DummyDataGenerator {
       ];
       final note = notes[rand.nextInt(notes.length)];
 
-      await db.insert('transactions', {
+      batch.insert('transactions', {
         'account_id': accountId,
         'category_id': categoryId,
         'amount': amount,
@@ -70,12 +72,14 @@ class DummyDataGenerator {
     // 3. Generate dummy budgets for the current month
     final budgetCategories = [1, 2, 3]; // Makanan, Minuman, Belanja
     for (var catId in budgetCategories) {
-      await db.insert('budgets', {
+      batch.insert('budgets', {
         'category_id': catId,
         'budget_amount': (rand.nextInt(10) + 5) * 50000, // 250k - 700k
         'month': now.month,
         'year': now.year,
       });
     }
+    
+    await batch.commit(noResult: true);
   }
 }

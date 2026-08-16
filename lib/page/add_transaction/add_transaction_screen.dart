@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+import 'package:artavia/core/utils/date_format.dart';
 import 'package:artavia/page/add_transaction/add_transaction_controller.dart';
 import 'package:artavia/widgets/commons/common.dart';
 
@@ -15,12 +15,21 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
       appBar: _buildAppBar(),
       body: Column(
         children: [
-          _buildTopBar(context),
           Expanded(child: _buildCategoryGrid()),
-          _buildAmountDisplay(),
-          _buildNoteRow(),
-          _buildQuickAmounts(),
-          _buildCustomNumpad(context),
+          Obx(() {
+            if (controller.selectedCategoryId.value == null) {
+              return const SizedBox.shrink();
+            }
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildAmountDisplay(),
+                _buildNoteRow(),
+                _buildQuickAmounts(),
+                _buildCustomNumpad(context),
+              ],
+            );
+          }),
         ],
       ),
     );
@@ -77,31 +86,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
     });
   }
 
-  Widget _buildTopBar(BuildContext context) {
-    return Container(
-      color: colorCard,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Center(
-        child: GestureDetector(
-          onTap: () => controller.pickDate(context),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.calendar_today_outlined,
-                  color: colorGrey, size: 16),
-              const SizedBox(width: 6),
-              Obx(() => Text(
-                    DateFormat('dd MMM yyyy', 'id_ID')
-                        .format(controller.selectedDate.value),
-                    style: const TextStyle(color: colorWhite, fontSize: 14),
-                  )),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
+  // Top bar removed
   void _showAccountBottomSheet() {
     Get.bottomSheet(
       Material(
@@ -129,22 +114,29 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                         fontSize: 15)),
               ),
             ),
-            Obx(() => Column(
-                  children: controller.availableAccounts.map((acc) {
-                    return ListTile(
-                      leading: const Icon(
-                          Icons.account_balance_wallet_outlined,
-                          color: colorGrey),
-                      title: Text(acc['name'] as String,
-                          style: const TextStyle(color: colorWhite)),
-                      onTap: () {
-                        controller.selectedAccountId.value = acc['id'] as int;
-                        controller.selectedAccountName.value = acc['name'] as String;
-                        Get.back();
-                      },
-                    );
-                  }).toList(),
-                )),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Obx(() => Column(
+                      children: controller.availableAccounts.map((acc) {
+                        return ListTile(
+                          leading: const Icon(
+                              Icons.account_balance_wallet_outlined,
+                              color: colorGrey),
+                          title: Text(acc['name'] as String,
+                              style: const TextStyle(color: colorWhite)),
+                          subtitle: Text(
+                              CurrencyService.to.format(acc['balance'] as int? ?? 0),
+                              style: const TextStyle(color: colorGrey, fontSize: 12)),
+                          onTap: () {
+                            controller.selectedAccountId.value = acc['id'] as int;
+                            controller.selectedAccountName.value = acc['name'] as String;
+                            Get.back();
+                          },
+                        );
+                      }).toList(),
+                    )),
+              ),
+            ),
             const SizedBox(height: 16),
           ],
         ),
@@ -261,17 +253,19 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
   }
 
   Widget _buildAmountDisplay() {
-    return Container(
-      color: colorCard,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Obx(() {
-        final hasPending = controller.pendingOperator.value.isNotEmpty;
-        final isExpense = controller.currentTab.value == 'Pengeluaran';
-        final amtColor = isExpense ? colorExpense : colorIncome;
+    return GestureDetector(
+      onTap: () => controller.toggleNumpad(),
+      child: Container(
+        color: colorCard,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Obx(() {
+          final hasPending = controller.pendingOperator.value.isNotEmpty;
+          final isExpense = controller.currentTab.value == 'Pengeluaran';
+          final amtColor = isExpense ? colorExpense : colorIncome;
 
-        return Row(
-          children: [
-            // Account picker
+          return Row(
+            children: [
+              // Account picker
             GestureDetector(
               onTap: _showAccountBottomSheet,
               child: Container(
@@ -280,23 +274,33 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                   color: colorBackground,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.account_balance_wallet_outlined,
-                        color: colorGrey, size: 14),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        controller.selectedAccountName.value,
-                        style: const TextStyle(
-                            color: colorWhite, fontSize: 13),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.account_balance_wallet_outlined,
+                            color: colorGrey, size: 14),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            controller.selectedAccountName.value,
+                            style: const TextStyle(
+                                color: colorWhite, fontSize: 13),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const Icon(Icons.arrow_drop_down,
+                            color: colorGrey, size: 16),
+                      ],
                     ),
-                    const Icon(Icons.arrow_drop_down,
-                        color: colorGrey, size: 16),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Saldo: ${CurrencyService.to.format(controller.selectedAccountBalance)}',
+                      style: const TextStyle(color: colorGrey, fontSize: 10),
+                    ),
                   ],
                 ),
               ),
@@ -334,7 +338,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
           ],
         );
       }),
-    );
+    ));
   }
 
   Widget _buildNoteRow() {
@@ -440,31 +444,34 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
   }
 
   Widget _buildCustomNumpad(BuildContext context) {
-    return Container(
-      color: colorCard,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(children: [
-            _key('7'), _key('8'), _key('9'),
-            _key('C', textColor: colorExpense),
-          ]),
-          Row(children: [
-            _key('4'), _key('5'), _key('6'),
-            _key('+', textColor: colorAccent),
-          ]),
-          Row(children: [
-            _key('1'), _key('2'), _key('3'),
-            _key('-', textColor: colorAccent),
-          ]),
-          Row(children: [
-            _iconKey(Icons.calendar_today_outlined, colorGrey,
-                onTap: () => controller.pickDate(context)),
-            _key('0'),
-            _iconKey(Icons.backspace_outlined, colorGrey,
-                onTap: () => controller.onNumpadPressed('delete')),
-            // Confirm — colorAccent background
-            Expanded(
+    return Obx(() {
+      if (!controller.isNumpadVisible.value) {
+        return const SizedBox.shrink();
+      }
+      return Container(
+        color: colorCard,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(children: [
+              _key('7'), _key('8'), _key('9'),
+              _buildDateKey(context),
+            ]),
+            Row(children: [
+              _key('4'), _key('5'), _key('6'),
+              _key('+', textColor: colorAccent),
+            ]),
+            Row(children: [
+              _key('1'), _key('2'), _key('3'),
+              _key('-', textColor: colorAccent),
+            ]),
+            Row(children: [
+              _key('0'),
+              _key('000'),
+              _iconKey(Icons.backspace_outlined, colorGrey,
+                  onTap: () => controller.onNumpadPressed('delete')),
+              // Confirm — colorAccent background
+              Expanded(
               child: GestureDetector(
                 onTap: () => controller.onNumpadPressed('confirm'),
                 child: Container(
@@ -475,9 +482,40 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                   ),
                 ),
               ),
+              ),
+            ]),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildDateKey(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => controller.pickDate(context),
+        child: Container(
+          height: 60,
+          decoration: BoxDecoration(
+            color: colorCard,
+            border: Border.all(
+                color: colorBackground.withValues(alpha: 0.6), width: 0.5),
+          ),
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.calendar_today, color: colorAccent, size: 14),
+                const SizedBox(width: 4),
+                Obx(() => Text(
+                      DateFormatter.formatWithRelative(controller.selectedDate.value)
+                          .replaceAll(RegExp(r' \(\d{2} [a-zA-Z]+ \d{4}\)'), ''),
+                      style: const TextStyle(color: colorAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                    )),
+              ],
             ),
-          ]),
-        ],
+          ),
+        ),
       ),
     );
   }

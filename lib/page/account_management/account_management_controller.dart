@@ -4,6 +4,8 @@ import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/models/account_model.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
 import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/widgets/components/tutorial_card.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 /// Defines account type metadata for the type selector grid
 class AccountType {
@@ -22,6 +24,10 @@ class AccountType {
 
 class AccountManagementController extends GetxController {
   final accountGroups = <Map<String, dynamic>>[].obs;
+  
+  final GlobalKey keyAccountFAB = GlobalKey();
+  final GlobalKey keyAddAccountForm = GlobalKey();
+  final GlobalKey keyAddAccountSave = GlobalKey();
 
   // ─── Account Types ─────────────────────────────────────────────────────────
 
@@ -166,6 +172,8 @@ class AccountManagementController extends GetxController {
     super.onInit();
     loadAccounts();
   }
+
+
 
   @override
   void onClose() {
@@ -347,5 +355,111 @@ class AccountManagementController extends GetxController {
       borderRadius: 12,
       icon: const Icon(Icons.check_circle_outline, color: Colors.white),
     );
+  }
+
+  bool _hasShownMainTutorial = false;
+
+  Future<void> showTutorialIfNoAccount() async {
+    if (_hasShownMainTutorial) return;
+    final accounts = await DatabaseHelper.instance.readAllAccounts();
+    if (accounts.isEmpty) {
+      _hasShownMainTutorial = true;
+      _showTutorial();
+    }
+  }
+
+  void _showTutorial() {
+    List<TargetFocus> targets = [
+      TargetFocus(
+        identify: "TargetAddAccountFAB",
+        keyTarget: keyAccountFAB,
+        alignSkip: Alignment.topLeft,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top,
+            builder: (context, controller) {
+              return TutorialCard(
+                controller: controller,
+                title: "Buat Rekening Baru",
+                description: "Ketuk tombol ini untuk membuat dompet Tunai, rekening Bank, atau jenis dompet lainnya.",
+                isLast: true,
+              );
+            },
+          )
+        ],
+      )
+    ];
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: Colors.black,
+      hideSkip: true,
+      paddingFocus: 10,
+      opacityShadow: 0.8,
+    ).show(context: keyAccountFAB.currentContext!);
+  }
+
+  bool _hasShownAddTutorial = false;
+
+  Future<void> showAddAccountTutorialIfNoAccount(BuildContext context) async {
+    if (_hasShownAddTutorial) return;
+    final accounts = await DatabaseHelper.instance.readAllAccounts();
+    if (accounts.isEmpty && context.mounted) {
+      _hasShownAddTutorial = true;
+      _showAddAccountTutorial(context);
+    }
+  }
+
+  void _showAddAccountTutorial(BuildContext context) {
+    List<TargetFocus> targets = [
+      TargetFocus(
+        identify: "TargetAddAccountForm",
+        keyTarget: keyAddAccountForm,
+        shape: ShapeLightFocus.RRect,
+        radius: 16,
+        alignSkip: Alignment.topRight,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            builder: (context, controller) {
+              return TutorialCard(
+                controller: controller,
+                title: "Langkah 1: Isi Detail",
+                description: "Mulai dengan mengisi nama rekening (mis: Dompet, BCA) beserta saldo awal Anda saat ini.",
+                isLast: false,
+              );
+            },
+          )
+        ],
+      ),
+      TargetFocus(
+        identify: "TargetAddAccountSave",
+        keyTarget: keyAddAccountSave,
+        shape: ShapeLightFocus.RRect,
+        radius: 12,
+        alignSkip: Alignment.topRight,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            builder: (context, controller) {
+              return TutorialCard(
+                controller: controller,
+                title: "Langkah 2: Simpan",
+                description: "Jika sudah, tekan Simpan untuk membuat rekening pertama Anda. Mudah bukan?",
+                isLast: true,
+              );
+            },
+          )
+        ],
+      )
+    ];
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: Colors.black,
+      hideSkip: true,
+      paddingFocus: 10,
+      opacityShadow: 0.8,
+    ).show(context: context);
   }
 }

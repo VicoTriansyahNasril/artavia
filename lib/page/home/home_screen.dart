@@ -7,6 +7,7 @@ import 'package:artavia/page/report/report_screen.dart';
 import 'package:artavia/page/profile/profile_screen.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/widgets/components/bouncy_button.dart';
+import 'package:artavia/widgets/transaction/transaction_item.dart';
 import 'package:artavia/model/transaction_model.dart';
 
 class HomeScreen extends GetView<HomeController> {
@@ -14,6 +15,12 @@ class HomeScreen extends GetView<HomeController> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) {
+        controller.showTutorialIfNoAccount();
+      }
+    });
+
     return Scaffold(
       backgroundColor: colorBackground,
       appBar: _buildAppBar(),
@@ -105,16 +112,17 @@ class HomeScreen extends GetView<HomeController> {
           _navItem(Icons.pie_chart_outline, Icons.pie_chart, 'Grafik', 1),
           const SizedBox(width: 40),
           _navItem(Icons.bar_chart_outlined, Icons.bar_chart, 'Laporan', 2),
-          _navItem(Icons.person_outline, Icons.person, 'Saya', 3),
+          _navItem(Icons.person_outline, Icons.person, 'Saya', 3, key: controller.keyBottomNavProfile),
         ],
       ),
     );
   }
 
-  Widget _navItem(IconData unsel, IconData sel, String label, int index) {
+  Widget _navItem(IconData unsel, IconData sel, String label, int index, {Key? key}) {
     return Obx(() {
       final active = controller.currentIndex.value == index;
       return BouncyButton(
+        key: key,
         onPressed: () {
           controller.isFabOpen.value = false;
           controller.changePage(index);
@@ -530,102 +538,7 @@ class HistoryView extends GetView<HomeController> {
   }
 
   Widget _buildTransactionItem(TransactionModel tx) {
-    final isExpense = tx.type == 'pengeluaran';
-    final isTransfer = tx.type == 'transfer';
-
-    // Use category color from DB if available, else fallback to type color
-    final Color iconColor;
-
-    int? iconCode;
-    String? iconPath;
-
-    if (isTransfer) {
-      iconColor = colorGrey;
-      iconCode = Icons.swap_horiz.codePoint;
-    } else if (tx.categoryColorVal != null && tx.categoryColorVal != 0) {
-      iconColor = Color(tx.categoryColorVal!);
-      iconCode = tx.categoryIconCode;
-      iconPath = tx.categoryIconPath;
-      if (iconCode == null && iconPath == null) {
-        iconCode = isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint;
-      }
-    } else {
-      iconColor = isExpense ? colorExpense : colorIncome;
-      iconCode = isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint;
-    }
-
-    final iconBg = iconColor.withValues(alpha: 0.15);
-    final displayAmount = (tx.amount ?? 0).abs();
-    final amountColor =
-        isTransfer ? colorGrey : isExpense ? colorExpense : colorIncome;
-    final prefix = isTransfer ? '' : isExpense ? '-' : '+';
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-      onTap: () => Get.toNamed('/transaction-detail', arguments: {
-        'id': tx.id,
-        'type': tx.type,
-        'amount': displayAmount,
-        'category': tx.categoryName,
-        'note': tx.note,
-        'account': tx.accountName ?? 'CASH',
-        'account_id': tx.accountId,
-        'destination_account': tx.destinationAccountName,
-        'destination_account_id': tx.destinationAccountId,
-        'date': tx.date,
-        'icon_code': iconCode,
-        'icon_path': iconPath,
-        'color_val': iconColor.toARGB32(),
-      }),
-      leading: CircleAvatar(
-        radius: 22,
-        backgroundColor: iconBg,
-        child: CategoryIcon(
-          iconCode: iconCode,
-          iconPath: iconPath,
-          color: iconColor,
-          size: 20,
-        ),
-      ),
-      title: Text(
-        tx.note?.isNotEmpty == true ? tx.note! : (tx.categoryName ?? '-'),
-        style: const TextStyle(
-          color: colorWhite,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 2),
-        child: Text(
-          isTransfer
-              ? '${tx.accountName ?? ''} → ${tx.destinationAccountName ?? ''}'
-              : (tx.categoryName ?? ''),
-          style: const TextStyle(color: colorGrey, fontSize: 11),
-        ),
-      ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            '$prefix${CurrencyService.to.formatWithoutSymbol(displayAmount)}',
-            style: TextStyle(
-              color: amountColor,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            tx.accountName ?? '',
-            style: const TextStyle(color: colorGrey, fontSize: 10),
-          ),
-        ],
-      ),
-    );
+    return TransactionItem(tx: tx);
   }
 
 

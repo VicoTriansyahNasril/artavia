@@ -4,7 +4,16 @@ import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
 
 class TransferController extends GetxController {
-  final amountStr = '0'.obs;
+  final sourceAmountStr = '0'.obs;
+  final destAmountStr = '0'.obs;
+  final activeField = 'source'.obs;
+  final isSynced = true.obs;
+  
+  final isNumpadVisible = false.obs;
+
+  void toggleNumpad() {
+    isNumpadVisible.value = !isNumpadVisible.value;
+  }
   
   final sourceAccountId = RxnInt();
   final sourceAccountName = 'CASH'.obs;
@@ -13,6 +22,16 @@ class TransferController extends GetxController {
   final availableAccounts = <Map<String, dynamic>>[].obs;
   
   final selectedDate = DateTime.now().obs;
+  
+  int get sourceAccountBalance {
+    final account = availableAccounts.firstWhereOrNull((a) => a['id'] == sourceAccountId.value);
+    return account?['balance'] as int? ?? 0;
+  }
+  
+  int get destinationAccountBalance {
+    final account = availableAccounts.firstWhereOrNull((a) => a['id'] == destinationAccountId.value);
+    return account?['balance'] as int? ?? 0;
+  }
   
   final noteTextController = TextEditingController();
   final note = ''.obs;
@@ -47,67 +66,142 @@ class TransferController extends GetxController {
     super.onClose();
   }
 
+  void setActiveField(String field) {
+    activeField.value = field;
+    isSynced.value = false;
+  }
+
   Future<void> onNumpadPressed(String key) async {
     if (key == 'delete') {
-      if (amountStr.value.length > 1) {
-        amountStr.value = amountStr.value.substring(0, amountStr.value.length - 1);
-      } else {
-        amountStr.value = '0';
-      }
+      _handleDelete();
     } else if (key == 'C') {
-      amountStr.value = '0';
+      sourceAmountStr.value = '0';
+      destAmountStr.value = '0';
+      isSynced.value = true;
+      activeField.value = 'source';
     } else if (key == 'confirm') {
-      if (isWorking.value) return;
-      if (note.value.isNotEmpty && !noteHistory.contains(note.value)) {
-        noteHistory.insert(0, note.value);
-      }
-      
-      final parsedAmount = int.tryParse(amountStr.value) ?? 0;
-      if (parsedAmount > 0) {
-        final transaction = {
-          'type': 'transfer',
-          'amount': parsedAmount,
-          'category_id': null, // category not needed for transfer usually, but depends on logic
-          'note': note.value,
-          'account_id': sourceAccountId.value,
-          'destination_account_id': destinationAccountId.value,
-          'date': selectedDate.value.toIso8601String(),
-        };
-        
-        isWorking.value = true;
-        try {
-          await DatabaseHelper.instance.insertTransferWithBalanceUpdate(
-              transaction, sourceAccountId.value!, destinationAccountId.value!, parsedAmount);
-          refreshAllGlobalData();
-
-          Get.back();
-          Get.snackbar(
-            'Berhasil', 
-            'Transfer berhasil disimpan',
-            backgroundColor: Colors.green.shade800,
-            colorText: Colors.white,
-            snackPosition: SnackPosition.BOTTOM,
-            margin: const EdgeInsets.all(16),
-          );
-        } catch (e) {
-          Get.snackbar('Error', 'Gagal menyimpan transfer',
-              backgroundColor: Colors.red.shade800, colorText: Colors.white);
-        } finally {
-          isWorking.value = false;
-        }
-      }
+      _handleConfirm();
     } else if (key == '+' || key == '-') {
       // Operator placeholder
     } else {
-      if (amountStr.value.length >= 12) {
-        Get.snackbar('Batas Maksimal', 'Maksimal 12 digit angka', snackPosition: SnackPosition.BOTTOM);
+      _handleDigit(key);
+    }
+  }
+
+  void _handleDelete() {
+    if (activeField.value == 'source') {
+      if (sourceAmountStr.value.length > 1) {
+        sourceAmountStr.value = sourceAmountStr.value.substring(0, sourceAmountStr.value.length - 1);
+      } else {
+        sourceAmountStr.value = '0';
+      }
+      if (isSynced.value) destAmountStr.value = sourceAmountStr.value;
+    } else {
+      if (destAmountStr.value.length > 1) {
+        destAmountStr.value = destAmountStr.value.substring(0, destAmountStr.value.length - 1);
+      } else {
+        destAmountStr.value = '0';
+      }
+    }
+  }
+
+  void _handleDigit(String key) {
+    if (activeField.value == 'source') {
+      if (sourceAmountStr.value.length >= 12) {
+        if (!Get.isSnackbarOpen) {
+          Get.snackbar('Batas Maksimal', 'Maksimal 12 digit angka', snackPosition: SnackPosition.BOTTOM);
+        }
         return;
       }
-      if (amountStr.value == '0') {
-        amountStr.value = key;
+      if (sourceAmountStr.value == '0') {
+        sourceAmountStr.value = key;
       } else {
-        amountStr.value += key;
+        sourceAmountStr.value += key;
       }
+      if (isSynced.value) destAmountStr.value = sourceAmountStr.value;
+    } else {
+      if (destAmountStr.value.length >= 12) {
+        if (!Get.isSnackbarOpen) {
+          Get.snackbar('Batas Maksimal', 'Maksimal 12 digit angka', snackPosition: SnackPosition.BOTTOM);
+        }
+        return;
+      }
+      if (destAmountStr.value == '0') {
+        destAmountStr.value = key;
+      } else {
+        destAmountStr.value += key;
+      }
+    }
+  }
+
+  Future<void> _handleConfirm() async {
+    if (isWorking.value) return;
+    
+    final sAmount = int.tryParse(sourceAmountStr.value) ?? 0;
+    final dAmount = int.tryParse(destAmountStr.value) ?? 0;
+    
+    if (sourceAccountId.value == destinationAccountId.value) {
+      if (!Get.isSnackbarOpen) {
+        Get.snackbar('Peringatan', 'Rekening asal dan tujuan tidak boleh sama',
+            backgroundColor: Colors.orange.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+      }
+      return;
+    }
+
+    if (sAmount <= 0 || dAmount <= 0) {
+      if (!Get.isSnackbarOpen) {
+        Get.snackbar('Peringatan', 'Nominal tidak boleh 0',
+            backgroundColor: Colors.orange.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+      }
+      return;
+    }
+
+    if (sAmount < dAmount) {
+      if (!Get.isSnackbarOpen) {
+        Get.snackbar('Peringatan', 'Nominal dipotong tidak boleh lebih kecil dari yang diterima',
+            backgroundColor: Colors.orange.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+      }
+      return;
+    }
+
+    if (note.value.isNotEmpty && !noteHistory.contains(note.value)) {
+      noteHistory.insert(0, note.value);
+    }
+    
+    final adminFee = sAmount - dAmount;
+
+    final transaction = {
+      'type': 'transfer',
+      'amount': dAmount, // Baseline is what destination gets
+      'category_id': null,
+      'note': note.value,
+      'account_id': sourceAccountId.value,
+      'destination_account_id': destinationAccountId.value,
+      'date': selectedDate.value.toIso8601String(),
+      'admin_fee': adminFee,
+      'admin_fee_type': 'Pengirim', // D deducted + (S-D) = S total deducted. Works perfectly!
+    };
+    
+    isWorking.value = true;
+    try {
+      await DatabaseHelper.instance.insertTransferWithBalanceUpdate(
+          transaction, sourceAccountId.value!, destinationAccountId.value!, dAmount, adminFee, 'Pengirim');
+      refreshAllGlobalData();
+
+      Get.back();
+      Get.snackbar(
+        'Berhasil', 
+        'Transfer berhasil disimpan',
+        backgroundColor: Colors.green.shade800,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(16),
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Gagal menyimpan transfer',
+          backgroundColor: Colors.red.shade800, colorText: Colors.white);
+    } finally {
+      isWorking.value = false;
     }
   }
 

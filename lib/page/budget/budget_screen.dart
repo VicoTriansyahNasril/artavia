@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:artavia/core/utils/currency_format.dart';
 import 'package:get/get.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/page/budget/budget_controller.dart';
 
@@ -202,46 +203,53 @@ class BudgetScreen extends GetView<BudgetController> {
     final double percent = budget > 0 ? used / budget : 0.0;
     final isOverBudget = used > budget;
 
-    return Dismissible(
+    return Slidable(
       key: Key('budget_${item['id']}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: colorExpense.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Icon(Icons.delete_outline, color: colorExpense),
-      ),
-      confirmDismiss: (_) async {
-        bool confirmed = false;
-        await Get.defaultDialog(
-          backgroundColor: colorCard,
-          title: 'Hapus Anggaran',
-          titleStyle: const TextStyle(color: colorWhite),
-          middleText: 'Hapus anggaran ${item['category']}?',
-          middleTextStyle: const TextStyle(color: colorGrey),
-          confirm: ElevatedButton(
-            style:
-                ElevatedButton.styleFrom(backgroundColor: colorExpense),
-            onPressed: () {
-              confirmed = true;
-              Get.back();
+      endActionPane: ActionPane(
+        motion: const DrawerMotion(),
+        children: [
+          SlidableAction(
+            onPressed: (context) => controller.showEditBudgetDialog(context, item),
+            backgroundColor: colorAccent,
+            foregroundColor: colorOnAccent,
+            icon: Icons.edit,
+            label: 'Edit',
+            borderRadius: BorderRadius.circular(16),
+          ),
+          SlidableAction(
+            onPressed: (context) async {
+              bool confirmed = false;
+              await Get.defaultDialog(
+                backgroundColor: colorCard,
+                title: 'Hapus Anggaran',
+                titleStyle: const TextStyle(color: colorWhite),
+                middleText: 'Hapus anggaran ${item['category']}?',
+                middleTextStyle: const TextStyle(color: colorGrey),
+                confirm: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: colorExpense),
+                  onPressed: () {
+                    confirmed = true;
+                    Get.back();
+                  },
+                  child: const Text('Hapus', style: TextStyle(color: colorWhite)),
+                ),
+                cancel: TextButton(
+                  onPressed: () => Get.back(),
+                  child: const Text('Batal', style: TextStyle(color: colorGrey)),
+                ),
+              );
+              if (confirmed) {
+                controller.deleteBudget(item['id'] as int);
+              }
             },
-            child: const Text('Hapus',
-                style: TextStyle(color: colorWhite)),
+            backgroundColor: colorExpense,
+            foregroundColor: colorWhite,
+            icon: Icons.delete,
+            label: 'Hapus',
+            borderRadius: BorderRadius.circular(16),
           ),
-          cancel: TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Batal',
-                style: TextStyle(color: colorGrey)),
-          ),
-        );
-        return confirmed;
-      },
-      onDismissed: (_) => controller.deleteBudget(item['id'] as int),
+        ],
+      ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),

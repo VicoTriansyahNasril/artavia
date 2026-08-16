@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/core/utils/date_format.dart';
 import 'package:artavia/page/transfer/transfer_controller.dart';
 
 class TransferScreen extends GetView<TransferController> {
@@ -22,7 +22,6 @@ class TransferScreen extends GetView<TransferController> {
       ),
       body: Column(
         children: [
-          _buildDateRow(context),
           const SizedBox(height: 8),
           _buildTransferAccountsCard(),
           const Spacer(),
@@ -35,32 +34,7 @@ class TransferScreen extends GetView<TransferController> {
     );
   }
 
-  Widget _buildDateRow(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          InkWell(
-            onTap: () => controller.pickDate(context),
-            child: Row(
-              children: [
-                Obx(() {
-                  String formatted = DateFormat('dd MMM yyyy', 'id_ID').format(controller.selectedDate.value);
-                  return Text(
-                    formatted,
-                    style: const TextStyle(color: colorWhite, fontSize: 16),
-                  );
-                }),
-                const SizedBox(width: 8),
-                const Icon(Icons.calendar_today, color: colorGrey, size: 20),
-              ],
-            ),
-          )
-        ],
-      ),
-    );
-  }
+  // Date row removed
 
   Widget _buildTransferAccountsCard() {
     return Container(
@@ -89,7 +63,9 @@ class TransferScreen extends GetView<TransferController> {
                     Obx(() => Text(controller.sourceAccountName.value, style: const TextStyle(color: colorWhite, fontWeight: FontWeight.bold))),
                     const Icon(Icons.arrow_drop_down, color: colorGrey),
                   ],
-                )
+                ),
+                const SizedBox(height: 4),
+                Obx(() => Text('Saldo: ${CurrencyService.to.format(controller.sourceAccountBalance)}', style: const TextStyle(color: colorGrey, fontSize: 11))),
               ],
             ),
           ),
@@ -110,7 +86,9 @@ class TransferScreen extends GetView<TransferController> {
                     Obx(() => Text(controller.destinationAccountName.value, style: const TextStyle(color: colorWhite, fontWeight: FontWeight.bold))),
                     const Icon(Icons.arrow_drop_down, color: colorGrey),
                   ],
-                )
+                ),
+                const SizedBox(height: 4),
+                Obx(() => Text('Saldo: ${CurrencyService.to.format(controller.destinationAccountBalance)}', style: const TextStyle(color: colorGrey, fontSize: 11))),
               ],
             ),
           ),
@@ -123,12 +101,17 @@ class TransferScreen extends GetView<TransferController> {
     Get.bottomSheet(
       Material(
         color: colorCard,
-        child: Obx(() => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: controller.availableAccounts.map((account) {
+        child: SingleChildScrollView(
+          child: Obx(() => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: controller.availableAccounts.map((account) {
             return ListTile(
               leading: const Icon(Icons.account_balance_wallet, color: colorWhite),
               title: Text(account['name'] as String, style: const TextStyle(color: colorWhite)),
+              subtitle: Text(
+                CurrencyService.to.format(account['balance'] as int? ?? 0),
+                style: const TextStyle(color: colorGrey, fontSize: 12),
+              ),
               onTap: () {
                 if (isSource) {
                   controller.sourceAccountId.value = account['id'] as int;
@@ -140,8 +123,9 @@ class TransferScreen extends GetView<TransferController> {
                 Get.back();
               },
             );
-          }).toList(),
-        )),
+            }).toList(),
+          )),
+        ),
       ),
     );
   }
@@ -149,17 +133,76 @@ class TransferScreen extends GetView<TransferController> {
   Widget _buildAmountRow() {
     return Container(
       color: colorCard,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Row(
         children: [
-          const Text('Jumlah Transfer', style: TextStyle(color: colorGrey, fontSize: 14)),
-          const SizedBox(height: 8),
-          Obx(() => Text(
-            CurrencyService.to.format(int.tryParse(controller.amountStr.value) ?? 0),
-            style: const TextStyle(color: Colors.blue, fontSize: 40, fontWeight: FontWeight.bold),
-          )),
+          // Left Box: Source (Dipotong)
+          Expanded(
+            child: Obx(() {
+              final isActive = controller.isSynced.value || controller.activeField.value == 'source';
+              return GestureDetector(
+                onTap: () {
+                  controller.setActiveField('source');
+                  controller.isNumpadVisible.value = true;
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isActive ? colorAccent.withValues(alpha: 0.1) : colorBackground,
+                    border: Border.all(color: isActive ? colorAccent : colorGrey.withValues(alpha: 0.2), width: isActive ? 2 : 1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Dipotong', style: TextStyle(color: colorGrey, fontSize: 12)),
+                      const SizedBox(height: 4),
+                      Text(
+                        CurrencyService.to.formatWithoutSymbol(int.tryParse(controller.sourceAmountStr.value) ?? 0),
+                        style: TextStyle(color: isActive ? colorAccent : colorWhite, fontSize: 20, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(width: 12),
+          // Right Box: Destination (Diterima)
+          Expanded(
+            child: Obx(() {
+              final isActive = controller.isSynced.value || controller.activeField.value == 'dest';
+              return GestureDetector(
+                onTap: () {
+                  controller.setActiveField('dest');
+                  controller.isNumpadVisible.value = true;
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isActive ? Colors.blue.withValues(alpha: 0.1) : colorBackground,
+                    border: Border.all(color: isActive ? Colors.blue : colorGrey.withValues(alpha: 0.2), width: isActive ? 2 : 1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Diterima', style: TextStyle(color: colorGrey, fontSize: 12)),
+                      const SizedBox(height: 4),
+                      Text(
+                        CurrencyService.to.formatWithoutSymbol(int.tryParse(controller.destAmountStr.value) ?? 0),
+                        style: TextStyle(color: isActive ? Colors.blue : colorWhite, fontSize: 20, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
         ],
       ),
     );
@@ -219,45 +262,73 @@ class TransferScreen extends GetView<TransferController> {
     );
   }
 
+
   Widget _buildCustomNumpad(BuildContext context) {
-    return Container(
-      color: colorCard,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
+    return Obx(() {
+      if (!controller.isNumpadVisible.value) {
+        return const SizedBox.shrink();
+      }
+      return Container(
+        color: colorCard,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(children: [
               _buildNumpadButton('7', context: context),
               _buildNumpadButton('8', context: context),
               _buildNumpadButton('9', context: context),
-              _buildNumpadButton('calendar', isIcon: true, iconData: Icons.calendar_today, context: context),
-            ],
-          ),
-          Row(
-            children: [
+              _buildDateKey(context),
+            ]),
+            Row(children: [
               _buildNumpadButton('4', context: context),
               _buildNumpadButton('5', context: context),
               _buildNumpadButton('6', context: context),
-              _buildNumpadButton('+', context: context),
-            ],
-          ),
-          Row(
-            children: [
+              _buildNumpadButton('+', textColor: colorAccent, context: context),
+            ]),
+            Row(children: [
               _buildNumpadButton('1', context: context),
               _buildNumpadButton('2', context: context),
               _buildNumpadButton('3', context: context),
-              _buildNumpadButton('-', context: context),
-            ],
-          ),
-          Row(
-            children: [
-              _buildNumpadButton('C', textColor: colorExpense, context: context),
+              _buildNumpadButton('-', textColor: colorAccent, context: context),
+            ]),
+            Row(children: [
               _buildNumpadButton('0', context: context),
+              _buildNumpadButton('000', context: context),
               _buildNumpadButton('delete', isIcon: true, iconData: Icons.backspace_outlined, context: context),
-              _buildNumpadButton('confirm', isIcon: true, iconData: Icons.check, bgColor: Colors.blue, iconColor: colorWhite, context: context),
-            ],
+              _buildNumpadButton('confirm', isIcon: true, iconData: Icons.check, bgColor: colorAccent, iconColor: colorOnAccent, context: context),
+            ]),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildDateKey(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => controller.pickDate(context),
+        child: Container(
+          height: 60,
+          decoration: BoxDecoration(
+            color: colorCard,
+            border: Border.all(
+                color: colorBackground.withValues(alpha: 0.6), width: 0.5),
           ),
-        ],
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.calendar_today, color: colorAccent, size: 14),
+                const SizedBox(width: 4),
+                Obx(() => Text(
+                      DateFormatter.formatWithRelative(controller.selectedDate.value)
+                          .replaceAll(RegExp(r' \(\d{2} [a-zA-Z]+ \d{4}\)'), ''), // Hide full date if 'Hari Ini', 'Besok' etc
+                      style: const TextStyle(color: colorAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                    )),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

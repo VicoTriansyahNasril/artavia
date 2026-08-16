@@ -1,6 +1,8 @@
 class TransactionModel {
   int? id;
   int? amount;
+  int? adminFee;
+  String? adminFeeType;
   DateTime? date;
   String? note;
   String? type; // "pengeluaran" or "pemasukan"
@@ -17,6 +19,8 @@ class TransactionModel {
   TransactionModel({
     this.id,
     this.amount,
+    this.adminFee,
+    this.adminFeeType,
     this.date,
     this.note,
     this.type,
@@ -34,6 +38,8 @@ class TransactionModel {
   TransactionModel.fromJson(Map<String, dynamic> json) {
     id = json['id'];
     amount = json['amount'];
+    adminFee = json['admin_fee'];
+    adminFeeType = json['admin_fee_type'];
     date = json['date'] != null ? DateTime.parse(json['date']) : null;
     note = json['note'];
     type = json['type'];
@@ -52,6 +58,8 @@ class TransactionModel {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['id'] = id;
     data['amount'] = amount;
+    data['admin_fee'] = adminFee;
+    data['admin_fee_type'] = adminFeeType;
     if (date != null) {
       data['date'] = date!.toIso8601String();
     }

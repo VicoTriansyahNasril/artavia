@@ -25,6 +25,7 @@ class ProfileScreen extends GetView<ProfileController> {
               'Manajemen Rekening',
               subtitle: 'Kelola dompet & rekening bank',
               onTap: () => Get.toNamed('/account-management'),
+              key: controller.keyProfileManageAccounts,
             ),
             _menuItem(
               Icons.pie_chart_rounded,
@@ -68,6 +69,28 @@ class ProfileScreen extends GetView<ProfileController> {
               'Pengaturan Lainnya',
               subtitle: 'Notifikasi, keamanan, dan data',
               onTap: () => Get.toNamed('/settings'),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          _buildSection('Developer', [
+            _menuItem(
+              Icons.bug_report_rounded,
+              Colors.redAccent,
+              'Generate Dummy Data',
+              subtitle: 'Tambah data dummy ke database saat ini',
+              onTap: () {
+                Get.defaultDialog(
+                  title: 'Generate Dummy Data',
+                  middleText: 'Ini akan menambahkan data dummy ke database saat ini. Lanjutkan?',
+                  textConfirm: 'Ya',
+                  textCancel: 'Batal',
+                  confirmTextColor: Colors.white,
+                  onConfirm: () {
+                    Get.back();
+                    controller.generateDummyData();
+                  },
+                );
+              },
             ),
           ]),
           const SizedBox(height: 28),
@@ -266,8 +289,10 @@ class ProfileScreen extends GetView<ProfileController> {
     String title, {
     String? subtitle,
     VoidCallback? onTap,
+    Key? key,
   }) {
     return Column(
+      key: key,
       children: [
         ListTile(
           leading: Container(

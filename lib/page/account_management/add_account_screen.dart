@@ -9,6 +9,12 @@ class AddAccountScreen extends GetView<AccountManagementController> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) {
+        controller.showAddAccountTutorialIfNoAccount(context);
+      }
+    });
+
     return Scaffold(
       backgroundColor: colorBackground,
       appBar: AppBar(
@@ -27,6 +33,7 @@ class AddAccountScreen extends GetView<AccountManagementController> {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: TextButton(
+              key: controller.keyAddAccountSave,
               onPressed: controller.saveAccount,
               style: TextButton.styleFrom(
                 backgroundColor: colorAccent,
@@ -59,7 +66,10 @@ class AddAccountScreen extends GetView<AccountManagementController> {
             // ─── Informasi Rekening ───────────────────────────────────────
             const _SectionLabel('Nama & Saldo'),
             const SizedBox(height: 10),
-            _InfoCard(controller: controller),
+            Container(
+              key: controller.keyAddAccountForm,
+              child: _InfoCard(controller: controller),
+            ),
             const SizedBox(height: 24),
 
             // ─── Mata Uang ────────────────────────────────────────────────

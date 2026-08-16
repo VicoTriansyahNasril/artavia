@@ -1,7 +1,11 @@
+import 'package:flutter/material.dart';
+import 'package:artavia/widgets/components/tutorial_card.dart';
+import 'package:artavia/page/profile/profile_controller.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:artavia/model/transaction_model.dart';
 import 'package:artavia/core/database/database_helper.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 class HomeController extends GetxController {
   final isLoading = false.obs;
@@ -14,6 +18,8 @@ class HomeController extends GetxController {
   final hideBalance = false.obs;
   final currentIndex = 0.obs;
   final isFabOpen = false.obs;
+
+  final GlobalKey keyBottomNavProfile = GlobalKey();
 
   String get currentMonth =>
       DateFormat('MMM', 'id_ID').format(currentDate.value);
@@ -44,6 +50,8 @@ class HomeController extends GetxController {
     super.onInit();
     loadData();
   }
+
+
 
   Future<void> loadData() async {
     isLoading.value = true;
@@ -103,5 +111,59 @@ class HomeController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  bool _hasShownTutorial = false;
+
+  Future<void> showTutorialIfNoAccount() async {
+    if (_hasShownTutorial) return;
+    final accounts = await DatabaseHelper.instance.readAllAccounts();
+    if (accounts.isEmpty) {
+      _hasShownTutorial = true;
+      _showTutorial();
+    }
+  }
+
+  void _showTutorial() {
+    List<TargetFocus> targets = [
+      TargetFocus(
+        identify: "TargetProfileTab",
+        keyTarget: keyBottomNavProfile,
+        alignSkip: Alignment.topRight,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top,
+            builder: (context, controller) {
+              return TutorialCard(
+                controller: controller,
+                title: "Mulai Dari Sini!",
+                description: "Ketuk menu Saya untuk membuat dompet atau rekening pertama Anda agar bisa mulai mencatat.",
+                isLast: true,
+              );
+            },
+          )
+        ],
+      )
+    ];
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: Colors.black,
+      hideSkip: true,
+      paddingFocus: 10,
+      opacityShadow: 0.8,
+      onFinish: () {
+        changePage(3);
+        Future.delayed(const Duration(milliseconds: 400), () {
+          Get.find<ProfileController>().showTutorialIfNoAccount();
+        });
+      },
+      onClickTarget: (target) {
+        changePage(3);
+        Future.delayed(const Duration(milliseconds: 400), () {
+          Get.find<ProfileController>().showTutorialIfNoAccount();
+        });
+      },
+    ).show(context: keyBottomNavProfile.currentContext!);
   }
 }

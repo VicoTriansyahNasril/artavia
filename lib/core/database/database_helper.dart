@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 9,
+      version: 10,
       onConfigure: _onConfigure,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
@@ -47,6 +47,8 @@ CREATE TABLE transactions (
   account_id INTEGER,
   destination_account_id INTEGER,
   date $textType,
+  admin_fee INTEGER NOT NULL DEFAULT 0,
+  admin_fee_type TEXT,
   FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE RESTRICT,
   FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE RESTRICT,
   FOREIGN KEY (destination_account_id) REFERENCES accounts (id) ON DELETE RESTRICT
@@ -118,20 +120,11 @@ CREATE TABLE settings (
       {'name': 'Bisnis', 'type': 'pemasukan', 'icon_code': null, 'icon_path': 'assets/pribadi/meeting.png', 'color_val': 0xFF2196F3},
       {'name': 'Tabungan', 'type': 'pemasukan', 'icon_code': null, 'icon_path': 'assets/keuangan/nabung.png', 'color_val': 0xFF009688},
     ];
+    final batch = db.batch();
     for (var cat in initialCategories) {
-      await db.insert('categories', cat);
+      batch.insert('categories', cat);
     }
-
-    // Seed 1 default account only
-    await db.insert('accounts', {
-      'name': 'Kas Utama',
-      'type': 'Kas Pribadi',
-      'balance': 0,
-      'icon_code': 0xe4fc,
-      'icon_path': 'assets/keuangan/dompet.png',
-      'color_val': 0xFF005EAA, // BMW Blue
-      'is_excluded': 0,
-    });
+    await batch.commit(noResult: true);
 
     if (useDummyData) {
       await DummyDataGenerator.generate(db);
@@ -223,6 +216,14 @@ CREATE TABLE IF NOT EXISTS settings (
         await db.execute('ALTER TABLE accounts ADD COLUMN icon_path TEXT');
       } catch (_) {}
     }
+    if (oldVersion < 10) {
+      try {
+        await db.execute('ALTER TABLE transactions ADD COLUMN admin_fee INTEGER NOT NULL DEFAULT 0');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE transactions ADD COLUMN admin_fee_type TEXT');
+      } catch (_) {}
+    }
   }
 
   // ─── Transactions CRUD ───────────────────────────────────────────────────
@@ -291,7 +292,7 @@ CREATE TABLE IF NOT EXISTS settings (
     });
   }
 
-  Future<void> insertTransferWithBalanceUpdate(Map<String, dynamic> row, int sourceAccountId, int destAccountId, int amount) async {
+  Future<void> insertTransferWithBalanceUpdate(Map<String, dynamic> row, int sourceAccountId, int destAccountId, int amount, int adminFee, String adminFeeType) async {
     final db = await instance.database;
     await db.transaction((txn) async {
       await txn.insert('transactions', row);
@@ -299,9 +300,10 @@ CREATE TABLE IF NOT EXISTS settings (
       final sourceRes = await txn.query('accounts', where: 'id = ?', whereArgs: [sourceAccountId]);
       if (sourceRes.isNotEmpty) {
         final currentBalance = sourceRes.first['balance'] as int;
+        final deduction = adminFeeType == 'Pengirim' ? amount + adminFee : amount;
         await txn.update(
           'accounts',
-          {'balance': currentBalance - amount},
+          {'balance': currentBalance - deduction},
           where: 'id = ?',
           whereArgs: [sourceAccountId],
         );
@@ -310,9 +312,10 @@ CREATE TABLE IF NOT EXISTS settings (
       final destRes = await txn.query('accounts', where: 'id = ?', whereArgs: [destAccountId]);
       if (destRes.isNotEmpty) {
         final currentBalance = destRes.first['balance'] as int;
+        final addition = adminFeeType == 'Penerima' ? amount - adminFee : amount;
         await txn.update(
           'accounts',
-          {'balance': currentBalance + amount},
+          {'balance': currentBalance + addition},
           where: 'id = ?',
           whereArgs: [destAccountId],
         );
@@ -320,19 +323,21 @@ CREATE TABLE IF NOT EXISTS settings (
     });
   }
 
-  Future<void> deleteTransactionWithBalanceUpdate(int transactionId, int? accountId, int? destinationAccountId, int amount, bool isExpense, bool isTransfer) async {
+  Future<void> deleteTransactionWithBalanceUpdate(int transactionId, int? accountId, int? destinationAccountId, int amount, bool isExpense, bool isTransfer, {int adminFee = 0, String? adminFeeType}) async {
     final db = await instance.database;
     await db.transaction((txn) async {
       if (isTransfer && accountId != null && destinationAccountId != null) {
         final sourceRes = await txn.query('accounts', where: 'id = ?', whereArgs: [accountId]);
         if (sourceRes.isNotEmpty) {
           final currentBalance = sourceRes.first['balance'] as int;
-          await txn.update('accounts', {'balance': currentBalance + amount}, where: 'id = ?', whereArgs: [accountId]);
+          final deduction = adminFeeType == 'Pengirim' ? amount + adminFee : amount;
+          await txn.update('accounts', {'balance': currentBalance + deduction}, where: 'id = ?', whereArgs: [accountId]);
         }
         final destRes = await txn.query('accounts', where: 'id = ?', whereArgs: [destinationAccountId]);
         if (destRes.isNotEmpty) {
           final currentBalance = destRes.first['balance'] as int;
-          await txn.update('accounts', {'balance': currentBalance - amount}, where: 'id = ?', whereArgs: [destinationAccountId]);
+          final addition = adminFeeType == 'Penerima' ? amount - adminFee : amount;
+          await txn.update('accounts', {'balance': currentBalance - addition}, where: 'id = ?', whereArgs: [destinationAccountId]);
         }
       } else if (accountId != null) {
         final multiplier = isExpense ? 1 : -1;

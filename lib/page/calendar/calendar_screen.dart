@@ -5,6 +5,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import 'package:artavia/page/calendar/calendar_controller.dart';
 import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/widgets/transaction/transaction_item.dart';
 import 'package:artavia/model/transaction_model.dart';
 
 class CalendarScreen extends GetView<CalendarController> {
@@ -186,104 +187,26 @@ class CalendarScreen extends GetView<CalendarController> {
                 );
               }
 
-              return ListView.builder(
-                itemCount: controller.selectedDayTransactions.length,
-                itemBuilder: (context, index) {
-                  final tx =
-                      controller.selectedDayTransactions[index];
-                  return _buildTxItem(tx);
-                },
+              return ListView(
+                children: controller.selectedDayTransactions.asMap().entries.map((entry) {
+                  int i = entry.key;
+                  TransactionModel tx = entry.value;
+                  return Column(
+                    children: [
+                      if (i > 0)
+                        const Divider(
+                          color: colorBackground,
+                          height: 1,
+                          indent: 64,
+                        ),
+                      TransactionItem(tx: tx),
+                    ],
+                  );
+                }).toList(),
               );
             }),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTxItem(TransactionModel tx) {
-    final isExpense = tx.type == 'pengeluaran';
-    final isTransfer = tx.type == 'transfer';
-
-    int? iconCode;
-    String? iconPath;
-    Color bgColor = colorGrey;
-
-    if (isTransfer) {
-      iconCode = Icons.swap_horiz.codePoint;
-      bgColor = Colors.blue;
-    } else if (tx.categoryColorVal != null && tx.categoryColorVal != 0) {
-      bgColor = Color(tx.categoryColorVal!);
-      iconCode = tx.categoryIconCode;
-      iconPath = tx.categoryIconPath;
-      if (iconCode == null && iconPath == null) {
-        iconCode = isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint;
-      }
-    } else {
-      bgColor = isExpense ? colorExpense : colorIncome;
-      iconCode = isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint;
-    }
-
-    final amount = (tx.amount ?? 0).abs();
-    final amtColor = isTransfer
-        ? Colors.blue
-        : isExpense
-            ? colorExpense
-            : colorIncome;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 1),
-      child: Material(
-        color: colorCard,
-        child: ListTile(
-        onTap: () => Get.toNamed('/transaction-detail', arguments: {
-          'id': tx.id,
-          'type': tx.type,
-          'amount': amount,
-          'category': tx.categoryName,
-          'note': tx.note,
-          'account': tx.accountName ?? 'CASH',
-          'account_id': tx.accountId,
-          'destination_account': tx.destinationAccountName,
-          'destination_account_id': tx.destinationAccountId,
-          'date': tx.date,
-          'icon_code': iconCode,
-          'icon_path': iconPath,
-          'color_val': bgColor.toARGB32(),
-        }),
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: bgColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: CategoryIcon(
-            iconCode: iconCode,
-            iconPath: iconPath,
-            color: bgColor,
-            size: 20,
-          ),
-        ),
-        title: Text(
-          tx.note?.isNotEmpty == true ? tx.note! : (tx.categoryName ?? '-'),
-          style: const TextStyle(
-              color: colorWhite,
-              fontSize: 14,
-              fontWeight: FontWeight.w500),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(tx.categoryName ?? '',
-            style: const TextStyle(color: colorGrey, fontSize: 11)),
-        trailing: Text(
-          '${isExpense ? '-' : isTransfer ? '' : '+'}${CurrencyService.to.formatWithoutSymbol(amount)}',
-          style: TextStyle(
-              color: amtColor,
-              fontSize: 14,
-              fontWeight: FontWeight.bold),
-        ),
-      ),
       ),
     );
   }

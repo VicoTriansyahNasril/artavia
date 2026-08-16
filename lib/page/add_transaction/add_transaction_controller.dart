@@ -9,6 +9,12 @@ class AddTransactionController extends GetxController {
   // For calculator: pending operand and operator
   final _pendingValueObs = 0.obs;
   final _pendingOperatorObs = ''.obs;
+  
+  final isNumpadVisible = false.obs;
+
+  void toggleNumpad() {
+    isNumpadVisible.value = !isNumpadVisible.value;
+  }
 
   // Public getters for screen binding
   RxInt get pendingValue => _pendingValueObs;
@@ -20,6 +26,11 @@ class AddTransactionController extends GetxController {
   final selectedAccountName = 'CASH'.obs;
   final availableAccounts = <Map<String, dynamic>>[].obs;
   final availableCategories = <Map<String, dynamic>>[].obs;
+
+  int get selectedAccountBalance {
+    final account = availableAccounts.firstWhereOrNull((a) => a['id'] == selectedAccountId.value);
+    return account?['balance'] as int? ?? 0;
+  }
 
   final noteHistory = <String>[].obs;
   final RxBool isWorking = false.obs;
@@ -180,20 +191,24 @@ class AddTransactionController extends GetxController {
       final parsedAmount = int.tryParse(amountStr.value) ?? 0;
 
       if (parsedAmount <= 0) {
-        Get.snackbar('Peringatan', 'Masukkan nominal yang valid',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.orange.shade800,
-            colorText: Colors.white,
-            margin: const EdgeInsets.all(16));
+        if (!Get.isSnackbarOpen) {
+          Get.snackbar('Peringatan', 'Masukkan nominal yang valid',
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.orange.shade800,
+              colorText: Colors.white,
+              margin: const EdgeInsets.all(16));
+        }
         return;
       }
 
       if (selectedCategoryId.value == null) {
-        Get.snackbar('Peringatan', 'Pilih kategori terlebih dahulu',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.orange.shade800,
-            colorText: Colors.white,
-            margin: const EdgeInsets.all(16));
+        if (!Get.isSnackbarOpen) {
+          Get.snackbar('Peringatan', 'Pilih kategori terlebih dahulu',
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.orange.shade800,
+              colorText: Colors.white,
+              margin: const EdgeInsets.all(16));
+        }
         return;
       }
 
@@ -251,7 +266,9 @@ class AddTransactionController extends GetxController {
     } else {
       // Digit
       if (amountStr.value.length >= 12) {
-        Get.snackbar('Batas Maksimal', 'Maksimal 12 digit angka', snackPosition: SnackPosition.BOTTOM);
+        if (!Get.isSnackbarOpen) {
+          Get.snackbar('Batas Maksimal', 'Maksimal 12 digit angka', snackPosition: SnackPosition.BOTTOM);
+        }
         return;
       }
       if (amountStr.value == '0') {
@@ -267,7 +284,9 @@ class AddTransactionController extends GetxController {
     final current = int.tryParse(amountStr.value) ?? 0;
     final newAmount = current + amount;
     if (newAmount.toString().length > 12) {
-      Get.snackbar('Batas Maksimal', 'Nominal terlalu besar', snackPosition: SnackPosition.BOTTOM);
+      if (!Get.isSnackbarOpen) {
+        Get.snackbar('Batas Maksimal', 'Nominal terlalu besar', snackPosition: SnackPosition.BOTTOM);
+      }
       return;
     }
     amountStr.value = newAmount.toString();
@@ -276,6 +295,7 @@ class AddTransactionController extends GetxController {
   void selectCategory(int id, String name) {
     selectedCategoryId.value = id;
     selectedCategoryName.value = name;
+    isNumpadVisible.value = true;
   }
 
   void onSuggestionTapped(String suggestion) {

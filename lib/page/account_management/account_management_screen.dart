@@ -36,6 +36,7 @@ class AccountManagementScreen
         return _buildAccountList();
       }),
       floatingActionButton: FloatingActionButton.extended(
+        key: controller.keyAccountFAB,
         onPressed: () {
           controller.resetForm();
           Get.toNamed('/add-account');
