@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 import 'package:artavia/page/home/home_controller.dart';
 import 'package:artavia/page/chart/chart_screen.dart';
 import 'package:artavia/page/report/report_screen.dart';
@@ -58,18 +57,91 @@ class HomeScreen extends GetView<HomeController> {
   Widget _buildBody() {
     return Obx(() => IndexedStack(
           index: controller.currentIndex.value,
-          children: [
-            _buildHistoryView(),
-            const ChartScreen(),
-            const ReportScreen(),
-            const ProfileScreen(),
+          children: const [
+            HistoryView(),
+            ChartScreen(),
+            ReportScreen(),
+            ProfileScreen(),
           ],
         ));
   }
 
-  // ─── History tab ─────────────────────────────────────────────────────────
+    // ─── FAB — speed dial ────────────────────────────────────────────────────
 
-  Widget _buildHistoryView() {
+  Widget _buildFAB() {
+    return FloatingActionButton(
+      onPressed: () => Get.toNamed('/add-transaction'),
+      backgroundColor: colorAccent,
+      elevation: 2,
+      shape: const CircleBorder(),
+      child: const Icon(Icons.add, color: colorOnAccent, size: 28),
+    );
+  }
+
+  // ─── Bottom nav ──────────────────────────────────────────────────────────
+
+  Widget _buildBottomNav() {
+    return BottomAppBar(
+      color: colorCard,
+      shape: const CircularNotchedRectangle(),
+      notchMargin: 6,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _navItem(Icons.receipt_long_outlined, Icons.receipt_long, 'Riwayat', 0),
+          _navItem(Icons.pie_chart_outline, Icons.pie_chart, 'Grafik', 1),
+          const SizedBox(width: 40),
+          _navItem(Icons.bar_chart_outlined, Icons.bar_chart, 'Laporan', 2),
+          _navItem(Icons.person_outline, Icons.person, 'Saya', 3),
+        ],
+      ),
+    );
+  }
+
+  Widget _navItem(IconData unsel, IconData sel, String label, int index) {
+    return Obx(() {
+      final active = controller.currentIndex.value == index;
+      return InkWell(
+        onTap: () {
+          controller.isFabOpen.value = false;
+          controller.changePage(index);
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                active ? sel : unsel,
+                color: active ? colorAccent : colorGrey,
+                size: 22,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  color: active ? colorAccent : colorGrey,
+                  fontSize: 10,
+                  fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+}
+
+
+class HistoryView extends GetView<HomeController> {
+  const HistoryView({super.key});
+
+// ─── History tab ─────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
         _buildSummaryHeader(),
@@ -352,16 +424,11 @@ class HomeScreen extends GetView<HomeController> {
   // ─── Transaction list ────────────────────────────────────────────────────
 
   Widget _buildTransactionList() {
-    final Map<String, List<TransactionModel>> grouped = {};
-    for (var tx in controller.transactions) {
-      if (tx.date == null) continue;
-      final dateStr = DateFormat('d MMM · EEEE', 'id_ID').format(tx.date!);
-      grouped.putIfAbsent(dateStr, () => []).add(tx);
-    }
+    final grouped = controller.groupedTransactions;
 
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: grouped.keys.length,
+      itemCount: grouped.length,
       itemBuilder: (context, index) {
         final dateKey = grouped.keys.elementAt(index);
         final txList = grouped[dateKey]!;
@@ -548,70 +615,5 @@ class HomeScreen extends GetView<HomeController> {
     );
   }
 
-  // ─── FAB — speed dial ────────────────────────────────────────────────────
 
-  Widget _buildFAB() {
-    return FloatingActionButton(
-      onPressed: () => Get.toNamed('/add-transaction'),
-      backgroundColor: colorAccent,
-      elevation: 2,
-      shape: const CircleBorder(),
-      child: const Icon(Icons.add, color: colorOnAccent, size: 28),
-    );
-  }
-
-  // ─── Bottom nav ──────────────────────────────────────────────────────────
-
-  Widget _buildBottomNav() {
-    return BottomAppBar(
-      color: colorCard,
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 6,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(Icons.receipt_long_outlined, Icons.receipt_long, 'Riwayat', 0),
-          _navItem(Icons.pie_chart_outline, Icons.pie_chart, 'Grafik', 1),
-          const SizedBox(width: 40),
-          _navItem(Icons.bar_chart_outlined, Icons.bar_chart, 'Laporan', 2),
-          _navItem(Icons.person_outline, Icons.person, 'Saya', 3),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem(IconData unsel, IconData sel, String label, int index) {
-    return Obx(() {
-      final active = controller.currentIndex.value == index;
-      return InkWell(
-        onTap: () {
-          controller.isFabOpen.value = false;
-          controller.changePage(index);
-        },
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                active ? sel : unsel,
-                color: active ? colorAccent : colorGrey,
-                size: 22,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  color: active ? colorAccent : colorGrey,
-                  fontSize: 10,
-                  fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    });
-  }
 }

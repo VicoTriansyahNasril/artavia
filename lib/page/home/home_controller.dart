@@ -6,6 +6,7 @@ import 'package:artavia/core/database/database_helper.dart';
 class HomeController extends GetxController {
   final isLoading = false.obs;
   final transactions = <TransactionModel>[].obs;
+  final groupedTransactions = <String, List<TransactionModel>>{}.obs;
   final totalPengeluaran = 0.obs;
   final totalPemasukan = 0.obs;
   final saldoTotal = 0.obs;
@@ -88,6 +89,15 @@ class HomeController extends GetxController {
       totalPengeluaran.value = exTotal;
       saldoTotal.value = inTotal - exTotal;
       transactions.value = loaded;
+
+      // Group by date to avoid doing it in the UI build method (fixing lag)
+      final Map<String, List<TransactionModel>> grouped = {};
+      for (var tx in loaded) {
+        if (tx.date == null) continue;
+        final dateStr = DateFormat('d MMM · EEEE', 'id_ID').format(tx.date!);
+        grouped.putIfAbsent(dateStr, () => []).add(tx);
+      }
+      groupedTransactions.value = grouped;
     } catch (e) {
       Get.log('Error loading data: $e');
     } finally {

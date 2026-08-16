@@ -5,10 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/page/transfer/transfer_controller.dart';
 
-class TransferScreen extends StatelessWidget {
-  final TransferController controller = Get.put(TransferController());
-
-  TransferScreen({super.key});
+class TransferScreen extends GetView<TransferController> {
+  const TransferScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

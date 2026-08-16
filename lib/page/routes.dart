@@ -18,8 +18,9 @@ import 'package:artavia/page/ledger/ledger_screen.dart';
 import 'package:artavia/page/ledger/ledger_binding.dart';
 import 'package:artavia/page/settings/settings_screen.dart';
 import 'package:artavia/page/budget/budget_screen.dart';
+import 'package:artavia/page/budget/budget_binding.dart';
 import 'package:artavia/page/transfer/transfer_screen.dart';
-
+import 'package:artavia/page/transfer/transfer_binding.dart';
 const homeRoute = '/';
 const transferRoute = '/transfer';
 const budgetRoute = '/budget';
@@ -90,10 +91,12 @@ var route = [
   ),
   GetPage(
     name: transferRoute,
-    page: () => TransferScreen(),
+    page: () => const TransferScreen(),
+    binding: TransferBinding(),
   ),
   GetPage(
     name: budgetRoute,
-    page: () => BudgetScreen(),
+    page: () => const BudgetScreen(),
+    binding: BudgetBinding(),
   ),
 ];

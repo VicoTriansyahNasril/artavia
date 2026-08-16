@@ -4,10 +4,8 @@ import 'package:get/get.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/page/budget/budget_controller.dart';
 
-class BudgetScreen extends StatelessWidget {
-  final BudgetController controller = Get.put(BudgetController());
-
-  BudgetScreen({super.key});
+class BudgetScreen extends GetView<BudgetController> {
+  const BudgetScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
