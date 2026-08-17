@@ -1,17 +1,42 @@
-# artavia
+# Artavia - Money Tracker 💸
 
-A new Flutter project.
+*Read this in other languages: [English](README.md) | [Bahasa Indonesia](README_id.md)*
 
-## Getting Started
+> **🚧 Development Status: Active Development**  
+> *This project is currently under active development. Features, UI, and database schemas are subject to change. Contributions and feedback are welcome!*
 
-This project is a starting point for a Flutter application.
+Artavia is a sleek, local-first, privacy-focused money tracker and expense manager mobile application built with Flutter. Designed with premium aesthetics and smooth micro-animations, it helps you manage your daily finances, track multiple accounts, and analyze your spending habits—all entirely offline.
 
-A few resources to get you started if this is your first Flutter project:
+## ✨ Key Features
+- **Privacy First (Local Only)**: No cloud sync, no tracking, no external APIs. All your financial data is securely stored on your local device using SQLite.
+- **Multiple Accounts Management**: Manage various wallets, bank accounts, and digital money effortlessly.
+- **Dynamic Analytics**: Beautiful charts and in-depth categorized reports for income and expenses.
+- **Category Customization**: Create custom categories with a built-in icon and color picker.
+- **Premium UI/UX**: Enjoy a responsive, dark-mode focused interface with micro-animations and smooth transitions.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## 🛠️ Technology Stack
+- **Framework**: [Flutter](https://flutter.dev/)
+- **State Management & Routing**: [GetX](https://pub.dev/packages/get)
+- **Local Database**: [sqflite](https://pub.dev/packages/sqflite)
+- **Architecture**: Feature-Based Architecture
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🚀 Getting Started
+
+Since this is a Flutter project, make sure you have the Flutter SDK installed on your machine.
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/VicoTriansyahNasril/artavia.git
+   cd artavia
+   ```
+2. **Install dependencies**
+   ```bash
+   flutter pub get
+   ```
+3. **Run the app**
+   ```bash
+   flutter run
+   ```
+
+## 📝 License
+This project is open-source. Feel free to fork and modify!
