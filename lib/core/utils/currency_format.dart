@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 
 class CurrencyService {
   CurrencyService._();
@@ -26,5 +27,32 @@ class CurrencyService {
       symbol: 'Rp ',
       decimalDigits: 0,
     ).format(amount);
+  }
+}
+
+class CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.selection.baseOffset == 0) {
+      return newValue;
+    }
+    bool isNegative = newValue.text.startsWith('-');
+    String numStr = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (numStr.isEmpty) {
+        return newValue.copyWith(text: isNegative ? '-' : '');
+    }
+
+    final int value = int.parse(numStr);
+    final formatted = value.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    final result = isNegative ? '-$formatted' : formatted;
+
+    return newValue.copyWith(
+      text: result,
+      selection: TextSelection.collapsed(offset: result.length),
+    );
   }
 }

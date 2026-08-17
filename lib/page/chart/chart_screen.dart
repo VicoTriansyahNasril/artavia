@@ -277,16 +277,22 @@ class ChartScreen extends GetView<ChartController> {
         return Column(
           children: controller.expenses.map((ex) {
             final color = Color(ex['color'] as int);
-            final icon = ex['icon'] as IconData;
+            final iconCode = ex['icon_code'] as int?;
+            final iconPath = ex['icon_path'] as String?;
             return InkWell(
               onTap: () {
                 final transactions = (ex['transactions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-                _showCategoryTransactions(ex['name'] as String, color, icon, transactions);
+                _showCategoryTransactions(ex['name'] as String, color, iconCode, iconPath, transactions);
               },
               child: ListTile(
                 leading: CircleAvatar(
                   backgroundColor: color.withValues(alpha: 0.2),
-                  child: Icon(icon, color: color, size: 20),
+                  child: CategoryIcon(
+                    iconCode: iconCode,
+                    iconPath: iconPath,
+                    color: color,
+                    size: 20,
+                  ),
                 ),
                 title: Text(ex['name'] as String,
                     style: const TextStyle(color: colorWhite)),
@@ -306,7 +312,7 @@ class ChartScreen extends GetView<ChartController> {
     );
   }
 
-  void _showCategoryTransactions(String categoryName, Color color, IconData icon, List<Map<String, dynamic>> transactions) {
+  void _showCategoryTransactions(String categoryName, Color color, int? iconCode, String? iconPath, List<Map<String, dynamic>> transactions) {
     Get.bottomSheet(
       Material(
         color: colorCard,
@@ -322,7 +328,15 @@ class ChartScreen extends GetView<ChartController> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    CircleAvatar(backgroundColor: color.withValues(alpha: 0.2), child: Icon(icon, color: color, size: 20)),
+                    CircleAvatar(
+                      backgroundColor: color.withValues(alpha: 0.2), 
+                      child: CategoryIcon(
+                        iconCode: iconCode,
+                        iconPath: iconPath,
+                        color: color,
+                        size: 20,
+                      )
+                    ),
                     const SizedBox(width: 12),
                     Expanded(child: Text(categoryName, style: const TextStyle(color: colorWhite, fontSize: 18, fontWeight: FontWeight.bold))),
                     Text('${transactions.length} Trx', style: const TextStyle(color: colorGrey)),

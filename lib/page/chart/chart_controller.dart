@@ -87,6 +87,7 @@ class ChartController extends GetxController {
     final Map<String, int> byCat = {};
     final Map<String, List<Map<String, dynamic>>> transactionsByCat = {};
     final Map<int, int> byDay = {};
+    final Map<String, Map<String, dynamic>> catDetails = {};
     int totEx = 0;
     int totIn = 0;
 
@@ -100,6 +101,13 @@ class ChartController extends GetxController {
         final cat = (t['categoryName'] as String?) ?? 'Lainnya';
         byCat[cat] = (byCat[cat] ?? 0) + amt;
         transactionsByCat.putIfAbsent(cat, () => []).add(t);
+        
+        catDetails[cat] = {
+          'icon_code': t['categoryIconCode'],
+          'icon_path': t['categoryIconPath'],
+          'color_val': t['categoryColorVal'],
+        };
+        
         final day = date.day;
         byDay[day] = (byDay[day] ?? 0) + amt;
       } else if (type == 'pemasukan') {
@@ -110,35 +118,32 @@ class ChartController extends GetxController {
     totalExpense.value = totEx;
     totalIncome.value = totIn;
 
-    // Build category list sorted by amount desc
-    final catColors = [
-      0xFFFF9800, 0xFF4CAF50, 0xFF9C27B0, 0xFFF44336,
-      0xFF2196F3, 0xFFE91E63, 0xFF00BCD4, 0xFFFFEB3B,
-    ];
-    final catIcons = [
-      Icons.shopping_cart, Icons.restaurant, Icons.directions_bus,
-      Icons.medical_services, Icons.home, Icons.movie,
-      Icons.fitness_center, Icons.category,
-    ];
-
     final sorted = byCat.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
     int idx = 0;
     final expList = <Map<String, dynamic>>[];
     const maxCategories = 5;
+    
+    // Default fallback colors if category color_val is missing
+    final defaultCatColors = [
+      0xFFFF9800, 0xFF4CAF50, 0xFF9C27B0, 0xFFF44336,
+      0xFF2196F3, 0xFFE91E63, 0xFF00BCD4, 0xFFFFEB3B,
+    ];
 
     if (sorted.length > maxCategories) {
       for (int i = 0; i < maxCategories - 1; i++) {
         final e = sorted[i];
         final percent =
             totEx > 0 ? (e.value / totEx * 100).toStringAsFixed(1) : '0.0';
+        final details = catDetails[e.key] ?? {};
         expList.add({
           'name': e.key,
           'amount': e.value,
           'percent': double.tryParse(percent) ?? 0.0,
-          'color': catColors[idx % catColors.length],
-          'icon': catIcons[idx % catIcons.length],
+          'color': details['color_val'] ?? defaultCatColors[idx % defaultCatColors.length],
+          'icon_code': details['icon_code'],
+          'icon_path': details['icon_path'],
           'transactions': transactionsByCat[e.key] ?? [],
         });
         idx++;
@@ -158,19 +163,22 @@ class ChartController extends GetxController {
         'amount': othersAmount,
         'percent': double.tryParse(othersPercent) ?? 0.0,
         'color': 0xFF9E9E9E,
-        'icon': Icons.more_horiz,
+        'icon_code': Icons.more_horiz.codePoint,
+        'icon_path': null,
         'transactions': othersTx,
       });
     } else {
       for (var e in sorted) {
         final percent =
             totEx > 0 ? (e.value / totEx * 100).toStringAsFixed(1) : '0.0';
+        final details = catDetails[e.key] ?? {};
         expList.add({
           'name': e.key,
           'amount': e.value,
           'percent': double.tryParse(percent) ?? 0.0,
-          'color': catColors[idx % catColors.length],
-          'icon': catIcons[idx % catIcons.length],
+          'color': details['color_val'] ?? defaultCatColors[idx % defaultCatColors.length],
+          'icon_code': details['icon_code'],
+          'icon_path': details['icon_path'],
           'transactions': transactionsByCat[e.key] ?? [],
         });
         idx++;

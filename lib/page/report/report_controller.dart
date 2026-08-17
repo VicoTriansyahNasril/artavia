@@ -150,11 +150,15 @@ class ReportController extends GetxController {
 
       if (!grouped.containsKey(type)) grouped[type] = [];
       grouped[type]!.add({
+        'id': acc['id'],
         'name': acc['name'],
         'balance': balance,
-        'icon_code': acc['icon_code'] ?? 0xe4fc,
+        'type': type,
+        'currency': acc['currency_code'] ?? 'IDR',
+        'icon_code': acc['icon_code'],
         'icon_path': acc['icon_path'],
         'color_val': acc['color_val'] ?? 0xFFFFCA28,
+        'exclude_from_total': (acc['is_excluded'] as int? ?? 0) == 1,
       });
     }
 

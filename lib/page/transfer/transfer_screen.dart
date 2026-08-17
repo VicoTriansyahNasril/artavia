@@ -20,17 +20,60 @@ class TransferScreen extends GetView<TransferController> {
           onPressed: () => Get.back(),
         ),
       ),
-      body: Column(
-        children: [
-          const SizedBox(height: 8),
-          _buildTransferAccountsCard(),
-          const Spacer(),
-          _buildAmountRow(),
-          const SizedBox(height: 1),
-          _buildNoteRow(),
-          _buildCustomNumpad(context),
-        ],
-      ),
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(
+            child: CircularProgressIndicator(color: colorAccent),
+          );
+        }
+
+        if (controller.availableAccounts.length < 2) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.account_balance_wallet_outlined, size: 64, color: colorGrey),
+                const SizedBox(height: 16),
+                const Text(
+                  'Rekening Belum Cukup',
+                  style: TextStyle(color: colorWhite, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Anda butuh minimal 2 rekening\nuntuk melakukan transfer.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: colorGrey, fontSize: 14),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                  onPressed: () {
+                    Get.back(); // Pop transfer screen
+                    Get.toNamed('/account-management'); // Go to account management
+                  },
+                  child: const Text('Buat Rekening', style: TextStyle(color: colorOnAccent, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          children: [
+            const SizedBox(height: 8),
+            _buildTransferAccountsCard(),
+            const Spacer(),
+            _buildAmountRow(),
+            const SizedBox(height: 1),
+            _buildNoteRow(),
+            _buildCustomNumpad(context),
+          ],
+        );
+      }),
     );
   }
 

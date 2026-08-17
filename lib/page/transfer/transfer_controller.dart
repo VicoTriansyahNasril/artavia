@@ -20,6 +20,7 @@ class TransferController extends GetxController {
   final destinationAccountId = RxnInt();
   final destinationAccountName = 'BCA'.obs;
   final availableAccounts = <Map<String, dynamic>>[].obs;
+  final isLoading = true.obs;
   
   final selectedDate = DateTime.now().obs;
   
@@ -45,9 +46,10 @@ class TransferController extends GetxController {
   }
 
   Future<void> _loadAccounts() async {
+    isLoading.value = true;
     final accs = await DatabaseHelper.instance.readAllAccounts();
+    availableAccounts.value = accs;
     if (accs.isNotEmpty) {
-      availableAccounts.value = accs;
       sourceAccountId.value = accs.first['id'] as int;
       sourceAccountName.value = accs.first['name'].toString();
       if (accs.length > 1) {
@@ -57,7 +59,11 @@ class TransferController extends GetxController {
         destinationAccountId.value = accs.first['id'] as int;
         destinationAccountName.value = accs.first['name'].toString();
       }
+    } else {
+      sourceAccountName.value = '';
+      destinationAccountName.value = '';
     }
+    isLoading.value = false;
   }
 
   @override

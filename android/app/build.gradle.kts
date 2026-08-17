@@ -52,8 +52,12 @@ android {
 
     buildTypes {
         release {
-            // Signing with the release keys
-            signingConfig = signingConfigs.getByName("release")
+            // Signing with the release keys if available, otherwise fallback to debug keys
+            if (keystoreProperties["storeFile"] != null) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
 }

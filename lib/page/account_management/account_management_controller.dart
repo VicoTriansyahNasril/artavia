@@ -12,14 +12,14 @@ class AccountType {
   final String label;
   final IconData icon;
   final int defaultColorVal;
-  final int defaultIconCode;
 
   const AccountType({
     required this.label,
     required this.icon,
     required this.defaultColorVal,
-    required this.defaultIconCode,
   });
+
+  int get defaultIconCode => icon.codePoint;
 }
 
 class AccountManagementController extends GetxController {
@@ -34,57 +34,48 @@ class AccountManagementController extends GetxController {
   static const List<AccountType> accountTypes = [
     AccountType(
       label: 'Kas Tunai',
-      icon: Icons.payments_outlined,
+      icon: Icons.payments,
       defaultColorVal: 0xFFF5C842,
-      defaultIconCode: 0xe40f, // payments
     ),
     AccountType(
       label: 'Bank',
-      icon: Icons.account_balance_outlined,
+      icon: Icons.account_balance,
       defaultColorVal: 0xFF64B5F6,
-      defaultIconCode: 0xe0a9, // account_balance
     ),
     AccountType(
       label: 'Kartu Kredit',
-      icon: Icons.credit_card_outlined,
+      icon: Icons.credit_card,
       defaultColorVal: 0xFFE57373,
-      defaultIconCode: 0xe1ba, // credit_card
     ),
     AccountType(
       label: 'Dompet Digital',
-      icon: Icons.phone_android_outlined,
+      icon: Icons.phone_android,
       defaultColorVal: 0xFF81C784,
-      defaultIconCode: 0xe32c, // phone_android
     ),
     AccountType(
       label: 'Tabungan',
-      icon: Icons.savings_outlined,
+      icon: Icons.savings,
       defaultColorVal: 0xFF4DB6AC,
-      defaultIconCode: 0xf05fb, // savings
     ),
     AccountType(
       label: 'Investasi',
-      icon: Icons.trending_up_rounded,
+      icon: Icons.trending_up,
       defaultColorVal: 0xFFBA68C8,
-      defaultIconCode: 0xe698, // trending_up
     ),
     AccountType(
       label: 'Pinjaman',
-      icon: Icons.account_balance_wallet_outlined,
+      icon: Icons.account_balance_wallet,
       defaultColorVal: 0xFFFFB74D,
-      defaultIconCode: 0xe150, // account_balance_wallet
     ),
     AccountType(
       label: 'Investasi Aset',
-      icon: Icons.real_estate_agent_outlined,
+      icon: Icons.real_estate_agent,
       defaultColorVal: 0xFF90A4AE,
-      defaultIconCode: 0xf060e, // real_estate_agent
     ),
     AccountType(
       label: 'Lainnya',
       icon: Icons.more_horiz,
       defaultColorVal: 0xFF8A8A8E,
-      defaultIconCode: 0xe5d3, // more_horiz
     ),
   ];
 

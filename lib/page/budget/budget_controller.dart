@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
+import 'package:artavia/core/utils/currency_format.dart';
 
 class BudgetController extends GetxController {
   final isLoading = false.obs;
@@ -164,11 +165,14 @@ class BudgetController extends GetxController {
                       borderSide: BorderSide(color: Colors.grey)),
                 ),
                 inputFormatters: [
-                  LengthLimitingTextInputFormatter(12),
-                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(16),
+                  FilteringTextInputFormatter.allow(RegExp(r'^-?[0-9.]*')),
+                  CurrencyInputFormatter(),
                 ],
-                validator: (v) =>
-                    (int.tryParse(v ?? '') ?? 0) <= 0 ? 'Masukkan nominal' : null,
+                validator: (v) {
+                  final cleanStr = (v ?? '').replaceAll(RegExp(r'[^0-9\-]'), '');
+                  return (int.tryParse(cleanStr) ?? 0) <= 0 ? 'Masukkan nominal' : null;
+                },
               ),
             ],
           ),
@@ -188,7 +192,8 @@ class BudgetController extends GetxController {
                   selectedCategory != null) {
                 isWorking.value = true;
                 try {
-                  final amount = int.tryParse(amountCtrl.text) ?? 0;
+                  final amountStr = amountCtrl.text.replaceAll(RegExp(r'[^0-9\-]'), '');
+                  final amount = int.tryParse(amountStr) ?? 0;
                   final catId = availableCategories.firstWhere((c) => c['name'] == selectedCategory)['id'] as int;
                   await DatabaseHelper.instance.upsertBudget(
                     categoryId: catId,
@@ -235,8 +240,9 @@ class BudgetController extends GetxController {
                 borderSide: BorderSide(color: Colors.grey)),
           ),
           inputFormatters: [
-            LengthLimitingTextInputFormatter(12),
-            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(16),
+            FilteringTextInputFormatter.allow(RegExp(r'^-?[0-9.]*')),
+            CurrencyInputFormatter(),
           ],
         ),
         actions: [
@@ -250,7 +256,8 @@ class BudgetController extends GetxController {
                 backgroundColor: const Color(0xFFFFCA28)),
             onPressed: () async {
               if (isWorking.value) return;
-              final amount = int.tryParse(amountCtrl.text) ?? 0;
+              final amountStr = amountCtrl.text.replaceAll(RegExp(r'[^0-9\-]'), '');
+              final amount = int.tryParse(amountStr) ?? 0;
               if (amount > 0) {
                 isWorking.value = true;
                 try {

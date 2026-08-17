@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/page/account_management/account_management_controller.dart';
 import 'package:artavia/widgets/commons/common.dart';
 
@@ -238,13 +239,9 @@ class _TypeSelectorGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() => GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 3,
-          childAspectRatio: 1.55,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
+    return Obx(() => Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: AccountManagementController.accountTypes.map((type) {
             final isSelected = controller.typeValue.value == type.label;
             final color = Color(type.defaultColorVal);
@@ -252,35 +249,22 @@ class _TypeSelectorGrid extends StatelessWidget {
               onTap: () => controller.onTypeSelected(type),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isSelected ? color.withValues(alpha: 0.13) : colorCard,
+                  color: isSelected ? color.withValues(alpha: 0.15) : colorCard,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isSelected ? color : Colors.transparent,
+                    color: isSelected ? color : colorDivider,
                     width: 1.5,
                   ),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(type.icon,
-                        color: isSelected ? color : colorGrey, size: 22),
-                    const SizedBox(height: 5),
-                    Text(
-                      type.label,
-                      style: TextStyle(
-                        color: isSelected ? colorWhite : colorGrey,
-                        fontSize: 11,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                child: Text(
+                  type.label,
+                  style: TextStyle(
+                    color: isSelected ? color : colorGrey,
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
                 ),
               ),
             );
@@ -311,8 +295,8 @@ class _InfoCard extends StatelessWidget {
             child: Row(
               children: [
                 const SizedBox(
-                  width: 76,
-                  child: Text('Nama',
+                  width: 110,
+                  child: Text('Nama Rekening',
                       style: TextStyle(color: colorGrey, fontSize: 14)),
                 ),
                 Expanded(
@@ -341,7 +325,7 @@ class _InfoCard extends StatelessWidget {
                 child: Row(
                   children: [
                     const SizedBox(
-                      width: 76,
+                      width: 110,
                       child: Text('Saldo Awal',
                           style: TextStyle(color: colorGrey, fontSize: 14)),
                     ),
@@ -357,9 +341,10 @@ class _InfoCard extends StatelessWidget {
                         keyboardType: const TextInputType.numberWithOptions(
                             signed: true),
                         inputFormatters: [
-                          LengthLimitingTextInputFormatter(12),
+                          LengthLimitingTextInputFormatter(16),
                           FilteringTextInputFormatter.allow(
-                              RegExp(r'^-?\d*')),
+                              RegExp(r'^-?[0-9.]*')),
+                          CurrencyInputFormatter(),
                         ],
                         style: const TextStyle(color: colorWhite, fontSize: 15),
                         decoration: InputDecoration(
@@ -476,30 +461,58 @@ class _IconPickerGrid extends StatelessWidget {
           crossAxisCount: 6,
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
-          children: AccountManagementController.keuanganIcons.map((iconPath) {
-            final isSelected = controller.selectedIconPath.value == iconPath;
-            return GestureDetector(
-              onTap: () => controller.onIconSelected(iconPath),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? selectedColor.withValues(alpha: 0.18)
-                      : colorSurface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isSelected ? selectedColor : Colors.transparent,
-                    width: 1.5,
+          children: [
+            ...AccountManagementController.accountTypes.map((type) {
+              final isSelected = controller.selectedIconCode.value == type.defaultIconCode;
+              return GestureDetector(
+                onTap: () {
+                  controller.selectedIconCode.value = type.defaultIconCode;
+                  controller.selectedIconPath.value = null;
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? selectedColor.withValues(alpha: 0.18)
+                        : colorSurface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected ? selectedColor : Colors.transparent,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    type.icon,
+                    color: isSelected ? selectedColor : colorGrey,
                   ),
                 ),
-                padding: const EdgeInsets.all(8),
-                child: Image.asset(
-                  iconPath,
-                  color: isSelected ? selectedColor : colorGrey,
+              );
+            }),
+            ...AccountManagementController.keuanganIcons.map((iconPath) {
+              final isSelected = controller.selectedIconPath.value == iconPath;
+              return GestureDetector(
+                onTap: () => controller.onIconSelected(iconPath),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? selectedColor.withValues(alpha: 0.18)
+                        : colorSurface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected ? selectedColor : Colors.transparent,
+                      width: 1.5,
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: Image.asset(
+                    iconPath,
+                    color: isSelected ? selectedColor : colorGrey,
+                  ),
                 ),
-              ),
-            );
-          }).toList(),
+              );
+            }),
+          ],
         ),
       );
     });
