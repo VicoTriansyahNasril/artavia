@@ -3,8 +3,7 @@ import 'package:get/get.dart';
 import 'package:artavia/page/category_management/category_management_controller.dart';
 import 'package:artavia/widgets/commons/common.dart';
 
-class CategoryManagementScreen
-    extends GetView<CategoryManagementController> {
+class CategoryManagementScreen extends GetView<CategoryManagementController> {
   const CategoryManagementScreen({super.key});
 
   @override
@@ -17,14 +16,14 @@ class CategoryManagementScreen
         title: const Text(
           'Pengaturan Kategori',
           style: TextStyle(
-            color: colorWhite,
+            color: colorText,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: colorWhite),
+          icon: const Icon(Icons.arrow_back, color: colorText),
           onPressed: () => Get.back(),
         ),
       ),
@@ -93,8 +92,7 @@ class CategoryManagementScreen
             style: TextStyle(
               color: isSelected ? colorOnAccent : colorGrey,
               fontSize: 14,
-              fontWeight:
-                  isSelected ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
         ),
@@ -123,7 +121,7 @@ class CategoryManagementScreen
               const Text(
                 'Belum ada kategori',
                 style: TextStyle(
-                  color: colorWhite,
+                  color: colorText,
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                 ),
@@ -174,7 +172,7 @@ class CategoryManagementScreen
                   title: Text(
                     cat['name'] as String,
                     style: const TextStyle(
-                      color: colorWhite,
+                      color: colorText,
                       fontWeight: FontWeight.w500,
                       fontSize: 14,
                     ),
@@ -191,8 +189,7 @@ class CategoryManagementScreen
                         onPressed: () {
                           controller.isExpenseForm.value = isExpense;
                           controller.editingId.value = id;
-                          controller.categoryName.value =
-                              cat['name'] as String;
+                          controller.categoryName.value = cat['name'] as String;
                           controller.selectedIconCode.value = iconCode;
                           controller.selectedIconPath.value = iconPath;
                           controller.selectedColor.value =

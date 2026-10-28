@@ -57,49 +57,25 @@ class CalendarController extends GetxController {
   Future<void> loadDayTransactions(DateTime date) async {
     isLoadingDetail.value = true;
     try {
-      final allTx = await DatabaseHelper.instance
-          .readTransactionsByMonth(date.year, date.month);
-
-      final dayTx = allTx.where((t) {
-        final d = DateTime.parse(t['date'] as String);
-        return d.year == date.year &&
-            d.month == date.month &&
-            d.day == date.day;
-      }).toList();
-
-      selectedDayTransactions.value = dayTx.map((row) {
-        final type = row['type'] as String;
-        final amt = row['amount'] as int;
-        return TransactionModel(
-          id: row['id'] as int,
-          amount: type == 'pemasukan' ? amt : -amt,
-          date: DateTime.parse(row['date'] as String),
-          note: row['note'] as String,
-          type: type,
-          categoryId: row['category_id'] as int?,
-          categoryName: row['categoryName'] as String?,
-          accountId: row['account_id'] as int?,
-          accountName: row['accountName'] as String?,
-          destinationAccountId: row['destination_account_id'] as int?,
-          destinationAccountName: row['destinationAccountName'] as String?,
-          categoryIconCode: row['categoryIconCode'] as int?,
-          categoryColorVal: row['categoryColorVal'] as int?,
-        );
-      }).toList();
+      final day = DateTime(date.year, date.month, date.day);
+      final rows = await DatabaseHelper.instance
+          .readTransactionsByRange(day, day.add(const Duration(days: 1)));
+      selectedDayTransactions.value =
+          rows.map(TransactionModel.fromDbRow).toList();
     } finally {
       isLoadingDetail.value = false;
     }
   }
 
   int get selectedDayExpense {
-    final normalized = DateTime(selectedDay.value.year,
-        selectedDay.value.month, selectedDay.value.day);
+    final normalized = DateTime(
+        selectedDay.value.year, selectedDay.value.month, selectedDay.value.day);
     return dailyData[normalized]?['expense'] ?? 0;
   }
 
   int get selectedDayIncome {
-    final normalized = DateTime(selectedDay.value.year,
-        selectedDay.value.month, selectedDay.value.day);
+    final normalized = DateTime(
+        selectedDay.value.year, selectedDay.value.month, selectedDay.value.day);
     return dailyData[normalized]?['income'] ?? 0;
   }
 }

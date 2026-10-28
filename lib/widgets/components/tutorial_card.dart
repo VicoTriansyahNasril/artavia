@@ -25,7 +25,7 @@ class TutorialCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: colorScrim.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -38,7 +38,7 @@ class TutorialCard extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-              color: colorWhite,
+              color: colorText,
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
@@ -47,7 +47,7 @@ class TutorialCard extends StatelessWidget {
           Text(
             description,
             style: TextStyle(
-              color: colorWhite.withValues(alpha: 0.8),
+              color: colorText.withValues(alpha: 0.8),
               fontSize: 14,
             ),
           ),

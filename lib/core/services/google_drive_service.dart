@@ -36,9 +36,11 @@ class GoogleDriveService extends GetxService {
   Future<void> _initDrive() async {
     try {
       await sign_in.GoogleSignIn.instance.initialize(
-        serverClientId: 'GANTI_DENGAN_WEB_CLIENT_ID_ANDA.apps.googleusercontent.com',
+        serverClientId:
+            'GANTI_DENGAN_WEB_CLIENT_ID_ANDA.apps.googleusercontent.com',
       );
-      sign_in.GoogleSignIn.instance.authenticationEvents.listen((sign_in.GoogleSignInAuthenticationEvent event) {
+      sign_in.GoogleSignIn.instance.authenticationEvents
+          .listen((sign_in.GoogleSignInAuthenticationEvent event) {
         if (event is sign_in.GoogleSignInAuthenticationEventSignIn) {
           _currentUser = event.user;
           isConnected.value = true;
@@ -57,11 +59,11 @@ class GoogleDriveService extends GetxService {
     if (isConnecting.value || isWorking.value) return false;
     isConnecting.value = true;
     try {
-      _currentUser = await sign_in.GoogleSignIn.instance.authenticate(
-        scopeHint: [drive.DriveApi.driveFileScope]
-      );
+      _currentUser = await sign_in.GoogleSignIn.instance
+          .authenticate(scopeHint: [drive.DriveApi.driveFileScope]);
       if (_currentUser != null) {
-        final headers = await sign_in.GoogleSignIn.instance.authorizationClient.authorizationHeaders(
+        final headers = await sign_in.GoogleSignIn.instance.authorizationClient
+            .authorizationHeaders(
           [drive.DriveApi.driveFileScope],
           promptIfNecessary: true,
         );
@@ -96,7 +98,7 @@ class GoogleDriveService extends GetxService {
   Future<void> backupDatabase() async {
     if (isWorking.value) return;
     isWorking.value = true;
-    
+
     try {
       if (_driveApi == null) {
         final success = await signIn();
@@ -113,8 +115,9 @@ class GoogleDriveService extends GetxService {
       const q = "name = 'artavia_backup.db' and trashed = false";
       final fileList = await _driveApi!.files.list(q: q, spaces: 'drive');
 
-      final media = drive.Media(localDbFile.openRead(), localDbFile.lengthSync());
-      
+      final media =
+          drive.Media(localDbFile.openRead(), localDbFile.lengthSync());
+
       if (fileList.files != null && fileList.files!.isNotEmpty) {
         // Update existing file
         final fileId = fileList.files!.first.id!;
@@ -158,7 +161,7 @@ class GoogleDriveService extends GetxService {
       }
 
       final fileId = fileList.files!.first.id!;
-      
+
       // We actually need to download the file contents:
       final fullMedia = await _driveApi!.files.get(
         fileId,
@@ -175,7 +178,6 @@ class GoogleDriveService extends GetxService {
       }).asFuture();
 
       await localDbFile.writeAsBytes(dataStore, flush: true);
-
     } catch (e) {
       throw Exception('Gagal memulihkan backup: $e');
     } finally {

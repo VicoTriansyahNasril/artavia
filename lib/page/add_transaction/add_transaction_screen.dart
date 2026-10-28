@@ -4,6 +4,9 @@ import 'package:get/get.dart';
 import 'package:artavia/core/utils/date_format.dart';
 import 'package:artavia/page/add_transaction/add_transaction_controller.dart';
 import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/page/routes.dart';
+import 'package:artavia/widgets/components/type_switcher.dart';
+import 'package:artavia/widgets/components/menu_group.dart';
 
 class AddTransactionScreen extends GetView<AddTransactionController> {
   const AddTransactionScreen({super.key});
@@ -11,79 +14,93 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: colorBackground,
       appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          Expanded(child: _buildCategoryGrid()),
-          Obx(() {
-            if (controller.selectedCategoryId.value == null) {
-              return const SizedBox.shrink();
-            }
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildAmountDisplay(),
-                _buildNoteRow(),
-                _buildQuickAmounts(),
-                _buildCustomNumpad(context),
-              ],
-            );
-          }),
-        ],
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (controller.availableAccounts.isEmpty) return _buildNoAccountState();
+        return ContentWidth(child: _buildForm(context));
+      }),
+    );
+  }
+
+  /// Shown instead of the form when there is no account to record into (FR-012).
+  Widget _buildNoAccountState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.account_balance_wallet_outlined,
+                size: 48, color: colorGrey),
+            const SizedBox(height: 16),
+            const Text('Buat rekening terlebih dahulu',
+                style: TextStyle(
+                    color: colorText,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            const Text('Transaksi dicatat ke dompet atau rekening bank Anda.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: colorGrey, fontSize: 13)),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: controller.createAccount,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Buat Rekening'),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildForm(BuildContext context) {
+    return Column(
+      children: [
+        _buildTypeSwitcher(),
+        Expanded(child: _buildCategoryGrid()),
+        Obx(() {
+          if (controller.selectedCategoryId.value == null) {
+            return const SizedBox.shrink();
+          }
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildAmountDisplay(),
+              _buildNoteRow(),
+              _buildQuickAmounts(),
+              _buildCustomNumpad(context),
+            ],
+          );
+        }),
+      ],
     );
   }
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: colorBackground,
-      elevation: 0,
+      centerTitle: true,
       leading: IconButton(
-        icon: const Icon(Icons.close, color: colorGrey),
+        icon: const Icon(Icons.close_rounded),
+        tooltip: 'Tutup',
         onPressed: () => Get.back(),
       ),
-      title: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _buildTab('Pengeluaran'),
-          const SizedBox(width: 24),
-          _buildTab('Pemasukan'),
-          const SizedBox(width: 24),
-          _buildTab('Transfer'),
-        ],
-      ),
-      actions: const [SizedBox(width: 48)],
+      title: Text(controller.isEditArgs ? 'Edit Transaksi' : 'Catat Transaksi'),
     );
   }
 
-  Widget _buildTab(String title) {
-    return Obx(() {
-      final isSelected = controller.currentTab.value == title;
-      return GestureDetector(
-        onTap: () => controller.onTabChanged(title),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                color: isSelected ? colorWhite : colorGrey,
-                fontSize: 15,
-                fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              height: 2,
-              width: isSelected ? 18 : 0,
-              color: colorAccent,
-            ),
-          ],
-        ),
-      );
-    });
+  Widget _buildTypeSwitcher() {
+    if (controller.isEditArgs) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Obx(() => TransactionTypeSwitcher(
+            selected: controller.currentTab.value,
+            onChanged: controller.onTabChanged,
+          )),
+    );
   }
 
   // Top bar removed
@@ -109,7 +126,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                 alignment: Alignment.centerLeft,
                 child: Text('Pilih Rekening',
                     style: TextStyle(
-                        color: colorWhite,
+                        color: colorText,
                         fontWeight: FontWeight.bold,
                         fontSize: 15)),
               ),
@@ -123,13 +140,14 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                               Icons.account_balance_wallet_outlined,
                               color: colorGrey),
                           title: Text(acc['name'] as String,
-                              style: const TextStyle(color: colorWhite)),
+                              style: const TextStyle(color: colorText)),
                           subtitle: Text(
-                              CurrencyService.to.format(acc['balance'] as int? ?? 0),
-                              style: const TextStyle(color: colorGrey, fontSize: 12)),
+                              CurrencyService.to
+                                  .format(acc['balance'] as int? ?? 0),
+                              style: const TextStyle(
+                                  color: colorGrey, fontSize: 12)),
                           onTap: () {
-                            controller.selectedAccountId.value = acc['id'] as int;
-                            controller.selectedAccountName.value = acc['name'] as String;
+                            controller.selectAccount(acc);
                             Get.back();
                           },
                         );
@@ -151,14 +169,16 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.category_outlined,
-                  size: 40, color: colorGrey),
+              const Icon(Icons.category_outlined, size: 40, color: colorGrey),
               const SizedBox(height: 12),
               const Text('Belum ada kategori',
                   style: TextStyle(color: colorGrey)),
               const SizedBox(height: 8),
               TextButton(
-                onPressed: () => Get.toNamed('/category-management'),
+                onPressed: () async {
+                  await Get.toNamed(addCategoryRoute);
+                  controller.reloadCategories();
+                },
                 child: const Text('Tambah Kategori',
                     style: TextStyle(color: colorAccent)),
               ),
@@ -180,8 +200,8 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
           if (index == controller.availableCategories.length) {
             return GestureDetector(
               onTap: () {
-                Get.toNamed('/add-category')?.then((_) {
-                  controller.onTabChanged(controller.currentTab.value);
+                Get.toNamed(addCategoryRoute)?.then((_) {
+                  controller.reloadCategories();
                 });
               },
               child: const Column(
@@ -206,12 +226,14 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
           }
 
           final cat = controller.availableCategories[index];
+          final catColor = cat['color_val'] != null
+              ? Color(cat['color_val'] as int)
+              : paletteColorAt(index);
           return Obx(() {
-            final isSelected =
-                controller.selectedCategoryId.value == cat['id'];
+            final isSelected = controller.selectedCategoryId.value == cat['id'];
             return GestureDetector(
-              onTap: () =>
-                  controller.selectCategory(cat['id'] as int, cat['name'] as String),
+              onTap: () => controller.selectCategory(
+                  cat['id'] as int, cat['name'] as String),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -219,12 +241,14 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                   CircleAvatar(
                     radius: 24,
                     backgroundColor: isSelected
-                        ? colorAccent
+                        ? catColor.withValues(alpha: 0.28)
                         : colorCard,
                     child: CategoryIcon(
                       iconCode: cat['icon_code'] as int?,
                       iconPath: cat['icon_path'] as String?,
-                      color: isSelected ? colorOnAccent : colorGrey,
+                      color: isSelected
+                          ? catColor
+                          : catColor.withValues(alpha: 0.75),
                       size: 24,
                     ),
                   ),
@@ -234,9 +258,10 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                     child: Text(
                       cat['name'] as String,
                       style: TextStyle(
-                        color: isSelected ? colorAccent : colorGrey,
+                        color: isSelected ? colorText : colorGrey,
                         fontSize: 11,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -254,91 +279,94 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
 
   Widget _buildAmountDisplay() {
     return GestureDetector(
-      onTap: () => controller.toggleNumpad(),
-      child: Container(
-        color: colorCard,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Obx(() {
-          final hasPending = controller.pendingOperator.value.isNotEmpty;
-          final isExpense = controller.currentTab.value == 'Pengeluaran';
-          final amtColor = isExpense ? colorExpense : colorIncome;
+        onTap: () => controller.toggleNumpad(),
+        child: Container(
+          color: colorCard,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Obx(() {
+            final hasPending = controller.pendingOperator.value.isNotEmpty;
+            final isExpense = controller.currentTab.value == 'Pengeluaran';
+            final amtColor = isExpense ? colorExpense : colorIncome;
 
-          return Row(
-            children: [
-              // Account picker
-            GestureDetector(
-              onTap: _showAccountBottomSheet,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: colorBackground,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
+            return Row(
+              children: [
+                // Account picker
+                GestureDetector(
+                  onTap: _showAccountBottomSheet,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: colorSurface,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.account_balance_wallet_outlined,
-                            color: colorGrey, size: 14),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            controller.selectedAccountName.value,
-                            style: const TextStyle(
-                                color: colorWhite, fontSize: 13),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.account_balance_wallet_outlined,
+                                color: colorGrey, size: 14),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                controller.selectedAccountName.value,
+                                style: const TextStyle(
+                                    color: colorText, fontSize: 13),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Icon(Icons.arrow_drop_down,
+                                color: colorGrey, size: 16),
+                          ],
                         ),
-                        const Icon(Icons.arrow_drop_down,
-                            color: colorGrey, size: 16),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Saldo: ${CurrencyService.to.format(controller.selectedAccountBalance)}',
+                          style:
+                              const TextStyle(color: colorGrey, fontSize: 10),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Saldo: ${CurrencyService.to.format(controller.selectedAccountBalance)}',
-                      style: const TextStyle(color: colorGrey, fontSize: 10),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Amount Display
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (hasPending) ...[
-                    Text(
-                      '${CurrencyService.to.formatWithoutSymbol(controller.pendingValue.value)} ${controller.pendingOperator.value}',
-                      style: const TextStyle(color: colorGrey, fontSize: 18),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  Expanded(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        CurrencyService.to.formatWithoutSymbol(
-                            int.tryParse(controller.amountStr.value) ?? 0),
-                        style: TextStyle(
-                            color: amtColor,
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ),
                   ),
-                ],
-              ),
-            ),
-          ],
-        );
-      }),
-    ));
+                ),
+                const SizedBox(width: 12),
+                // Amount Display
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (hasPending) ...[
+                        Text(
+                          '${CurrencyService.to.formatWithoutSymbol(controller.pendingValue.value)} ${controller.pendingOperator.value}',
+                          style:
+                              const TextStyle(color: colorGrey, fontSize: 18),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Expanded(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            CurrencyService.to.formatWithoutSymbol(
+                                int.tryParse(controller.amountStr.value) ?? 0),
+                            style: TextStyle(
+                                color: amtColor,
+                                fontSize: 36,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }),
+        ));
   }
 
   Widget _buildNoteRow() {
@@ -347,7 +375,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Column(
         children: [
-          const Divider(color: colorBackground, height: 1),
+          const Divider(height: 1),
           const SizedBox(height: 6),
           Row(
             children: [
@@ -364,7 +392,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
-                  style: const TextStyle(color: colorWhite, fontSize: 14),
+                  style: const TextStyle(color: colorText, fontSize: 14),
                   onChanged: (val) => controller.note.value = val,
                 ),
               ),
@@ -379,9 +407,8 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: controller.noteHistory
-                      .map((t) => _buildChip(t))
-                      .toList(),
+                  children:
+                      controller.noteHistory.map((t) => _buildChip(t)).toList(),
                 ),
               ),
             );
@@ -398,12 +425,11 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: colorBackground,
+          color: colorSurface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colorGrey.withValues(alpha: 0.3)),
         ),
-        child: Text(text,
-            style: const TextStyle(color: colorGrey, fontSize: 11)),
+        child:
+            Text(text, style: const TextStyle(color: colorGrey, fontSize: 11)),
       ),
     );
   }
@@ -421,19 +447,15 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
               onTap: () => controller.addQuickAmount(amount),
               child: Container(
                 margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: colorCard,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                      color: colorGrey.withValues(alpha: 0.2)),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
                   '+${CurrencyService.to.compact(amount)}',
-                  style: const TextStyle(
-                      color: colorGrey,
-                      fontSize: 12),
+                  style: const TextStyle(color: colorGrey, fontSize: 12),
                 ),
               ),
             );
@@ -454,15 +476,21 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(children: [
-              _key('7'), _key('8'), _key('9'),
+              _key('7'),
+              _key('8'),
+              _key('9'),
               _buildDateKey(context),
             ]),
             Row(children: [
-              _key('4'), _key('5'), _key('6'),
+              _key('4'),
+              _key('5'),
+              _key('6'),
               _key('+', textColor: colorAccent),
             ]),
             Row(children: [
-              _key('1'), _key('2'), _key('3'),
+              _key('1'),
+              _key('2'),
+              _key('3'),
               _key('-', textColor: colorAccent),
             ]),
             Row(children: [
@@ -472,16 +500,16 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                   onTap: () => controller.onNumpadPressed('delete')),
               // Confirm — colorAccent background
               Expanded(
-              child: GestureDetector(
-                onTap: () => controller.onNumpadPressed('confirm'),
-                child: Container(
-                  height: 60,
-                  color: colorAccent,
-                  child: const Center(
-                    child: Icon(Icons.check, color: colorOnAccent, size: 26),
+                child: GestureDetector(
+                  onTap: () => controller.onNumpadPressed('confirm'),
+                  child: Container(
+                    height: 60,
+                    color: colorAccent,
+                    child: const Center(
+                      child: Icon(Icons.check, color: colorOnAccent, size: 26),
+                    ),
                   ),
                 ),
-              ),
               ),
             ]),
           ],
@@ -508,9 +536,14 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
                 const Icon(Icons.calendar_today, color: colorAccent, size: 14),
                 const SizedBox(width: 4),
                 Obx(() => Text(
-                      DateFormatter.formatWithRelative(controller.selectedDate.value)
-                          .replaceAll(RegExp(r' \(\d{2} [a-zA-Z]+ \d{4}\)'), ''),
-                      style: const TextStyle(color: colorAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                      DateFormatter.formatWithRelative(
+                              controller.selectedDate.value)
+                          .replaceAll(
+                              RegExp(r' \(\d{2} [a-zA-Z]+ \d{4}\)'), ''),
+                      style: const TextStyle(
+                          color: colorAccent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold),
                     )),
               ],
             ),
@@ -520,8 +553,7 @@ class AddTransactionScreen extends GetView<AddTransactionController> {
     );
   }
 
-  Widget _key(String label,
-      {Color textColor = colorWhite}) {
+  Widget _key(String label, {Color textColor = colorText}) {
     return Expanded(
       child: GestureDetector(
         onTap: () => controller.onNumpadPressed(label),

@@ -54,6 +54,15 @@ class TransactionModel {
     categoryColorVal = json['categoryColorVal'];
   }
 
+  /// From a joined DB row; income is positive, everything else negative.
+  factory TransactionModel.fromDbRow(Map<String, dynamic> row) {
+    final model = TransactionModel.fromJson(row);
+    final amt = (row['amount'] as int? ?? 0).abs();
+    model.amount = row['type'] == 'pemasukan' ? amt : -amt;
+    model.adminFee ??= 0;
+    return model;
+  }
+
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['id'] = id;

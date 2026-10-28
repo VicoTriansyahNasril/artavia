@@ -8,11 +8,13 @@
 Artavia is a sleek, local-first, privacy-focused money tracker and expense manager mobile application built with Flutter. Designed with premium aesthetics and smooth micro-animations, it helps you manage your daily finances, track multiple accounts, and analyze your spending habits—all entirely offline.
 
 ## ✨ Key Features
-- **Privacy First (Local Only)**: No cloud sync, no tracking, no external APIs. All your financial data is securely stored on your local device using SQLite.
-- **Multiple Accounts Management**: Manage various wallets, bank accounts, and digital money effortlessly.
-- **Dynamic Analytics**: Beautiful charts and in-depth categorized reports for income and expenses.
-- **Category Customization**: Create custom categories with a built-in icon and color picker.
-- **Premium UI/UX**: Enjoy a responsive, dark-mode focused interface with micro-animations and smooth transitions.
+- **Privacy First (Local)**: All data stays on the device (SQLite) with no tracking. Google Drive backup is optional and only runs when you ask for it.
+- **Multiple Accounts & Transfers**: Wallets, bank accounts and e-money, including transfers with admin fees.
+- **One Place for Analysis**: Summary, spending by category and weekly/monthly/yearly trends in the Grafik tab; net worth in the Aset tab.
+- **Budgets**: Per-category limits with a summary on the history tab and an over-budget warning.
+- **Recurring Transactions**: Salary, rent or subscriptions are recorded automatically.
+- **Complete Settings**: Daily reminder, PIN lock, custom month start, number format, sound effect, and CSV export/import.
+- **Calm UI**: Dark mode with a soft "slate" palette and measured contrast, easy on the eyes.
 
 ## 🛠️ Technology Stack
 - **Framework**: [Flutter](https://flutter.dev/)

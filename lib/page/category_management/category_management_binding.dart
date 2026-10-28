@@ -4,6 +4,7 @@ import 'package:artavia/page/category_management/category_management_controller.
 class CategoryManagementBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<CategoryManagementController>(() => CategoryManagementController());
+    Get.lazyPut<CategoryManagementController>(
+        () => CategoryManagementController());
   }
 }

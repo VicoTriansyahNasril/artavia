@@ -2,6 +2,7 @@ part of 'common.dart';
 
 const nameApp = 'Artavia';
 const pathImage = 'assets/images';
+
 class AppIcons {
   static const List<String> belanja = [
     'assets/belanja/cart.png',
@@ -152,6 +153,4 @@ class AppIcons {
     'assets/transportasi/train.png',
     'assets/transportasi/tyre.png',
   ];
-
 }
-

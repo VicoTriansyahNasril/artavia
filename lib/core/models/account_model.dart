@@ -31,7 +31,7 @@ class AccountModel {
       currencyCode: json['currency_code'] as String? ?? 'IDR',
       iconCode: json['icon_code'] as int? ?? 0xe4fc,
       iconPath: json['icon_path'] as String?,
-      colorVal: json['color_val'] as int? ?? 0xFFFFCA28,
+      colorVal: json['color_val'] as int? ?? 0xFFE0B25C,
       isExcluded: (json['is_excluded'] as int? ?? 0) == 1,
     );
   }

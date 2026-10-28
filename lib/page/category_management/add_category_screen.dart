@@ -14,10 +14,10 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
         backgroundColor: colorBackground,
         title: Obx(() => Text(
               controller.isEditMode ? 'Edit Kategori' : 'Tambah Kategori',
-              style: const TextStyle(color: colorWhite, fontSize: 18),
+              style: const TextStyle(color: colorText, fontSize: 18),
             )),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: colorWhite),
+          icon: const Icon(Icons.arrow_back, color: colorText),
           onPressed: () {
             controller.resetForm();
             Get.back();
@@ -79,13 +79,13 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
                   color: isExpense
                       ? colorExpense.withValues(alpha: 0.85)
                       : colorCard,
-                  borderRadius: const BorderRadius.horizontal(
-                      left: Radius.circular(8)),
+                  borderRadius:
+                      const BorderRadius.horizontal(left: Radius.circular(8)),
                 ),
                 alignment: Alignment.center,
                 child: Text('Pengeluaran',
                     style: TextStyle(
-                        color: isExpense ? colorWhite : colorGrey,
+                        color: isExpense ? colorText : colorGrey,
                         fontWeight: FontWeight.bold)),
               ),
             ),
@@ -100,13 +100,13 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
                   color: !isExpense
                       ? colorIncome.withValues(alpha: 0.85)
                       : colorCard,
-                  borderRadius: const BorderRadius.horizontal(
-                      right: Radius.circular(8)),
+                  borderRadius:
+                      const BorderRadius.horizontal(right: Radius.circular(8)),
                 ),
                 alignment: Alignment.center,
                 child: Text('Pemasukan',
                     style: TextStyle(
-                        color: !isExpense ? colorWhite : colorGrey,
+                        color: !isExpense ? colorText : colorGrey,
                         fontWeight: FontWeight.bold)),
               ),
             ),
@@ -140,21 +140,18 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
             child: Obx(() => TextField(
                   key: ValueKey(controller.categoryName.value +
                       controller.editingId.value.toString()),
-                  controller: TextEditingController(
-                      text: controller.categoryName.value)
-                    ..selection = TextSelection.fromPosition(
-                        TextPosition(
+                  controller:
+                      TextEditingController(text: controller.categoryName.value)
+                        ..selection = TextSelection.fromPosition(TextPosition(
                             offset: controller.categoryName.value.length)),
-                  style: const TextStyle(color: colorWhite),
+                  style: const TextStyle(color: colorText),
                   decoration: const InputDecoration(
                     hintText: 'Nama Kategori',
                     hintStyle: TextStyle(color: colorGrey),
                     border: InputBorder.none,
-                    contentPadding:
-                        EdgeInsets.symmetric(vertical: 16),
+                    contentPadding: EdgeInsets.symmetric(vertical: 16),
                   ),
-                  onChanged: (val) =>
-                      controller.categoryName.value = val,
+                  onChanged: (val) => controller.categoryName.value = val,
                 )),
           ),
         ],
@@ -178,7 +175,7 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
                   color: color,
                   shape: BoxShape.circle,
                   border: isSelected
-                      ? Border.all(color: colorWhite, width: 3)
+                      ? Border.all(color: colorText, width: 3)
                       : null,
                   boxShadow: isSelected
                       ? [
@@ -189,8 +186,7 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
                       : null,
                 ),
                 child: isSelected
-                    ? const Icon(Icons.check,
-                        color: Colors.white, size: 20)
+                    ? const Icon(Icons.check, color: colorOnAccent, size: 20)
                     : null,
               ),
             );
@@ -208,7 +204,8 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 16),
-            Text(categoryName, style: const TextStyle(color: colorWhite, fontSize: 14)),
+            Text(categoryName,
+                style: const TextStyle(color: colorText, fontSize: 14)),
             const SizedBox(height: 16),
             Wrap(
               spacing: 16,
@@ -228,17 +225,21 @@ class AddCategoryScreen extends GetView<CategoryManagementController> {
                       height: 48,
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? controller.selectedColor.value.withValues(alpha: 0.2)
+                            ? controller.selectedColor.value
+                                .withValues(alpha: 0.2)
                             : colorCard,
                         shape: BoxShape.circle,
                         border: isSelected
-                            ? Border.all(color: controller.selectedColor.value, width: 2)
+                            ? Border.all(
+                                color: controller.selectedColor.value, width: 2)
                             : Border.all(color: Colors.transparent),
                       ),
                       padding: const EdgeInsets.all(10),
                       child: Image.asset(
                         path,
-                        color: isSelected ? controller.selectedColor.value : colorGrey,
+                        color: isSelected
+                            ? controller.selectedColor.value
+                            : colorGrey,
                       ),
                     ),
                   );

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:artavia/core/utils/currency_format.dart';
 import 'package:get/get.dart';
+import 'package:artavia/core/services/period_service.dart';
+import 'package:artavia/core/utils/currency_format.dart';
+import 'package:artavia/core/utils/date_format.dart';
 import 'package:artavia/page/home/home_controller.dart';
 import 'package:artavia/page/chart/chart_screen.dart';
 import 'package:artavia/page/report/report_screen.dart';
 import 'package:artavia/page/profile/profile_screen.dart';
+import 'package:artavia/page/routes.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/widgets/components/bouncy_button.dart';
 import 'package:artavia/widgets/transaction/transaction_item.dart';
@@ -16,137 +19,99 @@ class HomeScreen extends GetView<HomeController> {
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) {
-        controller.showTutorialIfNoAccount();
-      }
+      if (context.mounted) controller.showTutorialIfNoAccount();
     });
 
     return Scaffold(
-      backgroundColor: colorBackground,
-      appBar: _buildAppBar(),
-      body: _buildBody(),
-      bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: _buildFAB(),
+      appBar: AppBar(
+        title: const Text('Artavia',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search_rounded),
+            tooltip: 'Cari',
+            onPressed: () => Get.toNamed(searchRoute),
+          ),
+          IconButton(
+            icon: const Icon(Icons.calendar_month_outlined),
+            tooltip: 'Kalender',
+            onPressed: () => Get.toNamed(calendarRoute),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+      body: Obx(() => IndexedStack(
+            index: controller.currentIndex.value,
+            children: const [
+              HistoryView(),
+              ChartScreen(),
+              ReportScreen(),
+              ProfileScreen(),
+            ],
+          )),
+      bottomNavigationBar: const _BottomNav(),
+      floatingActionButton: BouncyButton(
+        onPressed: () => Get.toNamed(addTransactionRoute),
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration:
+              const BoxDecoration(color: colorAccent, shape: BoxShape.circle),
+          child: const Icon(Icons.add_rounded, color: colorOnAccent, size: 28),
+        ),
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
+}
 
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: colorBackground,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.book_outlined, color: colorWhite),
-        onPressed: () => Get.toNamed('/ledger'),
-        tooltip: 'Buku Kas',
-      ),
-      title: const Text(
-        'Artavia',
-        style: TextStyle(
-          color: colorWhite,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      centerTitle: true,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.search, color: colorWhite),
-          onPressed: () => Get.toNamed('/search'),
-        ),
-        IconButton(
-          icon: const Icon(Icons.calendar_month_outlined, color: colorWhite),
-          onPressed: () => Get.toNamed('/calendar'),
-        ),
-      ],
-    );
-  }
+class _BottomNav extends GetView<HomeController> {
+  const _BottomNav();
 
-  Widget _buildBody() {
-    return Obx(() => IndexedStack(
-          index: controller.currentIndex.value,
-          children: const [
-            HistoryView(),
-            ChartScreen(),
-            ReportScreen(),
-            ProfileScreen(),
-          ],
-        ));
-  }
-
-    // ─── FAB — speed dial ────────────────────────────────────────────────────
-
-  Widget _buildFAB() {
-    return BouncyButton(
-      onPressed: () => Get.toNamed('/add-transaction'),
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: colorAccent,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: colorAccent.withValues(alpha: 0.4),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            )
-          ]
-        ),
-        child: const Icon(Icons.add, color: colorOnAccent, size: 28),
-      ),
-    );
-  }
-
-  // ─── Bottom nav ──────────────────────────────────────────────────────────
-
-  Widget _buildBottomNav() {
+  @override
+  Widget build(BuildContext context) {
     return BottomAppBar(
       color: colorCard,
       shape: const CircularNotchedRectangle(),
       notchMargin: 6,
+      height: 64,
+      padding: EdgeInsets.zero,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _navItem(Icons.receipt_long_outlined, Icons.receipt_long, 'Riwayat', 0),
-          _navItem(Icons.pie_chart_outline, Icons.pie_chart, 'Grafik', 1),
-          const SizedBox(width: 40),
-          _navItem(Icons.bar_chart_outlined, Icons.bar_chart, 'Laporan', 2),
-          _navItem(Icons.person_outline, Icons.person, 'Saya', 3, key: controller.keyBottomNavProfile),
+          _item(Icons.receipt_long_outlined, Icons.receipt_long, 'Riwayat', 0),
+          _item(Icons.pie_chart_outline, Icons.pie_chart, 'Grafik', 1),
+          const SizedBox(width: 48),
+          _item(Icons.account_balance_wallet_outlined,
+              Icons.account_balance_wallet, 'Aset', 2),
+          _item(Icons.person_outline, Icons.person, 'Saya', 3,
+              key: controller.keyBottomNavProfile),
         ],
       ),
     );
   }
 
-  Widget _navItem(IconData unsel, IconData sel, String label, int index, {Key? key}) {
+  Widget _item(IconData off, IconData on, String label, int index, {Key? key}) {
     return Obx(() {
       final active = controller.currentIndex.value == index;
+      final color = active ? colorAccent : colorGrey;
       return BouncyButton(
         key: key,
-        onPressed: () {
-          controller.isFabOpen.value = false;
-          controller.changePage(index);
-        },
+        onPressed: () => controller.changePage(index),
         child: Container(
-          color: Colors.transparent, // Ensure full hit area
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                active ? sel : unsel,
-                color: active ? colorAccent : colorGrey,
-                size: 22,
-              ),
+              Icon(active ? on : off, color: color, size: 22),
               const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  color: active ? colorAccent : colorGrey,
-                  fontSize: 10,
-                  fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
+              Text(label,
+                  style: TextStyle(
+                      color: color,
+                      fontSize: 10,
+                      fontWeight:
+                          active ? FontWeight.w600 : FontWeight.normal)),
             ],
           ),
         ),
@@ -155,391 +120,352 @@ class HomeScreen extends GetView<HomeController> {
   }
 }
 
-
 class HistoryView extends GetView<HomeController> {
   const HistoryView({super.key});
 
-// ─── History tab ─────────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: controller.loadData,
+      backgroundColor: colorCard,
+      child: Obx(() {
+        final grouped = controller.groupedTransactions;
+        final keys = grouped.keys.toList();
+        return ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 96),
+          itemCount: keys.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) return const _HistoryHeader();
+            final key = keys[index - 1];
+            return _DayGroup(title: key, items: grouped[key]!);
+          },
+        );
+      }),
+    );
+  }
+}
+
+/// Period picker, monthly totals, budget card and loading/empty states.
+class _HistoryHeader extends GetView<HomeController> {
+  const _HistoryHeader();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildSummaryHeader(),
-        Expanded(
-          child: Obx(() {
-            if (controller.isLoading.value) {
-              return const Center(
-                  child: CircularProgressIndicator(color: colorAccent));
-            }
-            if (controller.transactions.isEmpty) {
-              return _buildEmptyState();
-            }
-            return RefreshIndicator(
-              onRefresh: controller.loadData,
-              color: colorAccent,
-              backgroundColor: colorCard,
-              child: _buildTransactionList(),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return RefreshIndicator(
-      onRefresh: controller.loadData,
-      color: colorAccent,
-      backgroundColor: colorCard,
-      child: const SingleChildScrollView(
-        physics: AlwaysScrollableScrollPhysics(),
-        child: SizedBox(
-          height: 400,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.receipt_long_outlined, size: 56, color: colorGrey),
-                SizedBox(height: 16),
-                Text(
-                  'Belum ada transaksi bulan ini',
-                  style: TextStyle(
-                    color: colorWhite,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Ketuk + untuk mulai mencatat',
-                  style: TextStyle(color: colorGrey, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ─── Summary header ──────────────────────────────────────────────────────
-
-  Widget _buildSummaryHeader() {
-    return Container(
-      color: colorBackground,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+    return Obx(() {
+      final empty = controller.transactions.isEmpty;
+      return Column(
         children: [
-          // Month Year Picker
-          GestureDetector(
-            onTap: () => _showMonthPicker(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Obx(() => Text(
-                      controller.currentYear,
-                      style: const TextStyle(color: colorGrey, fontSize: 11),
-                    )),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Obx(() => Text(
-                          controller.currentMonth,
-                          style: const TextStyle(
-                            color: colorWhite,
+          const _SummaryCard(),
+          if (controller.budget.value.total > 0) const _BudgetCard(),
+          if (controller.isLoading.value && empty)
+            const Padding(
+              padding: EdgeInsets.all(48),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (empty)
+            const _EmptyState(),
+        ],
+      );
+    });
+  }
+}
+
+class _SummaryCard extends GetView<HomeController> {
+  const _SummaryCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(
+        color: colorCard,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => showPeriodPicker(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(children: [
+                    Obx(() => Text(controller.period.label,
+                        style: const TextStyle(
+                            color: colorText,
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )),
-                    const Icon(Icons.keyboard_arrow_down,
-                        color: colorWhite, size: 16),
-                  ],
+                            fontWeight: FontWeight.w600))),
+                    const Icon(Icons.keyboard_arrow_down_rounded,
+                        color: colorGrey, size: 20),
+                  ]),
                 ),
-              ],
-            ),
+              ),
+              const Spacer(),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Sembunyikan saldo',
+                onPressed: controller.toggleHideBalance,
+                icon: Obx(() => Icon(
+                      controller.hideBalance.value
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: colorGrey,
+                      size: 18,
+                    )),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          // Stats
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 1,
-                  child: _buildStat(
-                    'Pengeluaran',
-                    () => controller.totalPengeluaran.value,
-                    colorWhite,
-                    align: CrossAxisAlignment.start,
-                  ),
-                ),
-                Expanded(
-                  flex: 1,
-                  child: _buildStat(
-                    'Pemasukan',
-                    () => controller.totalPemasukan.value,
-                    colorWhite,
-                    align: CrossAxisAlignment.center,
-                  ),
-                ),
-                Expanded(
-                  flex: 1,
-                  child: _buildStat(
-                    'Saldo',
-                    () => controller.saldoTotal.value,
-                    colorWhite,
-                    align: CrossAxisAlignment.end,
-                    isTotal: true,
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _stat('Pengeluaran', () => controller.totalPengeluaran.value,
+                  colorExpense),
+              _stat('Pemasukan', () => controller.totalPemasukan.value,
+                  colorIncome),
+              _stat('Saldo', () => controller.saldoTotal.value, colorText),
+            ],
           ),
         ],
       ),
     );
   }
 
-  void _showMonthPicker() {
-    // Temporary year state for the picker
-    final RxInt selectedYear = controller.currentDate.value.year.obs;
-    final List<String> months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-
-    Get.bottomSheet(
-      Material(
-        color: colorCard,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left, color: colorWhite),
-                  onPressed: () => selectedYear.value--,
-                ),
-                Obx(() => Text(
-                      '${selectedYear.value}',
-                      style: const TextStyle(
-                        color: colorWhite,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right, color: colorWhite),
-                  onPressed: () => selectedYear.value++,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                childAspectRatio: 2,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              itemCount: 12,
-              itemBuilder: (context, index) {
-                return Obx(() {
-                  final isCurrentMonth = controller.currentDate.value.year == selectedYear.value && 
-                                         controller.currentDate.value.month == index + 1;
-                  return InkWell(
-                    onTap: () {
-                      controller.currentDate.value = DateTime(selectedYear.value, index + 1);
-                      controller.loadData();
-                      Get.back();
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: isCurrentMonth ? colorAccent : colorBackground,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        months[index],
-                        style: TextStyle(
-                          color: isCurrentMonth ? colorOnAccent : colorWhite,
-                          fontWeight: isCurrentMonth ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  );
-                });
-              },
-            ),
-          ],
-        ),
-      ),
-      ),
-    );
-  }
-
-  Widget _buildStat(
-    String label,
-    int Function() getValue,
-    Color color, {
-    CrossAxisAlignment align = CrossAxisAlignment.start,
-    bool isTotal = false,
-  }) {
-    return GestureDetector(
-      onTap: controller.toggleHideBalance,
-      behavior: HitTestBehavior.opaque,
+  Widget _stat(String label, int Function() value, Color color) {
+    return Expanded(
       child: Column(
-        crossAxisAlignment: align,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(color: colorGrey, fontSize: 12),
-              ),
-              if (isTotal) ...[
-                const SizedBox(width: 4),
-                Obx(() => Icon(
-                      controller.hideBalance.value
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                      color: colorGrey,
-                      size: 14,
-                    )),
-              ],
-            ],
-          ),
+          Text(label, style: const TextStyle(color: colorGrey, fontSize: 12)),
           const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
-            alignment: align == CrossAxisAlignment.end
-                ? Alignment.centerRight
-                : align == CrossAxisAlignment.center
-                    ? Alignment.center
-                    : Alignment.centerLeft,
+            alignment: Alignment.centerLeft,
             child: Obx(() => Text(
                   controller.hideBalance.value
                       ? '••••••'
-                      : CurrencyService.to.formatWithoutSymbol(getValue()),
+                      : CurrencyService.to.formatWithoutSymbol(value()),
                   style: TextStyle(
-                    color: color,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                      color: color, fontSize: 16, fontWeight: FontWeight.w600),
                 )),
           ),
         ],
       ),
     );
   }
+}
 
-  // ─── Transaction list ────────────────────────────────────────────────────
+class _BudgetCard extends GetView<HomeController> {
+  const _BudgetCard();
 
-  Widget _buildTransactionList() {
-    final grouped = controller.groupedTransactions;
-
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: grouped.length,
-      itemBuilder: (context, index) {
-        final dateKey = grouped.keys.elementAt(index);
-        final txList = grouped[dateKey]!;
-
-        final dailyExpense = txList
-            .where((t) => t.type == 'pengeluaran')
-            .fold(0, (s, t) => s + (t.amount ?? 0).abs());
-        final dailyIncome = txList
-            .where((t) => t.type == 'pemasukan')
-            .fold(0, (s, t) => s + (t.amount ?? 0).abs());
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Date header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
-              child: Row(
-                children: [
-                  // Accent line
-                  Container(
-                    width: 3,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: colorAccent,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    dateKey,
-                    style: const TextStyle(
-                      color: colorGrey,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+  @override
+  Widget build(BuildContext context) {
+    final b = controller.budget.value;
+    final tone = b.overCount > 0
+        ? colorExpense
+        : b.ratio >= 0.8
+            ? colorWarning
+            : colorAccent;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        color: colorCard,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => Get.toNamed(budgetRoute),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Text('Anggaran',
+                      style: TextStyle(color: colorGrey, fontSize: 12)),
                   const Spacer(),
-                  if (dailyIncome > 0)
-                    Text(
-                      '+${CurrencyService.to.formatWithoutSymbol(dailyIncome)}',
-                      style: const TextStyle(
-                        color: colorIncome,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  if (dailyIncome > 0 && dailyExpense > 0)
-                    const SizedBox(width: 8),
-                  if (dailyExpense > 0)
-                    Text(
-                      '-${CurrencyService.to.formatWithoutSymbol(dailyExpense)}',
-                      style: const TextStyle(
-                        color: colorExpense,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                  Text(
+                    '${CurrencyService.to.formatWithoutSymbol(b.used)} / '
+                    '${CurrencyService.to.formatWithoutSymbol(b.total)}',
+                    style: const TextStyle(color: colorText, fontSize: 12),
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: b.ratio.clamp(0, 1).toDouble(),
+                    minHeight: 6,
+                    backgroundColor: colorSurface,
+                    valueColor: AlwaysStoppedAnimation(tone),
+                  ),
+                ),
+                if (b.overCount > 0) ...[
+                  const SizedBox(height: 8),
+                  Text('${b.overCount} kategori melewati batas',
+                      style:
+                          const TextStyle(color: colorExpense, fontSize: 12)),
                 ],
-              ),
+              ],
             ),
-            Material(
-              color: colorCard,
-              child: Column(
-                children: txList.asMap().entries.map((e) {
-                  final i = e.key;
-                  final tx = e.value;
-                  return Column(
-                    children: [
-                      if (i > 0)
-                        const Divider(
-                          color: colorBackground,
-                          height: 1,
-                          indent: 64,
-                        ),
-                      _buildTransactionItem(tx),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+        ),
+      ),
     );
   }
+}
 
-  Widget _buildTransactionItem(TransactionModel tx) {
-    return TransactionItem(tx: tx);
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 64, horizontal: 32),
+      child: Column(
+        children: [
+          Icon(Icons.receipt_long_outlined, size: 48, color: colorGrey),
+          SizedBox(height: 16),
+          Text('Belum ada transaksi pada periode ini',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: colorText, fontSize: 15, fontWeight: FontWeight.w500)),
+          SizedBox(height: 6),
+          Text('Ketuk + untuk mulai mencatat',
+              style: TextStyle(color: colorGrey, fontSize: 13)),
+        ],
+      ),
+    );
   }
+}
 
+class _DayGroup extends StatelessWidget {
+  final String title;
+  final List<TransactionModel> items;
 
+  const _DayGroup({required this.title, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final expense = items
+        .where((t) => t.type == 'pengeluaran')
+        .fold<int>(0, (s, t) => s + (t.amount ?? 0).abs());
+    final income = items
+        .where((t) => t.type == 'pemasukan')
+        .fold<int>(0, (s, t) => s + (t.amount ?? 0).abs());
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+            child: Row(
+              children: [
+                Text(title,
+                    style: const TextStyle(color: colorGrey, fontSize: 12)),
+                const Spacer(),
+                if (income > 0)
+                  Text('+${CurrencyService.to.formatWithoutSymbol(income)}',
+                      style: const TextStyle(color: colorIncome, fontSize: 11)),
+                if (income > 0 && expense > 0) const SizedBox(width: 8),
+                if (expense > 0)
+                  Text('-${CurrencyService.to.formatWithoutSymbol(expense)}',
+                      style:
+                          const TextStyle(color: colorExpense, fontSize: 11)),
+              ],
+            ),
+          ),
+          Material(
+            color: colorCard,
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (var i = 0; i < items.length; i++) ...[
+                  if (i > 0) const Divider(indent: 68),
+                  TransactionItem(tx: items[i]),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet to pick the shared active month (FR-021, FR-022).
+void showPeriodPicker() {
+  final service = PeriodService.to;
+  final year = service.active.value.year.obs;
+  Get.bottomSheet(
+    SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left_rounded),
+                  onPressed: () => year.value--,
+                ),
+                Obx(() => Text('${year.value}',
+                    style: const TextStyle(
+                        color: colorText,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600))),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  onPressed: () => year.value++,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              children: List.generate(12, (i) {
+                return Obx(() {
+                  final active = service.active.value;
+                  final selected =
+                      active.year == year.value && active.month == i + 1;
+                  return Material(
+                    color: selected ? colorAccent : colorSurface,
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () {
+                        service.select(year.value, i + 1);
+                        Get.back();
+                      },
+                      child: Center(
+                        child: Text(
+                          IdNames.monthShort(i + 1),
+                          style: TextStyle(
+                            color: selected ? colorOnAccent : colorText,
+                            fontWeight:
+                                selected ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                });
+              }),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

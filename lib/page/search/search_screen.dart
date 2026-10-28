@@ -11,21 +11,14 @@ class SearchScreen extends GetView<app_search.SearchController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: colorBackground,
       appBar: AppBar(
-        backgroundColor: colorBackground,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: colorWhite),
-          onPressed: () => Get.back(),
-        ),
         title: TextField(
           autofocus: true,
-          style: const TextStyle(color: colorWhite, fontSize: 16),
+          style: const TextStyle(color: colorText, fontSize: 16),
           decoration: const InputDecoration(
-            hintText: 'Cari catatan, nominal, atau kategori...',
-            hintStyle: TextStyle(color: colorGrey),
+            hintText: 'Cari catatan atau kategori…',
             border: InputBorder.none,
+            filled: false,
           ),
           onChanged: (val) => controller.searchQuery.value = val,
         ),
@@ -49,14 +42,13 @@ class SearchScreen extends GetView<app_search.SearchController> {
 
   Widget _buildFilterChips() {
     return Container(
-      color: colorCard,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       width: double.infinity,
       child: Obx(() => SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: ['Semua', 'Pengeluaran', 'Pemasukan', 'Transfer']
-                  .map((type) {
+              children:
+                  ['Semua', 'Pengeluaran', 'Pemasukan', 'Transfer'].map((type) {
                 final isSelected = controller.filterType.value == type;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -64,14 +56,12 @@ class SearchScreen extends GetView<app_search.SearchController> {
                     label: Text(type),
                     selected: isSelected,
                     onSelected: (_) => controller.filterType.value = type,
-                    backgroundColor: colorBackground,
-                    selectedColor: colorAccent,
                     labelStyle: TextStyle(
-                        color: isSelected ? colorOnAccent : colorWhite,
+                        color: isSelected ? colorAccent : colorGrey,
                         fontSize: 13),
                     showCheckmark: false,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   ),
                 );
               }).toList(),
@@ -88,7 +78,8 @@ class SearchScreen extends GetView<app_search.SearchController> {
 
       final list = controller.filteredTransactions;
 
-      if (controller.searchQuery.value.isEmpty) {
+      if (controller.searchQuery.value.isEmpty &&
+          controller.filterType.value == 'Semua') {
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -112,7 +103,9 @@ class SearchScreen extends GetView<app_search.SearchController> {
                   size: 64, color: colorGrey.withValues(alpha: 0.3)),
               const SizedBox(height: 16),
               Text(
-                'Tidak ada hasil untuk\n"${controller.searchQuery.value}"',
+                controller.searchQuery.value.isEmpty
+                    ? 'Tidak ada transaksi ${controller.filterType.value.toLowerCase()}'
+                    : 'Tidak ada hasil untuk\n"${controller.searchQuery.value}"',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: colorGrey),
               ),
@@ -124,30 +117,25 @@ class SearchScreen extends GetView<app_search.SearchController> {
       return Column(
         children: [
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 Obx(() => Text(
                       '${list.length} transaksi ditemukan',
-                      style:
-                          const TextStyle(color: colorGrey, fontSize: 12),
+                      style: const TextStyle(color: colorGrey, fontSize: 12),
                     )),
               ],
             ),
           ),
           Expanded(
-            child: ListView.builder(
+            child: ListView.separated(
+              padding: const EdgeInsets.only(bottom: 24),
               itemCount: list.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 1),
-                  child: Material(
-                    color: colorCard,
-                    child: _buildTransactionItem(list[index]),
-                  ),
-                );
-              },
+              separatorBuilder: (_, __) => const Divider(indent: 68),
+              itemBuilder: (context, index) => Material(
+                color: colorCard,
+                child: _buildTransactionItem(list[index]),
+              ),
             ),
           ),
         ],

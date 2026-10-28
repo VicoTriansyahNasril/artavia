@@ -6,6 +6,12 @@ import 'package:artavia/core/utils/data_refresh.dart';
 import 'package:artavia/core/database/dummy_data.dart';
 import 'package:artavia/widgets/components/tutorial_card.dart';
 import 'package:artavia/page/account_management/account_management_controller.dart';
+import 'package:artavia/core/services/settings_service.dart';
+import 'package:artavia/core/services/period_service.dart';
+import 'package:artavia/core/utils/finance_calc.dart';
+import 'package:artavia/page/routes.dart';
+import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/widgets/components/app_feedback.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 class ProfileController extends GetxController {
@@ -22,23 +28,13 @@ class ProfileController extends GetxController {
     loadStats();
   }
 
-
-
   Future<void> loadStats() async {
     final accounts = await DatabaseHelper.instance.readAllAccounts();
     final categories = await DatabaseHelper.instance.readAllCategories();
 
-    int nw = 0;
-    for (final acc in accounts) {
-      final excluded = acc['is_excluded'] == 1;
-      if (!excluded) {
-        nw += acc['balance'] as int;
-      }
-    }
-
     totalAccounts.value = accounts.length;
     totalCategories.value = categories.length;
-    netWorth.value = nw;
+    netWorth.value = computeNetWorth(accounts).net;
   }
 
   Future<void> connectGoogleDrive() async {
@@ -46,9 +42,9 @@ class ProfileController extends GetxController {
     if (driveService.isConnecting.value || driveService.isWorking.value) return;
     final success = await driveService.signIn();
     if (success) {
-      Get.snackbar('Berhasil', 'Terhubung ke Google Drive');
+      AppToast.success('Berhasil', 'Terhubung ke Google Drive');
     } else {
-      Get.snackbar('Gagal', 'Tidak dapat terhubung ke Google Drive');
+      AppToast.error('Gagal', 'Tidak dapat terhubung ke Google Drive');
     }
   }
 
@@ -56,33 +52,21 @@ class ProfileController extends GetxController {
     final driveService = Get.find<GoogleDriveService>();
     if (driveService.isConnecting.value || driveService.isWorking.value) return;
     await driveService.signOut();
-    Get.snackbar('Terputus', 'Akun Google Drive telah diputuskan');
+    AppToast.info('Terputus', 'Akun Google Drive telah diputuskan');
   }
 
   Future<void> backupData() async {
     final driveService = Get.find<GoogleDriveService>();
     if (driveService.isConnecting.value || driveService.isWorking.value) return;
     try {
-      Get.dialog(
-        const Center(child: CircularProgressIndicator()),
-        barrierDismissible: false,
-      );
+      AppDialog.showProgress();
       await driveService.backupDatabase();
-      Get.back();
-      Get.snackbar(
-        'Backup Berhasil', 
-        'Data berhasil diunggah ke Google Drive',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      AppDialog.hideProgress();
+      AppToast.success(
+          'Backup Berhasil', 'Data berhasil diunggah ke Google Drive');
     } catch (e) {
-      Get.back();
-      Get.snackbar(
-        'Backup Gagal', 
-        e.toString(),
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      AppDialog.hideProgress();
+      AppToast.error('Backup Gagal', e.toString());
     }
   }
 
@@ -90,31 +74,20 @@ class ProfileController extends GetxController {
     final driveService = Get.find<GoogleDriveService>();
     if (driveService.isConnecting.value || driveService.isWorking.value) return;
     try {
-      Get.dialog(
-        const Center(child: CircularProgressIndicator()),
-        barrierDismissible: false,
-      );
+      AppDialog.showProgress();
       await driveService.restoreDatabase();
-      
-      // Reload everything in memory
-      refreshAllGlobalData();
-      loadStats();
 
-      Get.back();
-      Get.snackbar(
-        'Restore Berhasil', 
-        'Data berhasil dipulihkan dari Google Drive',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      // The restored DB carries its own settings (format, PIN, month start).
+      await SettingsService.to.reload();
+      PeriodService.to.resetToToday();
+      refreshAllGlobalData();
+
+      AppDialog.hideProgress();
+      AppToast.success(
+          'Restore Berhasil', 'Data berhasil dipulihkan dari Google Drive');
     } catch (e) {
-      Get.back();
-      Get.snackbar(
-        'Restore Gagal', 
-        e.toString(),
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      AppDialog.hideProgress();
+      AppToast.error('Restore Gagal', e.toString());
     }
   }
 
@@ -144,7 +117,8 @@ class ProfileController extends GetxController {
               return TutorialCard(
                 controller: controller,
                 title: "Manajemen Rekening",
-                description: "Pilih menu Mengelola Rekening untuk membuat rekening atau dompet pertama Anda.",
+                description:
+                    "Pilih menu Mengelola Rekening untuk membuat rekening atau dompet pertama Anda.",
                 isLast: true,
               );
             },
@@ -155,18 +129,18 @@ class ProfileController extends GetxController {
 
     TutorialCoachMark(
       targets: targets,
-      colorShadow: Colors.black,
+      colorShadow: colorScrim,
       hideSkip: true,
       paddingFocus: 10,
       opacityShadow: 0.8,
       onFinish: () {
-        Get.toNamed('/account-management');
+        Get.toNamed(accountManagementRoute);
         Future.delayed(const Duration(milliseconds: 400), () {
           Get.find<AccountManagementController>().showTutorialIfNoAccount();
         });
       },
       onClickTarget: (target) {
-        Get.toNamed('/account-management');
+        Get.toNamed(accountManagementRoute);
         Future.delayed(const Duration(milliseconds: 400), () {
           Get.find<AccountManagementController>().showTutorialIfNoAccount();
         });
@@ -176,32 +150,17 @@ class ProfileController extends GetxController {
 
   Future<void> generateDummyData() async {
     try {
-      Get.dialog(
-        const Center(child: CircularProgressIndicator()),
-        barrierDismissible: false,
-      );
+      AppDialog.showProgress();
       final db = await DatabaseHelper.instance.database;
       await DummyDataGenerator.generate(db);
-      
-      // Reload everything in memory
-      refreshAllGlobalData();
-      loadStats();
 
-      Get.back();
-      Get.snackbar(
-        'Berhasil', 
-        'Data dummy berhasil ditambahkan',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      refreshAllGlobalData();
+
+      AppDialog.hideProgress();
+      AppToast.success('Berhasil', 'Data dummy berhasil ditambahkan');
     } catch (e) {
-      Get.back();
-      Get.snackbar(
-        'Gagal', 
-        e.toString(),
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      AppDialog.hideProgress();
+      AppToast.error('Gagal', e.toString());
     }
   }
 }

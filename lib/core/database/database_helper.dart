@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 10,
+      version: 11,
       onConfigure: _onConfigure,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
@@ -31,6 +31,23 @@ class DatabaseHelper {
   Future _onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
   }
+
+  static const _recurringRulesSql = '''
+CREATE TABLE IF NOT EXISTS recurring_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  category_id INTEGER NOT NULL,
+  account_id INTEGER NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  frequency TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  last_run_date TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE,
+  FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE
+)
+''';
 
   Future _createDB(Database db, int version) async {
     const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
@@ -98,27 +115,125 @@ CREATE TABLE settings (
 )
 ''');
 
+    await db.execute(_recurringRulesSql);
+
     // Seed Categories
     final initialCategories = [
       // Pengeluaran
-      {'name': 'Makanan', 'type': 'pengeluaran', 'icon_code': null, 'icon_path': 'assets/makanan/bowl.png', 'color_val': 0xFF4CAF50},
-      {'name': 'Minuman', 'type': 'pengeluaran', 'icon_code': null, 'icon_path': 'assets/makanan/soft-drink.png', 'color_val': 0xFF8BC34A},
-      {'name': 'Belanja', 'type': 'pengeluaran', 'icon_code': null, 'icon_path': 'assets/belanja/shopping-bag.png', 'color_val': 0xFFFF9800},
-      {'name': 'Transportasi', 'type': 'pengeluaran', 'icon_code': null, 'icon_path': 'assets/transportasi/car.png', 'color_val': 0xFF9C27B0},
-      {'name': 'Kesehatan', 'type': 'pengeluaran', 'icon_code': null, 'icon_path': 'assets/kesehatan/health-care.png', 'color_val': 0xFFF44336},
-      {'name': 'Hiburan', 'type': 'pengeluaran', 'icon_code': null, 'icon_path': 'assets/hiburan/cinema.png', 'color_val': 0xFFE91E63},
-      {'name': 'Pendidikan', 'type': 'pengeluaran', 'icon_code': null, 'icon_path': 'assets/pendidikan/education.png', 'color_val': 0xFF3F51B5},
-      {'name': 'Olahraga', 'type': 'pengeluaran', 'icon_code': null, 'icon_path': 'assets/olahraga/sport.png', 'color_val': 0xFFFF5722},
-      {'name': 'Liburan', 'type': 'pengeluaran', 'icon_code': null, 'icon_path': 'assets/berpergian/travel.png', 'color_val': 0xFF009688},
-      {'name': 'Pribadi', 'type': 'pengeluaran', 'icon_code': null, 'icon_path': 'assets/pribadi/briefcase.png', 'color_val': 0xFF607D8B},
-      {'name': 'Tagihan', 'type': 'pengeluaran', 'icon_code': null, 'icon_path': 'assets/pribadi/wifi.png', 'color_val': 0xFF795548},
-      
+      {
+        'name': 'Makanan',
+        'type': 'pengeluaran',
+        'icon_code': null,
+        'icon_path': 'assets/makanan/bowl.png',
+        'color_val': 0xFFE59A6B
+      },
+      {
+        'name': 'Minuman',
+        'type': 'pengeluaran',
+        'icon_code': null,
+        'icon_path': 'assets/makanan/soft-drink.png',
+        'color_val': 0xFF4FB6B0
+      },
+      {
+        'name': 'Belanja',
+        'type': 'pengeluaran',
+        'icon_code': null,
+        'icon_path': 'assets/belanja/shopping-bag.png',
+        'color_val': 0xFFD98AA8
+      },
+      {
+        'name': 'Transportasi',
+        'type': 'pengeluaran',
+        'icon_code': null,
+        'icon_path': 'assets/transportasi/car.png',
+        'color_val': 0xFF5FA8D3
+      },
+      {
+        'name': 'Kesehatan',
+        'type': 'pengeluaran',
+        'icon_code': null,
+        'icon_path': 'assets/kesehatan/health-care.png',
+        'color_val': 0xFFE07A7A
+      },
+      {
+        'name': 'Hiburan',
+        'type': 'pengeluaran',
+        'icon_code': null,
+        'icon_path': 'assets/hiburan/cinema.png',
+        'color_val': 0xFFC987C9
+      },
+      {
+        'name': 'Pendidikan',
+        'type': 'pengeluaran',
+        'icon_code': null,
+        'icon_path': 'assets/pendidikan/education.png',
+        'color_val': 0xFF7AA2F7
+      },
+      {
+        'name': 'Olahraga',
+        'type': 'pengeluaran',
+        'icon_code': null,
+        'icon_path': 'assets/olahraga/sport.png',
+        'color_val': 0xFFA3BE6C
+      },
+      {
+        'name': 'Liburan',
+        'type': 'pengeluaran',
+        'icon_code': null,
+        'icon_path': 'assets/berpergian/travel.png',
+        'color_val': 0xFFE0B25C
+      },
+      {
+        'name': 'Pribadi',
+        'type': 'pengeluaran',
+        'icon_code': null,
+        'icon_path': 'assets/pribadi/briefcase.png',
+        'color_val': 0xFF8D94A3
+      },
+      {
+        'name': 'Tagihan',
+        'type': 'pengeluaran',
+        'icon_code': null,
+        'icon_path': 'assets/pribadi/wifi.png',
+        'color_val': 0xFF9D8CE6
+      },
+
       // Pemasukan
-      {'name': 'Gaji', 'type': 'pemasukan', 'icon_code': null, 'icon_path': 'assets/keuangan/uang.png', 'color_val': 0xFF4CAF50},
-      {'name': 'Bonus', 'type': 'pemasukan', 'icon_code': null, 'icon_path': 'assets/keuangan/coin.png', 'color_val': 0xFF8BC34A},
-      {'name': 'Investasi', 'type': 'pemasukan', 'icon_code': null, 'icon_path': 'assets/keuangan/stock.png', 'color_val': 0xFF00BCD4},
-      {'name': 'Bisnis', 'type': 'pemasukan', 'icon_code': null, 'icon_path': 'assets/pribadi/meeting.png', 'color_val': 0xFF2196F3},
-      {'name': 'Tabungan', 'type': 'pemasukan', 'icon_code': null, 'icon_path': 'assets/keuangan/nabung.png', 'color_val': 0xFF009688},
+      {
+        'name': 'Gaji',
+        'type': 'pemasukan',
+        'icon_code': null,
+        'icon_path': 'assets/keuangan/uang.png',
+        'color_val': 0xFF5FBF8F
+      },
+      {
+        'name': 'Bonus',
+        'type': 'pemasukan',
+        'icon_code': null,
+        'icon_path': 'assets/keuangan/coin.png',
+        'color_val': 0xFFA3BE6C
+      },
+      {
+        'name': 'Investasi',
+        'type': 'pemasukan',
+        'icon_code': null,
+        'icon_path': 'assets/keuangan/stock.png',
+        'color_val': 0xFF4FB6B0
+      },
+      {
+        'name': 'Bisnis',
+        'type': 'pemasukan',
+        'icon_code': null,
+        'icon_path': 'assets/pribadi/meeting.png',
+        'color_val': 0xFF7AA2F7
+      },
+      {
+        'name': 'Tabungan',
+        'type': 'pemasukan',
+        'icon_code': null,
+        'icon_path': 'assets/keuangan/nabung.png',
+        'color_val': 0xFFE0B25C
+      },
     ];
     final batch = db.batch();
     for (var cat in initialCategories) {
@@ -192,13 +307,16 @@ CREATE TABLE IF NOT EXISTS settings (
     }
     if (oldVersion < 7) {
       try {
-        await db.execute('ALTER TABLE transactions ADD COLUMN category_id INTEGER');
+        await db
+            .execute('ALTER TABLE transactions ADD COLUMN category_id INTEGER');
       } catch (_) {}
       try {
-        await db.execute('ALTER TABLE transactions ADD COLUMN account_id INTEGER');
+        await db
+            .execute('ALTER TABLE transactions ADD COLUMN account_id INTEGER');
       } catch (_) {}
       try {
-        await db.execute('ALTER TABLE transactions ADD COLUMN destination_account_id INTEGER');
+        await db.execute(
+            'ALTER TABLE transactions ADD COLUMN destination_account_id INTEGER');
       } catch (_) {}
     }
     if (oldVersion < 8) {
@@ -218,151 +336,60 @@ CREATE TABLE IF NOT EXISTS settings (
     }
     if (oldVersion < 10) {
       try {
-        await db.execute('ALTER TABLE transactions ADD COLUMN admin_fee INTEGER NOT NULL DEFAULT 0');
+        await db.execute(
+            'ALTER TABLE transactions ADD COLUMN admin_fee INTEGER NOT NULL DEFAULT 0');
       } catch (_) {}
       try {
-        await db.execute('ALTER TABLE transactions ADD COLUMN admin_fee_type TEXT');
+        await db
+            .execute('ALTER TABLE transactions ADD COLUMN admin_fee_type TEXT');
       } catch (_) {}
+    }
+    if (oldVersion < 11) {
+      await db.execute(_recurringRulesSql);
     }
   }
 
-  // ─── Transactions CRUD ───────────────────────────────────────────────────
+  // ─── Transactions (read) ─────────────────────────────────────────────────
+  // Mutations live in transaction_store.dart so balances are always updated
+  // in the same DB transaction as the row change.
 
-  Future<int> insertTransaction(Map<String, dynamic> row) async {
-    final db = await instance.database;
-    return await db.insert('transactions', row);
-  }
+  static const transactionSelect = '''
+      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal,
+             a.name as accountName, da.name as destinationAccountName
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN accounts a ON t.account_id = a.id
+      LEFT JOIN accounts da ON t.destination_account_id = da.id
+  ''';
 
   Future<List<Map<String, dynamic>>> readAllTransactions() async {
     final db = await instance.database;
-    return await db.rawQuery('''
-      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal, 
-             a.name as accountName, da.name as destinationAccountName 
-      FROM transactions t 
-      LEFT JOIN categories c ON t.category_id = c.id 
-      LEFT JOIN accounts a ON t.account_id = a.id 
-      LEFT JOIN accounts da ON t.destination_account_id = da.id 
-      ORDER BY t.date DESC
-    ''');
+    return db.rawQuery('$transactionSelect ORDER BY t.date DESC');
   }
 
+  /// Transactions with `start <= date < end`, newest first.
+  Future<List<Map<String, dynamic>>> readTransactionsByRange(
+      DateTime start, DateTime end) async {
+    final db = await instance.database;
+    return db.rawQuery(
+      '$transactionSelect WHERE t.date >= ? AND t.date < ? ORDER BY t.date DESC',
+      [start.toIso8601String(), end.toIso8601String()],
+    );
+  }
+
+  /// Calendar-month helper (Kalender always uses calendar months).
   Future<List<Map<String, dynamic>>> readTransactionsByMonth(
-      int year, int month) async {
-    final db = await instance.database;
-    final startDate = DateTime(year, month, 1).toIso8601String();
-    final endDate = DateTime(year, month + 1, 1).toIso8601String();
-    return await db.rawQuery('''
-      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal, 
-             a.name as accountName, da.name as destinationAccountName
-      FROM transactions t 
-      LEFT JOIN categories c ON t.category_id = c.id 
-      LEFT JOIN accounts a ON t.account_id = a.id 
-      LEFT JOIN accounts da ON t.destination_account_id = da.id 
-      WHERE t.date >= ? AND t.date < ?
-      ORDER BY t.date DESC
-    ''', [startDate, endDate]);
-  }
-
-  Future<int> updateTransaction(int id, Map<String, dynamic> row) async {
-    final db = await instance.database;
-    return await db
-        .update('transactions', row, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<int> deleteTransaction(int id) async {
-    final db = await instance.database;
-    return await db
-        .delete('transactions', where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> insertTransactionWithBalanceUpdate(Map<String, dynamic> row, int accountId, int balanceChange) async {
-    final db = await instance.database;
-    await db.transaction((txn) async {
-      await txn.insert('transactions', row);
-      final res = await txn.query('accounts', where: 'id = ?', whereArgs: [accountId]);
-      if (res.isNotEmpty) {
-        final currentBalance = res.first['balance'] as int;
-        await txn.update(
-          'accounts',
-          {'balance': currentBalance + balanceChange},
-          where: 'id = ?',
-          whereArgs: [accountId],
-        );
-      }
-    });
-  }
-
-  Future<void> insertTransferWithBalanceUpdate(Map<String, dynamic> row, int sourceAccountId, int destAccountId, int amount, int adminFee, String adminFeeType) async {
-    final db = await instance.database;
-    await db.transaction((txn) async {
-      await txn.insert('transactions', row);
-      
-      final sourceRes = await txn.query('accounts', where: 'id = ?', whereArgs: [sourceAccountId]);
-      if (sourceRes.isNotEmpty) {
-        final currentBalance = sourceRes.first['balance'] as int;
-        final deduction = adminFeeType == 'Pengirim' ? amount + adminFee : amount;
-        await txn.update(
-          'accounts',
-          {'balance': currentBalance - deduction},
-          where: 'id = ?',
-          whereArgs: [sourceAccountId],
-        );
-      }
-      
-      final destRes = await txn.query('accounts', where: 'id = ?', whereArgs: [destAccountId]);
-      if (destRes.isNotEmpty) {
-        final currentBalance = destRes.first['balance'] as int;
-        final addition = adminFeeType == 'Penerima' ? amount - adminFee : amount;
-        await txn.update(
-          'accounts',
-          {'balance': currentBalance + addition},
-          where: 'id = ?',
-          whereArgs: [destAccountId],
-        );
-      }
-    });
-  }
-
-  Future<void> deleteTransactionWithBalanceUpdate(int transactionId, int? accountId, int? destinationAccountId, int amount, bool isExpense, bool isTransfer, {int adminFee = 0, String? adminFeeType}) async {
-    final db = await instance.database;
-    await db.transaction((txn) async {
-      if (isTransfer && accountId != null && destinationAccountId != null) {
-        final sourceRes = await txn.query('accounts', where: 'id = ?', whereArgs: [accountId]);
-        if (sourceRes.isNotEmpty) {
-          final currentBalance = sourceRes.first['balance'] as int;
-          final deduction = adminFeeType == 'Pengirim' ? amount + adminFee : amount;
-          await txn.update('accounts', {'balance': currentBalance + deduction}, where: 'id = ?', whereArgs: [accountId]);
-        }
-        final destRes = await txn.query('accounts', where: 'id = ?', whereArgs: [destinationAccountId]);
-        if (destRes.isNotEmpty) {
-          final currentBalance = destRes.first['balance'] as int;
-          final addition = adminFeeType == 'Penerima' ? amount - adminFee : amount;
-          await txn.update('accounts', {'balance': currentBalance - addition}, where: 'id = ?', whereArgs: [destinationAccountId]);
-        }
-      } else if (accountId != null) {
-        final multiplier = isExpense ? 1 : -1;
-        final res = await txn.query('accounts', where: 'id = ?', whereArgs: [accountId]);
-        if (res.isNotEmpty) {
-          final currentBalance = res.first['balance'] as int;
-          await txn.update('accounts', {'balance': currentBalance + (amount * multiplier)}, where: 'id = ?', whereArgs: [accountId]);
-        }
-      }
-      await txn.delete('transactions', where: 'id = ?', whereArgs: [transactionId]);
-    });
+      int year, int month) {
+    return readTransactionsByRange(
+        DateTime(year, month, 1), DateTime(year, month + 1, 1));
   }
 
   Future<List<Map<String, dynamic>>> searchTransactions(String query) async {
     final db = await instance.database;
-    return await db.rawQuery('''
-      SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal, 
-             a.name as accountName, da.name as destinationAccountName
-      FROM transactions t 
-      LEFT JOIN categories c ON t.category_id = c.id 
-      LEFT JOIN accounts a ON t.account_id = a.id 
-      LEFT JOIN accounts da ON t.destination_account_id = da.id 
-      WHERE t.note LIKE ? OR c.name LIKE ?
-      ORDER BY t.date DESC
-    ''', ['%$query%', '%$query%']);
+    return db.rawQuery(
+      '$transactionSelect WHERE t.note LIKE ? OR c.name LIKE ? ORDER BY t.date DESC',
+      ['%$query%', '%$query%'],
+    );
   }
 
   // ─── Accounts CRUD ───────────────────────────────────────────────────────
@@ -386,21 +413,6 @@ CREATE TABLE IF NOT EXISTS settings (
   Future<int> deleteAccount(int id) async {
     final db = await instance.database;
     return await db.delete('accounts', where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<int> updateAccountBalanceById(int id, int amountChange) async {
-    final db = await instance.database;
-    final res = await db.query('accounts', where: 'id = ?', whereArgs: [id]);
-    if (res.isNotEmpty) {
-      final currentBalance = res.first['balance'] as int;
-      return await db.update(
-        'accounts',
-        {'balance': currentBalance + amountChange},
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-    }
-    return 0;
   }
 
   // ─── Categories CRUD ─────────────────────────────────────────────────────
@@ -492,6 +504,46 @@ CREATE TABLE IF NOT EXISTS settings (
     );
   }
 
+  Future<Map<String, String>> readAllSettings() async {
+    final db = await instance.database;
+    final rows = await db.query('settings');
+    return {for (final r in rows) r['key'] as String: r['value'] as String};
+  }
+
+  Future<int> deleteSetting(String key) async {
+    final db = await instance.database;
+    return db.delete('settings', where: 'key = ?', whereArgs: [key]);
+  }
+
+  // ─── Recurring rules CRUD ────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> readRecurringRules() async {
+    final db = await instance.database;
+    return db.rawQuery('''
+      SELECT r.*, c.name as categoryName, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal,
+             a.name as accountName
+      FROM recurring_rules r
+      LEFT JOIN categories c ON r.category_id = c.id
+      LEFT JOIN accounts a ON r.account_id = a.id
+      ORDER BY r.is_active DESC, r.start_date ASC
+    ''');
+  }
+
+  Future<int> insertRecurringRule(Map<String, dynamic> rule) async {
+    final db = await instance.database;
+    return db.insert('recurring_rules', rule);
+  }
+
+  Future<int> updateRecurringRule(int id, Map<String, dynamic> rule) async {
+    final db = await instance.database;
+    return db.update('recurring_rules', rule, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<int> deleteRecurringRule(int id) async {
+    final db = await instance.database;
+    return db.delete('recurring_rules', where: 'id = ?', whereArgs: [id]);
+  }
+
   Future close() async {
     final db = await instance.database;
     db.close();
@@ -500,12 +552,12 @@ CREATE TABLE IF NOT EXISTS settings (
   Future<void> resetDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'artavia.db');
-    
+
     if (_database != null) {
       await _database!.close();
       _database = null;
     }
-    
+
     await deleteDatabase(path);
     await database; // Re-initialize
   }

@@ -4,6 +4,9 @@ import 'package:get/get.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/core/utils/date_format.dart';
 import 'package:artavia/page/transfer/transfer_controller.dart';
+import 'package:artavia/page/routes.dart';
+import 'package:artavia/widgets/components/type_switcher.dart';
+import 'package:artavia/widgets/components/menu_group.dart';
 
 class TransferScreen extends GetView<TransferController> {
   const TransferScreen({super.key});
@@ -11,14 +14,15 @@ class TransferScreen extends GetView<TransferController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: colorBackground,
       appBar: AppBar(
-        backgroundColor: colorBackground,
-        title: const Text('Transfer', style: TextStyle(color: colorWhite, fontSize: 18)),
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: colorWhite),
+          icon: const Icon(Icons.close_rounded),
+          tooltip: 'Tutup',
           onPressed: () => Get.back(),
         ),
+        title:
+            Text(controller.isEditArgs ? 'Edit Transfer' : 'Catat Transaksi'),
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
@@ -32,11 +36,15 @@ class TransferScreen extends GetView<TransferController> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.account_balance_wallet_outlined, size: 64, color: colorGrey),
+                const Icon(Icons.account_balance_wallet_outlined,
+                    size: 64, color: colorGrey),
                 const SizedBox(height: 16),
                 const Text(
                   'Rekening Belum Cukup',
-                  style: TextStyle(color: colorWhite, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: colorText,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -45,26 +53,27 @@ class TransferScreen extends GetView<TransferController> {
                   style: TextStyle(color: colorGrey, fontSize: 14),
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorAccent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                  onPressed: () {
-                    Get.back(); // Pop transfer screen
-                    Get.toNamed('/account-management'); // Go to account management
-                  },
-                  child: const Text('Buat Rekening', style: TextStyle(color: colorOnAccent, fontWeight: FontWeight.bold)),
+                FilledButton(
+                  onPressed: () => Get.offNamed(accountManagementRoute),
+                  child: const Text('Kelola Rekening'),
                 ),
               ],
             ),
           );
         }
 
-        return Column(
+        return ContentWidth(
+            child: Column(
           children: [
-            const SizedBox(height: 8),
+            if (!controller.isEditArgs)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: TransactionTypeSwitcher(
+                  selected: 'Transfer',
+                  onChanged: (tab) => Get.offNamed(addTransactionRoute,
+                      arguments: {'initialTab': tab}, preventDuplicates: false),
+                ),
+              ),
             _buildTransferAccountsCard(),
             const Spacer(),
             _buildAmountRow(),
@@ -72,7 +81,7 @@ class TransferScreen extends GetView<TransferController> {
             _buildNoteRow(),
             _buildCustomNumpad(context),
           ],
-        );
+        ));
       }),
     );
   }
@@ -85,8 +94,7 @@ class TransferScreen extends GetView<TransferController> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: colorCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorGrey.withValues(alpha: 0.1)),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -97,41 +105,53 @@ class TransferScreen extends GetView<TransferController> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Dari', style: TextStyle(color: colorGrey, fontSize: 12)),
+                const Text('Dari',
+                    style: TextStyle(color: colorGrey, fontSize: 12)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.account_balance_wallet, color: colorAccent, size: 20),
+                    const Icon(Icons.account_balance_wallet,
+                        color: colorAccent, size: 20),
                     const SizedBox(width: 8),
-                    Obx(() => Text(controller.sourceAccountName.value, style: const TextStyle(color: colorWhite, fontWeight: FontWeight.bold))),
+                    Obx(() => Text(controller.sourceAccountName.value,
+                        style: const TextStyle(
+                            color: colorText, fontWeight: FontWeight.bold))),
                     const Icon(Icons.arrow_drop_down, color: colorGrey),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Obx(() => Text('Saldo: ${CurrencyService.to.format(controller.sourceAccountBalance)}', style: const TextStyle(color: colorGrey, fontSize: 11))),
+                Obx(() => Text(
+                    'Saldo: ${CurrencyService.to.format(controller.sourceAccountBalance)}',
+                    style: const TextStyle(color: colorGrey, fontSize: 11))),
               ],
             ),
           ),
           // Panah
-          const Icon(Icons.arrow_forward_rounded, color: colorWhite),
+          const Icon(Icons.arrow_forward_rounded, color: colorText),
           // Ke
           InkWell(
             onTap: () => _showAccountSheet(false),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Text('Ke', style: TextStyle(color: colorGrey, fontSize: 12)),
+                const Text('Ke',
+                    style: TextStyle(color: colorGrey, fontSize: 12)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.account_balance, color: Colors.blue, size: 20),
+                    const Icon(Icons.account_balance,
+                        color: colorAccent, size: 20),
                     const SizedBox(width: 8),
-                    Obx(() => Text(controller.destinationAccountName.value, style: const TextStyle(color: colorWhite, fontWeight: FontWeight.bold))),
+                    Obx(() => Text(controller.destinationAccountName.value,
+                        style: const TextStyle(
+                            color: colorText, fontWeight: FontWeight.bold))),
                     const Icon(Icons.arrow_drop_down, color: colorGrey),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Obx(() => Text('Saldo: ${CurrencyService.to.format(controller.destinationAccountBalance)}', style: const TextStyle(color: colorGrey, fontSize: 11))),
+                Obx(() => Text(
+                    'Saldo: ${CurrencyService.to.format(controller.destinationAccountBalance)}',
+                    style: const TextStyle(color: colorGrey, fontSize: 11))),
               ],
             ),
           ),
@@ -146,28 +166,25 @@ class TransferScreen extends GetView<TransferController> {
         color: colorCard,
         child: SingleChildScrollView(
           child: Obx(() => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: controller.availableAccounts.map((account) {
-            return ListTile(
-              leading: const Icon(Icons.account_balance_wallet, color: colorWhite),
-              title: Text(account['name'] as String, style: const TextStyle(color: colorWhite)),
-              subtitle: Text(
-                CurrencyService.to.format(account['balance'] as int? ?? 0),
-                style: const TextStyle(color: colorGrey, fontSize: 12),
-              ),
-              onTap: () {
-                if (isSource) {
-                  controller.sourceAccountId.value = account['id'] as int;
-                  controller.sourceAccountName.value = account['name'] as String;
-                } else {
-                  controller.destinationAccountId.value = account['id'] as int;
-                  controller.destinationAccountName.value = account['name'] as String;
-                }
-                Get.back();
-              },
-            );
-            }).toList(),
-          )),
+                mainAxisSize: MainAxisSize.min,
+                children: controller.availableAccounts.map((account) {
+                  return ListTile(
+                    leading: const Icon(Icons.account_balance_wallet_outlined,
+                        color: colorGrey),
+                    title: Text(account['name'] as String,
+                        style: const TextStyle(color: colorText)),
+                    subtitle: Text(
+                      CurrencyService.to
+                          .format(account['balance'] as int? ?? 0),
+                      style: const TextStyle(color: colorGrey, fontSize: 12),
+                    ),
+                    onTap: () {
+                      controller.selectAccount(isSource, account);
+                      Get.back();
+                    },
+                  );
+                }).toList(),
+              )),
         ),
       ),
     );
@@ -182,7 +199,8 @@ class TransferScreen extends GetView<TransferController> {
           // Left Box: Source (Dipotong)
           Expanded(
             child: Obx(() {
-              final isActive = controller.isSynced.value || controller.activeField.value == 'source';
+              final isActive = controller.isSynced.value ||
+                  controller.activeField.value == 'source';
               return GestureDetector(
                 onTap: () {
                   controller.setActiveField('source');
@@ -191,18 +209,30 @@ class TransferScreen extends GetView<TransferController> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isActive ? colorAccent.withValues(alpha: 0.1) : colorBackground,
-                    border: Border.all(color: isActive ? colorAccent : colorGrey.withValues(alpha: 0.2), width: isActive ? 2 : 1),
+                    color: isActive
+                        ? colorAccent.withValues(alpha: 0.1)
+                        : colorBackground,
+                    border: Border.all(
+                        color: isActive
+                            ? colorAccent
+                            : colorGrey.withValues(alpha: 0.2),
+                        width: isActive ? 2 : 1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Dipotong', style: TextStyle(color: colorGrey, fontSize: 12)),
+                      const Text('Dipotong',
+                          style: TextStyle(color: colorGrey, fontSize: 12)),
                       const SizedBox(height: 4),
                       Text(
-                        CurrencyService.to.formatWithoutSymbol(int.tryParse(controller.sourceAmountStr.value) ?? 0),
-                        style: TextStyle(color: isActive ? colorAccent : colorWhite, fontSize: 20, fontWeight: FontWeight.bold),
+                        CurrencyService.to.formatWithoutSymbol(
+                            int.tryParse(controller.sourceAmountStr.value) ??
+                                0),
+                        style: TextStyle(
+                            color: isActive ? colorAccent : colorText,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -216,7 +246,8 @@ class TransferScreen extends GetView<TransferController> {
           // Right Box: Destination (Diterima)
           Expanded(
             child: Obx(() {
-              final isActive = controller.isSynced.value || controller.activeField.value == 'dest';
+              final isActive = controller.isSynced.value ||
+                  controller.activeField.value == 'dest';
               return GestureDetector(
                 onTap: () {
                   controller.setActiveField('dest');
@@ -225,18 +256,25 @@ class TransferScreen extends GetView<TransferController> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isActive ? Colors.blue.withValues(alpha: 0.1) : colorBackground,
-                    border: Border.all(color: isActive ? Colors.blue : colorGrey.withValues(alpha: 0.2), width: isActive ? 2 : 1),
+                    color: isActive ? colorAccentDim : colorBackground,
+                    border: Border.all(
+                        color: isActive ? colorAccent : colorDivider,
+                        width: isActive ? 2 : 1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Diterima', style: TextStyle(color: colorGrey, fontSize: 12)),
+                      const Text('Diterima',
+                          style: TextStyle(color: colorGrey, fontSize: 12)),
                       const SizedBox(height: 4),
                       Text(
-                        CurrencyService.to.formatWithoutSymbol(int.tryParse(controller.destAmountStr.value) ?? 0),
-                        style: TextStyle(color: isActive ? Colors.blue : colorWhite, fontSize: 20, fontWeight: FontWeight.bold),
+                        CurrencyService.to.formatWithoutSymbol(
+                            int.tryParse(controller.destAmountStr.value) ?? 0),
+                        style: TextStyle(
+                            color: isActive ? colorAccent : colorText,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -271,7 +309,7 @@ class TransferScreen extends GetView<TransferController> {
                     hintStyle: TextStyle(color: colorGrey),
                     border: InputBorder.none,
                   ),
-                  style: const TextStyle(color: colorWhite),
+                  style: const TextStyle(color: colorText),
                   onChanged: (val) => controller.note.value = val,
                 ),
               ),
@@ -281,8 +319,10 @@ class TransferScreen extends GetView<TransferController> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Obx(() => Row(
-              children: controller.noteHistory.map((text) => _buildSuggestChip(text)).toList(),
-            )),
+                  children: controller.noteHistory
+                      .map((text) => _buildSuggestChip(text))
+                      .toList(),
+                )),
           )
         ],
       ),
@@ -300,11 +340,11 @@ class TransferScreen extends GetView<TransferController> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: colorGrey.withValues(alpha: 0.3)),
         ),
-        child: Text(text, style: const TextStyle(color: colorGrey, fontSize: 12)),
+        child:
+            Text(text, style: const TextStyle(color: colorGrey, fontSize: 12)),
       ),
     );
   }
-
 
   Widget _buildCustomNumpad(BuildContext context) {
     return Obx(() {
@@ -337,8 +377,16 @@ class TransferScreen extends GetView<TransferController> {
             Row(children: [
               _buildNumpadButton('0', context: context),
               _buildNumpadButton('000', context: context),
-              _buildNumpadButton('delete', isIcon: true, iconData: Icons.backspace_outlined, context: context),
-              _buildNumpadButton('confirm', isIcon: true, iconData: Icons.check, bgColor: colorAccent, iconColor: colorOnAccent, context: context),
+              _buildNumpadButton('delete',
+                  isIcon: true,
+                  iconData: Icons.backspace_outlined,
+                  context: context),
+              _buildNumpadButton('confirm',
+                  isIcon: true,
+                  iconData: Icons.check,
+                  bgColor: colorAccent,
+                  iconColor: colorOnAccent,
+                  context: context),
             ]),
           ],
         ),
@@ -364,9 +412,14 @@ class TransferScreen extends GetView<TransferController> {
                 const Icon(Icons.calendar_today, color: colorAccent, size: 14),
                 const SizedBox(width: 4),
                 Obx(() => Text(
-                      DateFormatter.formatWithRelative(controller.selectedDate.value)
-                          .replaceAll(RegExp(r' \(\d{2} [a-zA-Z]+ \d{4}\)'), ''), // Hide full date if 'Hari Ini', 'Besok' etc
-                      style: const TextStyle(color: colorAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                      DateFormatter.formatWithRelative(
+                              controller.selectedDate.value)
+                          .replaceAll(RegExp(r' \(\d{2} [a-zA-Z]+ \d{4}\)'),
+                              ''), // Hide full date if 'Hari Ini', 'Besok' etc
+                      style: const TextStyle(
+                          color: colorAccent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold),
                     )),
               ],
             ),
@@ -376,10 +429,11 @@ class TransferScreen extends GetView<TransferController> {
     );
   }
 
-  Widget _buildNumpadButton(String keyStr, {
+  Widget _buildNumpadButton(
+    String keyStr, {
     bool isIcon = false,
     IconData? iconData,
-    Color textColor = colorWhite,
+    Color textColor = colorText,
     Color? bgColor,
     Color? iconColor,
     required BuildContext context,
@@ -402,7 +456,11 @@ class TransferScreen extends GetView<TransferController> {
           child: Center(
             child: isIcon
                 ? Icon(iconData, color: iconColor ?? colorGrey)
-                : Text(keyStr, style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.bold)),
+                : Text(keyStr,
+                    style: TextStyle(
+                        color: textColor,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold)),
           ),
         ),
       ),

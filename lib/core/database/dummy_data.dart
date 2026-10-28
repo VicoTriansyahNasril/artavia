@@ -12,9 +12,36 @@ class DummyDataGenerator {
 
     // 1. Generate additional dummy accounts
     final accounts = [
-      {'name': 'Mandiri', 'type': 'Bank', 'balance': 5000000, 'currency_code': 'IDR', 'icon_code': null, 'icon_path': 'assets/keuangan/bank.png', 'color_val': 0xFF005EAA, 'is_excluded': 0},
-      {'name': 'BCA', 'type': 'Bank', 'balance': 2500000, 'currency_code': 'IDR', 'icon_code': null, 'icon_path': 'assets/keuangan/bank.png', 'color_val': 0xFF005EAA, 'is_excluded': 0},
-      {'name': 'Gopay', 'type': 'E-Wallet', 'balance': 300000, 'currency_code': 'IDR', 'icon_code': null, 'icon_path': 'assets/keuangan/dompet.png', 'color_val': 0xFF388E3C, 'is_excluded': 0},
+      {
+        'name': 'Mandiri',
+        'type': 'Bank',
+        'balance': 5000000,
+        'currency_code': 'IDR',
+        'icon_code': null,
+        'icon_path': 'assets/keuangan/bank.png',
+        'color_val': 0xFF5FA8D3,
+        'is_excluded': 0
+      },
+      {
+        'name': 'BCA',
+        'type': 'Bank',
+        'balance': 2500000,
+        'currency_code': 'IDR',
+        'icon_code': null,
+        'icon_path': 'assets/keuangan/bank.png',
+        'color_val': 0xFF7AA2F7,
+        'is_excluded': 0
+      },
+      {
+        'name': 'Gopay',
+        'type': 'E-Wallet',
+        'balance': 300000,
+        'currency_code': 'IDR',
+        'icon_code': null,
+        'icon_path': 'assets/keuangan/dompet.png',
+        'color_val': 0xFF5FBF8F,
+        'is_excluded': 0
+      },
     ];
 
     final batch = db.batch();
@@ -35,27 +62,40 @@ class DummyDataGenerator {
       } else {
         daysAgo = rand.nextInt(30) + 2;
       }
-      
-      final randomDate = now.subtract(Duration(days: daysAgo, hours: rand.nextInt(24), minutes: rand.nextInt(60)));
-      
+
+      final randomDate = now.subtract(Duration(
+          days: daysAgo, hours: rand.nextInt(24), minutes: rand.nextInt(60)));
+
       final isExpense = rand.nextDouble() > 0.3; // 70% expense, 30% income
       // Categories: 1-11 are pengeluaran, 12-16 are pemasukan
-      final categoryId = isExpense ? (rand.nextInt(11) + 1) : (rand.nextInt(5) + 12);
+      final categoryId =
+          isExpense ? (rand.nextInt(11) + 1) : (rand.nextInt(5) + 12);
       final type = isExpense ? 'pengeluaran' : 'pemasukan';
-      
+
       // Amount: 10k - 200k for expenses, 1M - 5M for income
-      final amount = isExpense 
-          ? ((rand.nextInt(20) + 1) * 10000) 
+      final amount = isExpense
+          ? ((rand.nextInt(20) + 1) * 10000)
           : ((rand.nextInt(40) + 10) * 100000);
-          
+
       final accountId = rand.nextInt(4) + 1; // 1 to 4
-      
-      final notes = isExpense ? [
-        'Beli kebutuhan bulanan', 'Jajan sore', 'Isi bensin', 'Makan siang',
-        'Bayar tagihan listrik', 'Nongkrong santai', 'Belanja online', 'Pulsa'
-      ] : [
-        'Gaji bulanan', 'Bonus proyek', 'Hasil investasi', 'Transferan teman'
-      ];
+
+      final notes = isExpense
+          ? [
+              'Beli kebutuhan bulanan',
+              'Jajan sore',
+              'Isi bensin',
+              'Makan siang',
+              'Bayar tagihan listrik',
+              'Nongkrong santai',
+              'Belanja online',
+              'Pulsa'
+            ]
+          : [
+              'Gaji bulanan',
+              'Bonus proyek',
+              'Hasil investasi',
+              'Transferan teman'
+            ];
       final note = notes[rand.nextInt(notes.length)];
 
       batch.insert('transactions', {
@@ -79,7 +119,7 @@ class DummyDataGenerator {
         'year': now.year,
       });
     }
-    
+
     await batch.commit(noResult: true);
   }
 }

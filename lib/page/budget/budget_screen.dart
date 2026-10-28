@@ -15,9 +15,9 @@ class BudgetScreen extends GetView<BudgetController> {
       appBar: AppBar(
         backgroundColor: colorBackground,
         title: const Text('Anggaran Bulanan',
-            style: TextStyle(color: colorWhite, fontSize: 18)),
+            style: TextStyle(color: colorText, fontSize: 18)),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: colorWhite),
+          icon: const Icon(Icons.arrow_back, color: colorText),
           onPressed: () => Get.back(),
         ),
       ),
@@ -39,12 +39,11 @@ class BudgetScreen extends GetView<BudgetController> {
                 children: [
                   const Text('Anggaran Kategori',
                       style: TextStyle(
-                          color: colorWhite,
+                          color: colorText,
                           fontSize: 16,
                           fontWeight: FontWeight.bold)),
                   TextButton.icon(
-                    onPressed: () =>
-                        controller.showAddBudgetDialog(context),
+                    onPressed: () => controller.showAddBudgetDialog(context),
                     icon: const Icon(Icons.add, color: colorAccent, size: 18),
                     label: const Text('Tambah',
                         style: TextStyle(color: colorAccent)),
@@ -53,8 +52,8 @@ class BudgetScreen extends GetView<BudgetController> {
               ),
               const SizedBox(height: 8),
               if (controller.budgetItems.isEmpty) _buildEmptyState(),
-              ...controller.budgetItems.map(
-                  (item) => _buildCategoryBudgetCard(context, item)),
+              ...controller.budgetItems
+                  .map((item) => _buildCategoryBudgetCard(context, item)),
             ],
           ),
         );
@@ -79,7 +78,7 @@ class BudgetScreen extends GetView<BudgetController> {
           Obx(() => Text(
                 controller.monthLabel,
                 style: const TextStyle(
-                    color: colorWhite,
+                    color: colorText,
                     fontSize: 16,
                     fontWeight: FontWeight.bold),
               )),
@@ -123,7 +122,7 @@ class BudgetScreen extends GetView<BudgetController> {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: colorCard,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: colorGrey.withValues(alpha: 0.1)),
         ),
         child: Column(
@@ -137,9 +136,7 @@ class BudgetScreen extends GetView<BudgetController> {
                   ? 'Belum ada anggaran'
                   : CurrencyService.to.format(total),
               style: const TextStyle(
-                  color: colorWhite,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold),
+                  color: colorText, fontSize: 28, fontWeight: FontWeight.bold),
             ),
             if (total > 0) ...[
               const SizedBox(height: 16),
@@ -149,8 +146,7 @@ class BudgetScreen extends GetView<BudgetController> {
                   value: percent.clamp(0.0, 1.0),
                   minHeight: 12,
                   backgroundColor: colorBackground,
-                  color:
-                      percent > 0.8 ? colorExpense : colorIncome,
+                  color: percent > 0.8 ? colorExpense : colorIncome,
                 ),
               ),
               const SizedBox(height: 16),
@@ -161,13 +157,11 @@ class BudgetScreen extends GetView<BudgetController> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text('Terpakai',
-                          style:
-                              TextStyle(color: colorGrey, fontSize: 12)),
+                          style: TextStyle(color: colorGrey, fontSize: 12)),
                       Text(
                         CurrencyService.to.format(used),
                         style: const TextStyle(
-                            color: colorWhite,
-                            fontWeight: FontWeight.bold),
+                            color: colorText, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -175,8 +169,7 @@ class BudgetScreen extends GetView<BudgetController> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       const Text('Sisa',
-                          style:
-                              TextStyle(color: colorGrey, fontSize: 12)),
+                          style: TextStyle(color: colorGrey, fontSize: 12)),
                       Text(
                         CurrencyService.to.format(sisa),
                         style: TextStyle(
@@ -199,7 +192,6 @@ class BudgetScreen extends GetView<BudgetController> {
     final int budget = item['budget_amount'] as int;
     final int used = item['used'] as int;
     final Color color = Color(item['color'] as int);
-    final IconData icon = item['icon'] as IconData;
     final double percent = budget > 0 ? used / budget : 0.0;
     final isOverBudget = used > budget;
 
@@ -209,44 +201,21 @@ class BudgetScreen extends GetView<BudgetController> {
         motion: const DrawerMotion(),
         children: [
           SlidableAction(
-            onPressed: (context) => controller.showEditBudgetDialog(context, item),
-            backgroundColor: colorAccent,
-            foregroundColor: colorOnAccent,
-            icon: Icons.edit,
+            onPressed: (context) =>
+                controller.showEditBudgetDialog(context, item),
+            backgroundColor: colorSurface,
+            foregroundColor: colorAccent,
+            icon: Icons.edit_outlined,
             label: 'Edit',
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
           ),
           SlidableAction(
-            onPressed: (context) async {
-              bool confirmed = false;
-              await Get.defaultDialog(
-                backgroundColor: colorCard,
-                title: 'Hapus Anggaran',
-                titleStyle: const TextStyle(color: colorWhite),
-                middleText: 'Hapus anggaran ${item['category']}?',
-                middleTextStyle: const TextStyle(color: colorGrey),
-                confirm: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: colorExpense),
-                  onPressed: () {
-                    confirmed = true;
-                    Get.back();
-                  },
-                  child: const Text('Hapus', style: TextStyle(color: colorWhite)),
-                ),
-                cancel: TextButton(
-                  onPressed: () => Get.back(),
-                  child: const Text('Batal', style: TextStyle(color: colorGrey)),
-                ),
-              );
-              if (confirmed) {
-                controller.deleteBudget(item['id'] as int);
-              }
-            },
-            backgroundColor: colorExpense,
-            foregroundColor: colorWhite,
-            icon: Icons.delete,
+            onPressed: (_) => controller.deleteBudget(item),
+            backgroundColor: colorSurface,
+            foregroundColor: colorExpense,
+            icon: Icons.delete_outline,
             label: 'Hapus',
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
           ),
         ],
       ),
@@ -255,7 +224,7 @@ class BudgetScreen extends GetView<BudgetController> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: colorCard,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(12),
           border: isOverBudget
               ? Border.all(color: colorExpense.withValues(alpha: 0.4))
               : null,
@@ -265,9 +234,14 @@ class BudgetScreen extends GetView<BudgetController> {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: color.withValues(alpha: 0.2),
+                  backgroundColor: color.withValues(alpha: 0.14),
                   radius: 20,
-                  child: Icon(icon, color: color, size: 20),
+                  child: CategoryIcon(
+                    iconCode: item['icon_code'] as int?,
+                    iconPath: item['icon_path'] as String?,
+                    color: color,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -276,13 +250,11 @@ class BudgetScreen extends GetView<BudgetController> {
                     children: [
                       Text(item['category'] as String,
                           style: const TextStyle(
-                              color: colorWhite,
-                              fontWeight: FontWeight.bold)),
+                              color: colorText, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
                       Text(
                         '${CurrencyService.to.format(used)} / ${CurrencyService.to.format(budget)}',
-                        style: const TextStyle(
-                            color: colorGrey, fontSize: 12),
+                        style: const TextStyle(color: colorGrey, fontSize: 12),
                       ),
                     ],
                   ),
@@ -299,9 +271,8 @@ class BudgetScreen extends GetView<BudgetController> {
                           controller.showEditBudgetDialog(context, item),
                     ),
                     if (isOverBudget)
-                      const Text('Melewati batas!',
-                          style: TextStyle(
-                              color: colorExpense, fontSize: 10)),
+                      const Text('Melewati batas',
+                          style: TextStyle(color: colorExpense, fontSize: 10)),
                   ],
                 ),
               ],
@@ -312,11 +283,11 @@ class BudgetScreen extends GetView<BudgetController> {
               child: LinearProgressIndicator(
                 value: percent.clamp(0.0, 1.0),
                 minHeight: 8,
-                backgroundColor: colorBackground,
+                backgroundColor: colorSurface,
                 color: percent > 1.0
                     ? colorExpense
                     : percent > 0.8
-                        ? Colors.orange
+                        ? colorWarning
                         : color,
               ),
             ),

@@ -39,7 +39,8 @@ class AddAccountScreen extends GetView<AccountManagementController> {
               style: TextButton.styleFrom(
                 backgroundColor: colorAccent,
                 foregroundColor: colorOnAccent,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
@@ -176,7 +177,7 @@ class _AccountPreviewCard extends StatelessWidget {
                   Text(
                     name,
                     style: const TextStyle(
-                      color: colorWhite,
+                      color: colorText,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -207,7 +208,7 @@ class _AccountPreviewCard extends StatelessWidget {
                 Text(
                   _formatBalance(balance),
                   style: TextStyle(
-                    color: balance < 0 ? colorExpense : colorWhite,
+                    color: balance < 0 ? colorExpense : colorText,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -224,9 +225,9 @@ class _AccountPreviewCard extends StatelessWidget {
     final sign = amount < 0 ? '-' : '';
     final abs = amount.abs();
     final formatted = abs.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
     return '$sign$formatted';
   }
 }
@@ -249,7 +250,8 @@ class _TypeSelectorGrid extends StatelessWidget {
               onTap: () => controller.onTypeSelected(type),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: isSelected ? color.withValues(alpha: 0.15) : colorCard,
                   borderRadius: BorderRadius.circular(10),
@@ -263,7 +265,8 @@ class _TypeSelectorGrid extends StatelessWidget {
                   style: TextStyle(
                     color: isSelected ? color : colorGrey,
                     fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ),
@@ -290,8 +293,7 @@ class _InfoCard extends StatelessWidget {
         children: [
           // Name field
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
               children: [
                 const SizedBox(
@@ -304,13 +306,12 @@ class _InfoCard extends StatelessWidget {
                     autofocus: false,
                     controller: controller.nameController,
                     onChanged: (v) => controller.accountName.value = v,
-                    style: const TextStyle(color: colorWhite, fontSize: 15),
+                    style: const TextStyle(color: colorText, fontSize: 15),
                     decoration: const InputDecoration(
                       hintText: 'cth: BCA, GoPay, Dompet',
                       hintStyle: TextStyle(color: colorGrey, fontSize: 14),
                       border: InputBorder.none,
-                      contentPadding:
-                          EdgeInsets.symmetric(vertical: 14),
+                      contentPadding: EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
                 ),
@@ -333,20 +334,19 @@ class _InfoCard extends StatelessWidget {
                       child: TextField(
                         controller: controller.balanceController,
                         onChanged: (v) {
-                          controller.balance.value =
-                              int.tryParse(v.replaceAll(
-                                      RegExp(r'[^0-9\-]'), '')) ??
-                                  0;
+                          controller.balance.value = int.tryParse(
+                                  v.replaceAll(RegExp(r'[^0-9\-]'), '')) ??
+                              0;
                         },
-                        keyboardType: const TextInputType.numberWithOptions(
-                            signed: true),
+                        keyboardType:
+                            const TextInputType.numberWithOptions(signed: true),
                         inputFormatters: [
                           LengthLimitingTextInputFormatter(16),
                           FilteringTextInputFormatter.allow(
-                              RegExp(r'^-?[0-9.]*')),
+                              RegExp(r'^-?[0-9.,]*')),
                           CurrencyInputFormatter(),
                         ],
-                        style: const TextStyle(color: colorWhite, fontSize: 15),
+                        style: const TextStyle(color: colorText, fontSize: 15),
                         decoration: InputDecoration(
                           hintText: '0',
                           hintStyle:
@@ -354,8 +354,7 @@ class _InfoCard extends StatelessWidget {
                           border: InputBorder.none,
                           contentPadding:
                               const EdgeInsets.symmetric(vertical: 14),
-                          prefixText:
-                              '${controller.currencyCode.value} ',
+                          prefixText: '${controller.currencyCode.value} ',
                           prefixStyle:
                               const TextStyle(color: colorGrey, fontSize: 14),
                         ),
@@ -381,27 +380,23 @@ class _CurrencyChips extends StatelessWidget {
     return Obx(() => SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
-            children: AccountManagementController.supportedCurrencies
-                .map((c) {
+            children: AccountManagementController.supportedCurrencies.map((c) {
               final isSelected = controller.currencyCode.value == c['code'];
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: GestureDetector(
-                  onTap: () =>
-                      controller.onCurrencySelected(c['code']!),
+                  onTap: () => controller.onCurrencySelected(c['code']!),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 9),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? colorAccent.withValues(alpha: 0.15)
                           : colorCard,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isSelected
-                            ? colorAccent
-                            : colorDivider,
+                        color: isSelected ? colorAccent : colorDivider,
                         width: 1.5,
                       ),
                     ),
@@ -411,7 +406,7 @@ class _CurrencyChips extends StatelessWidget {
                         Text(
                           c['symbol']!,
                           style: TextStyle(
-                            color: isSelected ? colorAccent : colorWhite,
+                            color: isSelected ? colorAccent : colorText,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -463,7 +458,8 @@ class _IconPickerGrid extends StatelessWidget {
           crossAxisSpacing: 8,
           children: [
             ...AccountManagementController.accountTypes.map((type) {
-              final isSelected = controller.selectedIconCode.value == type.defaultIconCode;
+              final isSelected =
+                  controller.selectedIconCode.value == type.defaultIconCode;
               return GestureDetector(
                 onTap: () {
                   controller.selectedIconCode.value = type.defaultIconCode;
@@ -549,7 +545,7 @@ class _ColorPicker extends StatelessWidget {
                     color: color,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected ? colorWhite : Colors.transparent,
+                      color: isSelected ? colorText : Colors.transparent,
                       width: 2.5,
                     ),
                     boxShadow: isSelected
@@ -563,7 +559,7 @@ class _ColorPicker extends StatelessWidget {
                   ),
                   child: isSelected
                       ? const Icon(Icons.check_rounded,
-                          color: Colors.white, size: 18)
+                          color: colorOnAccent, size: 18)
                       : null,
                 ),
               );
@@ -596,8 +592,8 @@ class _ExcludeToggle extends StatelessWidget {
               color: colorSurface,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.bar_chart_rounded,
-                color: colorGrey, size: 20),
+            child:
+                const Icon(Icons.bar_chart_rounded, color: colorGrey, size: 20),
           ),
           const SizedBox(width: 14),
           const Expanded(
@@ -607,7 +603,7 @@ class _ExcludeToggle extends StatelessWidget {
                 Text(
                   'Kecualikan dari Total',
                   style: TextStyle(
-                    color: colorWhite,
+                    color: colorText,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),

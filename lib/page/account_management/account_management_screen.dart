@@ -4,8 +4,7 @@ import 'package:get/get.dart';
 import 'package:artavia/page/account_management/account_management_controller.dart';
 import 'package:artavia/widgets/commons/common.dart';
 
-class AccountManagementScreen
-    extends GetView<AccountManagementController> {
+class AccountManagementScreen extends GetView<AccountManagementController> {
   const AccountManagementScreen({super.key});
 
   @override
@@ -18,14 +17,14 @@ class AccountManagementScreen
         title: const Text(
           'Mengelola Rekening',
           style: TextStyle(
-            color: colorWhite,
+            color: colorText,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: colorWhite),
+          icon: const Icon(Icons.arrow_back, color: colorText),
           onPressed: () => Get.back(),
         ),
       ),
@@ -37,10 +36,7 @@ class AccountManagementScreen
       }),
       floatingActionButton: FloatingActionButton.extended(
         key: controller.keyAccountFAB,
-        onPressed: () {
-          controller.resetForm();
-          Get.toNamed('/add-account');
-        },
+        onPressed: () => AccountManagementController.openEditor(),
         backgroundColor: colorAccent,
         icon: const Icon(Icons.add, color: colorOnAccent),
         label: const Text(
@@ -68,7 +64,7 @@ class AccountManagementScreen
           const Text(
             'Belum ada rekening',
             style: TextStyle(
-              color: colorWhite,
+              color: colorText,
               fontSize: 15,
               fontWeight: FontWeight.w500,
             ),
@@ -115,14 +111,14 @@ class AccountManagementScreen
                   final acc = entry.value as Map<String, dynamic>;
                   final iconCode = acc['icon_code'] as int?;
                   final iconPath = acc['icon_path'] as String?;
-                  final colorVal = acc['color_val'] as int? ?? 0xFFFFCA28;
+                  final colorVal =
+                      acc['color_val'] as int? ?? categoryPalette[2].toARGB32();
                   final color = Color(colorVal);
                   final isExcluded = acc['is_excluded'] as bool? ?? false;
 
                   return Column(
                     children: [
-                      if (i > 0)
-                        const Divider(color: colorBackground, height: 1),
+                      if (i > 0) const Divider(height: 1, indent: 68),
                       ListTile(
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 5),
@@ -145,7 +141,7 @@ class AccountManagementScreen
                             Text(
                               acc['name'] as String,
                               style: const TextStyle(
-                                color: colorWhite,
+                                color: colorText,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                               ),
@@ -185,7 +181,8 @@ class AccountManagementScreen
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                CurrencyService.to.formatWithoutSymbol(acc['balance']),
+                                CurrencyService.to
+                                    .formatWithoutSymbol(acc['balance']),
                                 style: const TextStyle(
                                   color: colorGrey,
                                   fontSize: 13,
@@ -203,10 +200,8 @@ class AccountManagementScreen
                                 color: colorGrey,
                                 size: 20,
                               ),
-                              onPressed: () {
-                                controller.startEditAccount(acc);
-                                Get.toNamed('/add-account');
-                              },
+                              onPressed: () =>
+                                  AccountManagementController.openEditor(acc),
                             ),
                             IconButton(
                               icon: const Icon(

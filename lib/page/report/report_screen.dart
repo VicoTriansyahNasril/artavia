@@ -1,677 +1,216 @@
 import 'package:flutter/material.dart';
-import 'package:artavia/core/utils/currency_format.dart';
 import 'package:get/get.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:artavia/core/utils/currency_format.dart';
+import 'package:artavia/core/utils/finance_calc.dart';
+import 'package:artavia/page/account_management/account_management_controller.dart';
 import 'package:artavia/page/report/report_controller.dart';
+import 'package:artavia/page/routes.dart';
 import 'package:artavia/widgets/commons/common.dart';
 
+/// "Aset" tab: net worth (shared rule, FR-013) and the account list.
 class ReportScreen extends GetView<ReportController> {
   const ReportScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          _buildTabBar(),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _buildAnalisisTab(),
-                _buildRekeningTab(),
-              ],
-            ),
-          ),
+    return RefreshIndicator(
+      onRefresh: controller.loadData,
+      backgroundColor: colorCard,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+        children: const [
+          _NetWorthCard(),
+          SizedBox(height: 12),
+          _ActionRow(),
+          _AccountList(),
         ],
       ),
     );
   }
+}
 
-  Widget _buildTabBar() {
+class _NetWorthCard extends GetView<ReportController> {
+  const _NetWorthCard();
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      color: colorBackground,
-      child: const TabBar(
-        indicatorColor: colorAccent,
-        indicatorWeight: 3,
-        indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: colorWhite,
-        unselectedLabelColor: colorGrey,
-        labelStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-        unselectedLabelStyle: TextStyle(fontSize: 14),
-        tabs: [
-          Tab(text: 'Analisis'),
-          Tab(text: 'Rekening'),
-        ],
-      ),
-    );
-  }
-
-  // ─── Analisis tab ─────────────────────────────────────────────────────────
-
-  Widget _buildAnalisisTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          _buildMonthNav(),
-          const SizedBox(height: 12),
-          _buildAnalisisSummary(),
-          const SizedBox(height: 12),
-          _buildExpenseDistribution(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMonthNav() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        decoration: BoxDecoration(
-          color: colorCard,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(
-              onPressed: () => controller.prevMonth(),
-              icon: const Icon(Icons.chevron_left, color: colorGrey, size: 24),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-            Obx(() => Text(
-                  controller.monthLabel,
-                  style: const TextStyle(
-                    color: colorWhite,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
-                )),
-            IconButton(
-              onPressed: () => controller.nextMonth(),
-              icon: const Icon(Icons.chevron_right, color: colorGrey, size: 24),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAnalisisSummary() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-        decoration: BoxDecoration(
-          color: colorCard,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildSummaryItem(
-              'Pengeluaran',
-              () => controller.pengeluaran.value,
-              colorExpense,
-            ),
-            Container(
-              width: 1,
-              height: 40,
-              color: colorGrey.withValues(alpha: 0.2),
-            ),
-            _buildSummaryItem(
-              'Pemasukan',
-              () => controller.pemasukan.value,
-              colorIncome,
-            ),
-            Container(
-              width: 1,
-              height: 40,
-              color: colorGrey.withValues(alpha: 0.2),
-            ),
-            _buildSummaryItem(
-              'Saldo',
-              () => controller.saldo.value,
-              colorAccent,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryItem(
-    String title,
-    int Function() getValue,
-    Color amountColor,
-  ) {
-    return Obx(() => Column(
-          children: [
-            Text(
-              title,
-              style: const TextStyle(color: colorGrey, fontSize: 11),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              CurrencyService.to.formatWithoutSymbol(getValue()),
-              style: TextStyle(
-                color: amountColor,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ));
-  }
-
-  Widget _buildExpenseDistribution() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: colorCard,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Obx(() {
-          if (controller.expenseByCategory.isEmpty) {
-            return Column(
-              children: [
-                const Text(
-                  'Distribusi Pengeluaran',
-                  style: TextStyle(
-                    color: colorWhite,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                Icon(
-                  Icons.pie_chart_outline,
-                  size: 52,
-                  color: colorGrey.withValues(alpha: 0.4),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Belum ada pengeluaran bulan ini',
-                  style: TextStyle(color: colorGrey),
-                ),
-                const SizedBox(height: 16),
-              ],
-            );
-          }
-
-          final total = controller.expenseByCategory
-              .fold(0, (sum, item) => sum + (item['amount'] as int));
-
-          return Column(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+          color: colorCard, borderRadius: BorderRadius.circular(12)),
+      child: Obx(() => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Distribusi Pengeluaran',
-                style: TextStyle(
-                  color: colorWhite,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+              const Text('Kekayaan Bersih',
+                  style: TextStyle(color: colorGrey, fontSize: 12)),
+              const SizedBox(height: 6),
+              Text(
+                CurrencyService.to.format(controller.kekayaanBersih.value),
+                style: const TextStyle(
+                    color: colorText,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 28),
-              SizedBox(
-                height: 200,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    PieChart(
-                      PieChartData(
-                        sectionsSpace: 3,
-                        centerSpaceRadius: 66,
-                        sections: controller.expenseByCategory.map((item) {
-                          final val = (item['amount'] as int).toDouble();
-                          final color = Color(item['color'] as int);
-                          final perc =
-                              total == 0 ? 0.0 : (val / total * 100);
-                          return PieChartSectionData(
-                            color: color,
-                            value: val,
-                            title: '${perc.toStringAsFixed(0)}%',
-                            radius: 22,
-                            titleStyle: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: colorWhite,
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Total',
-                          style: TextStyle(color: colorGrey, fontSize: 11),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          CurrencyService.to.format(total),
-                          style: const TextStyle(
-                            color: colorWhite,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Category list with progress bars
-              ...controller.expenseByCategory.map((item) {
-                final amount = item['amount'] as int;
-                final pct = total == 0 ? 0.0 : amount / total;
-                final color = Color(item['color'] as int);
-                final name = item['category'] as String;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              name,
-                              style: const TextStyle(
-                                color: colorWhite,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '${(pct * 100).toStringAsFixed(1)}%',
-                            style: const TextStyle(
-                              color: colorGrey,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            CurrencyService.to.formatWithoutSymbol(amount),
-                            style: const TextStyle(
-                              color: colorWhite,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      // Progress bar
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: pct,
-                          backgroundColor: colorGrey.withValues(alpha: 0.15),
-                          valueColor: AlwaysStoppedAnimation<Color>(color),
-                          minHeight: 4,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
+              const SizedBox(height: 16),
+              Row(children: [
+                _figure('Total Aset', controller.totalAset.value, colorIncome),
+                _figure('Total Liabilitas', controller.totalLiabilitas.value,
+                    colorExpense),
+              ]),
             ],
-          );
-        }),
-      ),
+          )),
     );
   }
 
-  // ─── Rekening tab ─────────────────────────────────────────────────────────
-
-  Widget _buildRekeningTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          _buildNetWorthSummary(),
-          const SizedBox(height: 16),
-          _buildAccountActionRow(),
-          const SizedBox(height: 8),
-          _buildAccountList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNetWorthSummary() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: colorCard,
-          borderRadius: BorderRadius.circular(10),
+  Widget _figure(String label, int value, Color color) => Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(color: colorGrey, fontSize: 11)),
+            const SizedBox(height: 4),
+            Text(CurrencyService.to.formatWithoutSymbol(value),
+                style: TextStyle(
+                    color: color, fontWeight: FontWeight.w600, fontSize: 15)),
+          ],
         ),
-        child: Obx(() => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Kekayaan Bersih',
-                  style: TextStyle(color: colorGrey, fontSize: 12),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  CurrencyService.to.formatWithoutSymbol(
-                      controller.kekayaanBersih.value),
-                  style: const TextStyle(
-                    color: colorWhite,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Total Aset',
-                            style: TextStyle(color: colorGrey, fontSize: 11),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            CurrencyService.to.formatWithoutSymbol(
-                                controller.totalAset.value),
-                            style: const TextStyle(
-                              color: colorIncome,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 36,
-                      color: colorGrey.withValues(alpha: 0.2),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const Text(
-                            'Total Liabilitas',
-                            style: TextStyle(color: colorGrey, fontSize: 11),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            CurrencyService.to.formatWithoutSymbol(
-                                controller.totalLiabilitas.value),
-                            style: const TextStyle(
-                              color: colorExpense,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            )),
-      ),
+      );
+}
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: () => AccountManagementController.openEditor(),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Tambah Rekening'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => Get.toNamed(accountManagementRoute),
+            icon: const Icon(Icons.tune_rounded, size: 18),
+            label: const Text('Kelola'),
+          ),
+        ),
+      ],
     );
   }
+}
 
-  Widget _buildAccountActionRow() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () async {
-                await Get.toNamed('/add-account');
-                controller.loadData();
-              },
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: colorAccent),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              icon: const Icon(Icons.add, color: colorAccent, size: 18),
-              label: const Text(
-                'Tambah Rekening',
-                style: TextStyle(
-                  color: colorAccent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () async {
-                await Get.toNamed('/account-management');
-                controller.loadData();
-              },
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colorGrey.withValues(alpha: 0.4)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              icon: Icon(Icons.settings_outlined,
-                  color: colorGrey.withValues(alpha: 0.7), size: 18),
-              label: Text(
-                'Kelola Rekening',
-                style: TextStyle(
-                  color: colorGrey.withValues(alpha: 0.7),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+class _AccountList extends GetView<ReportController> {
+  const _AccountList();
 
-  Widget _buildAccountList() {
+  @override
+  Widget build(BuildContext context) {
     return Obx(() {
       if (controller.accountGroups.isEmpty) {
-        return Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            children: [
-              Icon(
-                Icons.account_balance_wallet_outlined,
-                size: 52,
-                color: colorGrey.withValues(alpha: 0.4),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Belum ada rekening',
-                style: TextStyle(color: colorGrey),
-              ),
-            ],
-          ),
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 48),
+          child: Column(children: [
+            Icon(Icons.account_balance_wallet_outlined,
+                size: 48, color: colorGrey),
+            SizedBox(height: 12),
+            Text('Belum ada rekening',
+                style:
+                    TextStyle(color: colorText, fontWeight: FontWeight.w500)),
+            SizedBox(height: 4),
+            Text('Tambahkan rekening untuk mulai mencatat',
+                style: TextStyle(color: colorGrey, fontSize: 13)),
+          ]),
         );
       }
-
       return Column(
         children: controller.accountGroups.map((group) {
-          final accounts = group['accounts'] as List;
-          final groupTotal = group['total'] as int;
-
+          final accounts =
+              (group['accounts'] as List).cast<Map<String, dynamic>>();
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Group header
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      (group['groupName'] as String).toUpperCase(),
+                padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+                child: Row(children: [
+                  Text((group['groupName'] as String).toUpperCase(),
                       style: const TextStyle(
-                        color: colorGrey,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    Text(
-                      CurrencyService.to.formatWithoutSymbol(groupTotal),
-                      style: const TextStyle(
-                        color: colorGrey,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
+                          color: colorGrey,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.8)),
+                  const Spacer(),
+                  Text(
+                      CurrencyService.to
+                          .formatWithoutSymbol(group['total'] as int),
+                      style: const TextStyle(color: colorGrey, fontSize: 11)),
+                ]),
               ),
               Material(
                 color: colorCard,
-                child: Column(
-                  children: accounts.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final acc = entry.value as Map<String, dynamic>;
-                    final iconCode = acc['icon_code'] as int?;
-                    final iconPath = acc['icon_path'] as String?;
-                    final colorVal = acc['color_val'] as int? ?? 0xFFFFCA28;
-                    final color = Color(colorVal);
-                    final balance = acc['balance'] as int;
-
-                    return Column(
-                      children: [
-                        if (i > 0)
-                          const Divider(color: colorBackground, height: 1),
-                        Slidable(
-                          key: ValueKey(acc['id']),
-                          endActionPane: ActionPane(
-                            motion: const DrawerMotion(),
-                            children: [
-                              SlidableAction(
-                                onPressed: (context) {
-                                  Get.toNamed('/add-account', arguments: {
-                                    'isEdit': true,
-                                    'id': acc['id'],
-                                    'name': acc['name'],
-                                    'balance': acc['balance'],
-                                    'type': acc['type'],
-                                    'currency': acc['currency'],
-                                    'icon_code': acc['icon_code'],
-                                    'icon_path': acc['icon_path'],
-                                    'color_val': acc['color_val'],
-                                    'exclude_from_total': acc['exclude_from_total'],
-                                  });
-                                },
-                                backgroundColor: colorAccent,
-                                foregroundColor: colorOnAccent,
-                                icon: Icons.edit,
-                                label: 'Edit',
-                              ),
-                            ],
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4),
-                            onTap: () {
-                              Get.toNamed('/add-account', arguments: {
-                                'isEdit': true,
-                                'id': acc['id'],
-                                'name': acc['name'],
-                                'balance': acc['balance'],
-                                'type': acc['type'],
-                                'currency': acc['currency'],
-                                'icon_code': acc['icon_code'],
-                                'icon_path': acc['icon_path'],
-                                'color_val': acc['color_val'],
-                                'exclude_from_total': acc['exclude_from_total'],
-                              });
-                            },
-                            leading: Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: color.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: CategoryIcon(
-                                iconCode: iconCode,
-                                iconPath: iconPath,
-                                color: color,
-                                size: 20,
-                              ),
-                            ),
-                            title: Text(
-                              acc['name'] as String,
-                              style: const TextStyle(
-                                color: colorWhite,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  CurrencyService.to.formatWithoutSymbol(balance),
-                                  style: TextStyle(
-                                    color: balance < 0 ? colorExpense : colorWhite,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.chevron_right,
-                                  color: colorGrey,
-                                  size: 18,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-                ),
+                borderRadius: BorderRadius.circular(12),
+                clipBehavior: Clip.antiAlias,
+                child: Column(children: [
+                  for (var i = 0; i < accounts.length; i++) ...[
+                    if (i > 0) const Divider(indent: 68),
+                    _AccountTile(account: accounts[i]),
+                  ],
+                ]),
               ),
-              const SizedBox(height: 4),
             ],
           );
         }).toList(),
       );
     });
+  }
+}
+
+class _AccountTile extends StatelessWidget {
+  final Map<String, dynamic> account;
+
+  const _AccountTile({required this.account});
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        Color(account['color_val'] as int? ?? categoryPalette.first.toARGB32());
+    final balance = account['balance'] as int? ?? 0;
+    final excluded = isExcludedAccount(account);
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      onTap: () => AccountManagementController.openEditor(account),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: CategoryIcon(
+          iconCode: account['icon_code'] as int?,
+          iconPath: account['icon_path'] as String?,
+          color: color,
+          size: 20,
+        ),
+      ),
+      title: Text(account['name'] as String,
+          style: const TextStyle(
+              color: colorText, fontWeight: FontWeight.w500, fontSize: 14)),
+      subtitle: excluded
+          ? const Text('Tidak dihitung dalam total',
+              style: TextStyle(color: colorGrey, fontSize: 11))
+          : null,
+      trailing: Text(
+        CurrencyService.to.formatWithoutSymbol(balance),
+        style: TextStyle(
+          color: balance < 0 ? colorExpense : colorText,
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
+      ),
+    );
   }
 }

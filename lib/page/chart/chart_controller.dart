@@ -1,204 +1,169 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:artavia/core/database/database_helper.dart';
+import 'package:artavia/core/services/period_service.dart';
+import 'package:artavia/core/utils/date_format.dart';
+import 'package:artavia/core/utils/finance_calc.dart';
+import 'package:artavia/widgets/commons/common.dart';
+
+/// One slice of the expense donut (top categories + "Lain-lain").
+class CategorySlice {
+  final String name;
+  final int amount;
+  final double percent;
+  final Color color;
+  final int? iconCode;
+  final String? iconPath;
+  final List<Map<String, dynamic>> transactions;
+
+  const CategorySlice({
+    required this.name,
+    required this.amount,
+    required this.percent,
+    required this.color,
+    required this.iconCode,
+    required this.iconPath,
+    required this.transactions,
+  });
+}
 
 class ChartController extends GetxController {
-  final currentTab = 'Bulan'.obs;
-  final currentDate = DateTime.now().obs;
+  static const _maxSlices = 5;
 
-  final expenses = <Map<String, dynamic>>[].obs;
-  final dailySpots = <FlSpot>[].obs;
+  final mode = TrendMode.month.obs;
+  final weekStart = startOfWeek(DateTime.now()).obs;
+  final year = DateTime.now().year.obs;
+
+  final slices = <CategorySlice>[].obs;
+  final trend = <TrendPoint>[].obs;
   final totalExpense = 0.obs;
   final totalIncome = 0.obs;
   final avgExpense = 0.obs;
+  final hasData = false.obs;
 
-  String get currentDateLabel {
-    final d = currentDate.value;
-    if (currentTab.value == 'Pekan') {
-      return 'Pekan ini';
-    } else if (currentTab.value == 'Bulan') {
-      final months = [
-        '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
-      ];
-      return '${months[d.month]} ${d.year}';
-    } else {
-      return d.year.toString();
+  PeriodService get _period => PeriodService.to;
+
+  DateTime get rangeStart => switch (mode.value) {
+        TrendMode.week => weekStart.value,
+        TrendMode.month => _period.active.value.start,
+        TrendMode.year => DateTime(year.value),
+      };
+
+  DateTime get rangeEnd => switch (mode.value) {
+        TrendMode.week => weekStart.value.add(const Duration(days: 7)),
+        TrendMode.month => _period.active.value.end,
+        TrendMode.year => DateTime(year.value + 1),
+      };
+
+  String get periodLabel {
+    switch (mode.value) {
+      case TrendMode.week:
+        final end = weekStart.value.add(const Duration(days: 6));
+        return '${weekStart.value.day} ${IdNames.monthShort(weekStart.value.month)}'
+            ' – ${end.day} ${IdNames.monthShort(end.month)}';
+      case TrendMode.month:
+        return _period.active.value.label;
+      case TrendMode.year:
+        return '${year.value}';
     }
   }
 
   @override
   void onInit() {
     super.onInit();
+    ever(_period.active, (_) {
+      if (mode.value == TrendMode.month) loadData();
+    });
     loadData();
   }
 
-  void changeTab(String tab) {
-    currentTab.value = tab;
+  void changeMode(TrendMode value) {
+    mode.value = value;
     loadData();
   }
 
-  void prevPeriod() {
-    final d = currentDate.value;
-    if (currentTab.value == 'Bulan') {
-      currentDate.value = DateTime(d.year, d.month - 1);
-    } else if (currentTab.value == 'Tahun') {
-      currentDate.value = DateTime(d.year - 1);
-    }
-    loadData();
-  }
-
-  void nextPeriod() {
-    final d = currentDate.value;
-    if (currentTab.value == 'Bulan') {
-      currentDate.value = DateTime(d.year, d.month + 1);
-    } else if (currentTab.value == 'Tahun') {
-      currentDate.value = DateTime(d.year + 1);
+  void shiftPeriod(int step) {
+    switch (mode.value) {
+      case TrendMode.week:
+        weekStart.value = weekStart.value.add(Duration(days: 7 * step));
+      case TrendMode.month:
+        _period.shift(step); // reloads via ever()
+        return;
+      case TrendMode.year:
+        year.value += step;
     }
     loadData();
   }
 
   Future<void> loadData() async {
-    List<Map<String, dynamic>> transactions;
+    final start = rangeStart;
+    final end = rangeEnd;
+    final rows =
+        await DatabaseHelper.instance.readTransactionsByRange(start, end);
 
-    if (currentTab.value == 'Bulan') {
-      transactions = await DatabaseHelper.instance.readTransactionsByMonth(
-          currentDate.value.year, currentDate.value.month);
-    } else if (currentTab.value == 'Tahun') {
-      transactions = await DatabaseHelper.instance.readAllTransactions();
-      transactions = transactions
-          .where((t) =>
-              DateTime.parse(t['date'] as String).year ==
-              currentDate.value.year)
-          .toList();
-    } else {
-      // Pekan – last 7 days
-      final now = DateTime.now();
-      final weekAgo = now.subtract(const Duration(days: 7));
-      transactions = await DatabaseHelper.instance.readAllTransactions();
-      transactions = transactions.where((t) {
-        final d = DateTime.parse(t['date'] as String);
-        return d.isAfter(weekAgo) && d.isBefore(now.add(const Duration(days: 1)));
-      }).toList();
+    var expense = 0;
+    var income = 0;
+    for (final t in rows) {
+      final amount = t['amount'] as int;
+      if (t['type'] == 'pengeluaran') expense += amount;
+      if (t['type'] == 'pemasukan') income += amount;
     }
+    totalExpense.value = expense;
+    totalIncome.value = income;
+    hasData.value = rows.isNotEmpty;
+    slices.value = _buildSlices(rows, expense);
 
-    // Aggregate by category (expenses only)
-    final Map<String, int> byCat = {};
-    final Map<String, List<Map<String, dynamic>>> transactionsByCat = {};
-    final Map<int, int> byDay = {};
-    final Map<String, Map<String, dynamic>> catDetails = {};
-    int totEx = 0;
-    int totIn = 0;
+    final points = buildTrend(rows, mode.value, start, end);
+    trend.value = points;
+    final active = points.where((p) => p.amount > 0).length;
+    avgExpense.value = active == 0 ? 0 : expense ~/ active;
+  }
 
-    for (var t in transactions) {
-      final amt = t['amount'] as int;
-      final type = t['type'] as String;
-      final date = DateTime.parse(t['date'] as String);
-
-      if (type == 'pengeluaran') {
-        totEx += amt;
-        final cat = (t['categoryName'] as String?) ?? 'Lainnya';
-        byCat[cat] = (byCat[cat] ?? 0) + amt;
-        transactionsByCat.putIfAbsent(cat, () => []).add(t);
-        
-        catDetails[cat] = {
-          'icon_code': t['categoryIconCode'],
-          'icon_path': t['categoryIconPath'],
-          'color_val': t['categoryColorVal'],
-        };
-        
-        final day = date.day;
-        byDay[day] = (byDay[day] ?? 0) + amt;
-      } else if (type == 'pemasukan') {
-        totIn += amt;
-      }
+  List<CategorySlice> _buildSlices(List<Map<String, dynamic>> rows, int total) {
+    final byCategory = <String, List<Map<String, dynamic>>>{};
+    for (final t in rows.where((t) => t['type'] == 'pengeluaran')) {
+      final name = t['categoryName'] as String? ?? 'Lainnya';
+      byCategory.putIfAbsent(name, () => []).add(t);
     }
+    int sum(List<Map<String, dynamic>> list) =>
+        list.fold(0, (s, t) => s + (t['amount'] as int));
+    final sorted = byCategory.entries.toList()
+      ..sort((a, b) => sum(b.value).compareTo(sum(a.value)));
 
-    totalExpense.value = totEx;
-    totalIncome.value = totIn;
-
-    final sorted = byCat.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    int idx = 0;
-    final expList = <Map<String, dynamic>>[];
-    const maxCategories = 5;
-    
-    // Default fallback colors if category color_val is missing
-    final defaultCatColors = [
-      0xFFFF9800, 0xFF4CAF50, 0xFF9C27B0, 0xFFF44336,
-      0xFF2196F3, 0xFFE91E63, 0xFF00BCD4, 0xFFFFEB3B,
-    ];
-
-    if (sorted.length > maxCategories) {
-      for (int i = 0; i < maxCategories - 1; i++) {
-        final e = sorted[i];
-        final percent =
-            totEx > 0 ? (e.value / totEx * 100).toStringAsFixed(1) : '0.0';
-        final details = catDetails[e.key] ?? {};
-        expList.add({
-          'name': e.key,
-          'amount': e.value,
-          'percent': double.tryParse(percent) ?? 0.0,
-          'color': details['color_val'] ?? defaultCatColors[idx % defaultCatColors.length],
-          'icon_code': details['icon_code'],
-          'icon_path': details['icon_path'],
-          'transactions': transactionsByCat[e.key] ?? [],
-        });
-        idx++;
-      }
-
-      int othersAmount = 0;
-      List<Map<String, dynamic>> othersTx = [];
-      for (int i = maxCategories - 1; i < sorted.length; i++) {
-        othersAmount += sorted[i].value;
-        othersTx.addAll(transactionsByCat[sorted[i].key] ?? []);
-      }
-      final othersPercent =
-          totEx > 0 ? (othersAmount / totEx * 100).toStringAsFixed(1) : '0.0';
-
-      expList.add({
-        'name': 'Lain-lain',
-        'amount': othersAmount,
-        'percent': double.tryParse(othersPercent) ?? 0.0,
-        'color': 0xFF9E9E9E,
-        'icon_code': Icons.more_horiz.codePoint,
-        'icon_path': null,
-        'transactions': othersTx,
-      });
-    } else {
-      for (var e in sorted) {
-        final percent =
-            totEx > 0 ? (e.value / totEx * 100).toStringAsFixed(1) : '0.0';
-        final details = catDetails[e.key] ?? {};
-        expList.add({
-          'name': e.key,
-          'amount': e.value,
-          'percent': double.tryParse(percent) ?? 0.0,
-          'color': details['color_val'] ?? defaultCatColors[idx % defaultCatColors.length],
-          'icon_code': details['icon_code'],
-          'icon_path': details['icon_path'],
-          'transactions': transactionsByCat[e.key] ?? [],
-        });
-        idx++;
-      }
+    final overflow = sorted.length > _maxSlices;
+    final head = overflow ? sorted.take(_maxSlices - 1).toList() : sorted;
+    final result = <CategorySlice>[];
+    for (var i = 0; i < head.length; i++) {
+      final first = head[i].value.first;
+      final colorVal = first['categoryColorVal'] as int?;
+      result.add(_slice(
+        head[i].key,
+        head[i].value,
+        total,
+        colorVal != null && colorVal != 0 ? Color(colorVal) : paletteColorAt(i),
+        first['categoryIconCode'] as int?,
+        first['categoryIconPath'] as String?,
+      ));
     }
-    expenses.value = expList;
-
-    // Build daily spots for line chart
-    if (byDay.isNotEmpty) {
-      final spotList = byDay.entries
-          .map((e) => FlSpot(e.key.toDouble(), e.value.toDouble()))
-          .toList()
-        ..sort((a, b) => a.x.compareTo(b.x));
-      dailySpots.value = spotList;
-
-      final daysWithData = byDay.length;
-      avgExpense.value = daysWithData > 0 ? totEx ~/ daysWithData : 0;
-    } else {
-      dailySpots.value = [];
-      avgExpense.value = 0;
+    if (overflow) {
+      final rest = sorted.skip(_maxSlices - 1).expand((e) => e.value).toList();
+      result.add(_slice('Lain-lain', rest, total, colorGrey,
+          Icons.more_horiz.codePoint, null));
     }
+    return result;
+  }
+
+  CategorySlice _slice(String name, List<Map<String, dynamic>> txs, int total,
+      Color color, int? iconCode, String? iconPath) {
+    final amount = txs.fold<int>(0, (s, t) => s + (t['amount'] as int));
+    return CategorySlice(
+      name: name,
+      amount: amount,
+      percent: total == 0 ? 0 : amount / total * 100,
+      color: color,
+      iconCode: iconCode,
+      iconPath: iconPath,
+      transactions: txs,
+    );
   }
 }

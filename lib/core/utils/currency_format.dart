@@ -1,13 +1,20 @@
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 
+/// Formats amounts with the user's thousands separator (Pengaturan → Format Angka).
 class CurrencyService {
   CurrencyService._();
   static final CurrencyService to = CurrencyService._();
 
+  /// `true` → 1,000 ; `false` → 1.000 (default). Set by SettingsService.
+  bool useCommaSeparator = false;
+
+  String get _locale => useCommaSeparator ? 'en_US' : 'id_ID';
+  String get groupSeparator => useCommaSeparator ? ',' : '.';
+
   String format(num amount) {
     return NumberFormat.currency(
-      locale: 'id_ID',
+      locale: _locale,
       symbol: 'Rp ',
       decimalDigits: 0,
     ).format(amount);
@@ -15,10 +22,10 @@ class CurrencyService {
 
   String formatWithoutSymbol(num amount) {
     return NumberFormat.currency(
-      locale: 'id_ID',
+      locale: _locale,
       symbol: '',
       decimalDigits: 0,
-    ).format(amount);
+    ).format(amount).trim();
   }
 
   String compact(num amount) {
@@ -40,14 +47,15 @@ class CurrencyInputFormatter extends TextInputFormatter {
     bool isNegative = newValue.text.startsWith('-');
     String numStr = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
     if (numStr.isEmpty) {
-        return newValue.copyWith(text: isNegative ? '-' : '');
+      return newValue.copyWith(text: isNegative ? '-' : '');
     }
 
     final int value = int.parse(numStr);
+    final separator = CurrencyService.to.groupSeparator;
     final formatted = value.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}$separator',
+        );
     final result = isNegative ? '-$formatted' : formatted;
 
     return newValue.copyWith(

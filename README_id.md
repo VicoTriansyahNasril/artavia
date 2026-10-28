@@ -8,11 +8,13 @@
 Artavia adalah aplikasi mobile manajemen keuangan dan pengeluaran yang mengutamakan privasi (*local-first*), dibangun dengan menggunakan Flutter. Didesain dengan estetika premium dan animasi mikro (*micro-animations*) yang halus, aplikasi ini membantu Anda mengelola keuangan harian, melacak berbagai rekening, dan menganalisis kebiasaan pengeluaran Anda—semuanya dilakukan sepenuhnya secara *offline*.
 
 ## ✨ Fitur Utama
-- **Utamakan Privasi (Hanya Lokal)**: Tidak ada sinkronisasi *cloud*, tidak ada pelacakan, tidak ada API eksternal. Semua data keuangan Anda tersimpan dengan aman di perangkat lokal menggunakan SQLite.
-- **Manajemen Multi-Rekening**: Kelola berbagai dompet, rekening bank, dan uang digital dengan mudah.
-- **Analitik Dinamis**: Grafik yang indah dan laporan mendalam berbasis kategori untuk pemasukan dan pengeluaran.
-- **Kustomisasi Kategori**: Buat kategori Anda sendiri dengan pilihan ikon dan warna yang lengkap.
-- **UI/UX Premium**: Nikmati antarmuka mode gelap yang responsif dengan animasi yang mulus.
+- **Utamakan Privasi (Lokal)**: Semua data tersimpan di perangkat (SQLite), tanpa pelacakan. Cadangan Google Drive bersifat opsional dan hanya berjalan saat Anda memintanya.
+- **Manajemen Multi-Rekening & Transfer**: Dompet, bank, dan uang digital, termasuk transfer dengan biaya admin.
+- **Analisis dalam Satu Tempat**: Ringkasan, pengeluaran per kategori, dan tren mingguan/bulanan/tahunan di tab Grafik; kekayaan bersih di tab Aset.
+- **Anggaran**: Batas per kategori dengan ringkasan di Riwayat dan peringatan saat melewati batas.
+- **Transaksi Berulang**: Gaji, sewa, atau langganan tercatat otomatis.
+- **Pengaturan Lengkap**: Pengingat harian, kunci PIN, awal bulan kustom, format angka, efek suara, serta ekspor/impor CSV.
+- **Tampilan Kalem**: Mode gelap dengan palet "slate" yang lembut dan kontras terukur agar nyaman di mata.
 
 ## 🛠️ Teknologi yang Digunakan
 - **Framework**: [Flutter](https://flutter.dev/)

@@ -1,202 +1,108 @@
 import 'package:flutter/material.dart';
-import 'package:artavia/core/utils/currency_format.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/widgets/commons/common.dart';
-import 'package:artavia/core/database/database_helper.dart';
-import 'package:artavia/core/utils/data_refresh.dart';
+import 'package:artavia/widgets/transaction/transaction_item.dart';
 
+/// Read-only view of one transaction; arguments come from [transactionArgs].
 class TransactionDetailScreen extends StatelessWidget {
   const TransactionDetailScreen({super.key});
 
-  static Color _resolveColor(String? cat, bool isExpense, bool isTransfer) {
-    if (isTransfer) return Colors.blue;
-    return isExpense ? colorExpense : colorIncome;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final arg = Get.arguments;
-    final String? id = arg?['id']?.toString();
-    final String type = arg?['type'] ?? 'pengeluaran';
-    final int amount = arg?['amount'] ?? 0;
-    final String category = arg?['category'] ?? 'Lainnya';
-    final String note = arg?['note'] ?? '';
-    final String account = arg?['account'] ?? 'CASH';
-    final int? accountId = arg?['account_id'];
-    final String destinationAccount = arg?['destination_account'] ?? '';
-    final int? destinationAccountId = arg?['destination_account_id'];
-    final DateTime date = arg?['date'] ?? DateTime.now();
-
+    final Map<String, dynamic> arg =
+        Map<String, dynamic>.from(Get.arguments ?? {});
+    final type = arg['type'] as String? ?? 'pengeluaran';
     final isExpense = type == 'pengeluaran';
     final isTransfer = type == 'transfer';
-
-    final iconCode = arg?['icon_code'] as int?;
-    final iconPath = arg?['icon_path'] as String?;
-    final colorVal = arg?['color_val'] as int?;
-
-    final themeColor = colorVal != null
-        ? Color(colorVal)
-        : _resolveColor(category, isExpense, isTransfer);
+    final amount = arg['amount'] as int? ?? 0;
+    final adminFee = arg['admin_fee'] as int? ?? 0;
+    final note = arg['note'] as String? ?? '';
+    final date = arg['date'] as DateTime? ?? DateTime.now();
+    final category =
+        isTransfer ? 'Transfer' : (arg['category'] as String? ?? 'Lainnya');
+    final color = arg['color_val'] != null
+        ? Color(arg['color_val'] as int)
+        : (isExpense ? colorExpense : colorIncome);
+    final amountColor = isTransfer
+        ? colorText
+        : isExpense
+            ? colorExpense
+            : colorIncome;
 
     return Scaffold(
-      backgroundColor: colorBackground,
-      body: Column(
+      appBar: AppBar(
+        title: const Text('Detail Transaksi'),
+        actions: [
+          IconButton(
+            tooltip: 'Edit',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () => openTransactionEditor(arg),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          // ─── Gradient hero header ───────────────────────────────────────
           Container(
-            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [themeColor.withValues(alpha: 0.85), themeColor.withValues(alpha: 0.3)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  // Close / edit / delete actions
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back, color: colorWhite),
-                          onPressed: () => Get.back(),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, color: colorWhite),
-                          onPressed: () {
-                            Get.toNamed('/add-transaction', arguments: {
-                              'isEdit': true,
-                              'id': id,
-                              'type': type,
-                              'amount': amount,
-                              'category': category,
-                              'note': note,
-                              'account': account,
-                              'account_id': accountId,
-                              'date': date,
-                            });
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: colorWhite),
-                          onPressed: () => _confirmDelete(id, accountId, destinationAccountId, amount, isExpense, isTransfer),
-                        ),
-                      ],
-                    ),
+                color: colorCard, borderRadius: BorderRadius.circular(12)),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: color.withValues(alpha: 0.14),
+                  child: CategoryIcon(
+                    iconCode: arg['icon_code'] as int? ??
+                        (isExpense
+                            ? Icons.arrow_upward.codePoint
+                            : Icons.arrow_downward.codePoint),
+                    iconPath: arg['icon_path'] as String?,
+                    color: color,
+                    size: 28,
                   ),
-                  const SizedBox(height: 8),
-                  // Icon
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: CategoryIcon(
-                      iconCode: iconCode ?? (isExpense ? Icons.arrow_upward.codePoint : Icons.arrow_downward.codePoint),
-                      iconPath: iconPath,
-                      color: colorWhite,
-                      size: 36,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    category,
-                    style: const TextStyle(
-                        color: colorWhite,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${isExpense ? '-' : isTransfer ? '' : '+'}${CurrencyService.to.format(amount)}',
-                    style: const TextStyle(
-                        color: colorWhite,
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
+                ),
+                const SizedBox(height: 12),
+                Text(category,
+                    style: const TextStyle(color: colorGrey, fontSize: 14)),
+                const SizedBox(height: 6),
+                Text(
+                  '${isExpense ? '-' : isTransfer ? '' : '+'}${CurrencyService.to.format(amount)}',
+                  style: TextStyle(
+                      color: amountColor,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w700),
+                ),
+              ],
             ),
           ),
-
-          // ─── Detail rows ─────────────────────────────────────────────────
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  const SizedBox(height: 16),
-                  Container(
-                    color: colorCard,
-                    child: Column(
-                      children: [
-                        _buildRow(
-                          Icons.swap_vert_circle_rounded,
-                          'Jenis',
-                          isTransfer
-                              ? 'Transfer'
-                              : isExpense
-                                  ? 'Pengeluaran'
-                                  : 'Pemasukan',
-                          valueColor: themeColor,
-                        ),
-                        _divider(),
-                        _buildRow(Icons.grid_view_rounded, 'Kategori', category),
-                        _divider(),
-                        _buildRow(Icons.account_balance_wallet_rounded,
-                            'Rekening', isTransfer ? '$account -> $destinationAccount' : account),
-                        _divider(),
-                        _buildRow(
-                          Icons.calendar_today_rounded,
-                          'Tanggal',
-                          DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(date),
-                        ),
-                        _divider(),
-                        _buildRow(
-                          Icons.access_time_rounded,
-                          'Waktu',
-                          DateFormat('HH:mm', 'id_ID').format(date),
-                        ),
-                        if (note.isNotEmpty) ...[
-                          _divider(),
-                          _buildRow(Icons.notes_rounded, 'Catatan', note),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Delete button at bottom
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () =>
-                            _confirmDelete(id, accountId, destinationAccountId, amount, isExpense, isTransfer),
-                        icon: const Icon(Icons.delete_outline,
-                            color: colorExpense),
-                        label: const Text('Hapus Transaksi',
-                            style: TextStyle(color: colorExpense)),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: colorExpense),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                ],
-              ),
+          const SizedBox(height: 12),
+          Material(
+            color: colorCard,
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: _rows(arg, isTransfer, adminFee, date, note)
+                  .expand((w) => [const Divider(indent: 16), w])
+                  .skip(1)
+                  .toList(),
+            ),
+          ),
+          const SizedBox(height: 24),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final deleted = await confirmDeleteTransaction(arg['id'] as int?);
+              if (deleted) Get.back();
+            },
+            icon: const Icon(Icons.delete_outline, color: colorExpense),
+            label: const Text('Hapus Transaksi',
+                style: TextStyle(color: colorExpense)),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              side: BorderSide(color: colorExpense.withValues(alpha: 0.5)),
             ),
           ),
         ],
@@ -204,10 +110,27 @@ class TransactionDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRow(IconData icon, String label, String value,
-      {Color valueColor = colorWhite}) {
+  List<Widget> _rows(Map<String, dynamic> arg, bool isTransfer, int adminFee,
+      DateTime date, String note) {
+    final account = arg['account'] as String? ?? '-';
+    return [
+      _row(Icons.account_balance_wallet_outlined,
+          isTransfer ? 'Dari' : 'Rekening', account),
+      if (isTransfer)
+        _row(Icons.call_received_rounded, 'Ke',
+            arg['destination_account'] as String? ?? '-'),
+      if (isTransfer && adminFee > 0)
+        _row(Icons.receipt_outlined, 'Biaya admin',
+            CurrencyService.to.format(adminFee)),
+      _row(Icons.calendar_today_outlined, 'Tanggal',
+          DateFormat('EEEE, d MMMM yyyy · HH:mm', 'id_ID').format(date)),
+      if (note.isNotEmpty) _row(Icons.notes_rounded, 'Catatan', note),
+    ];
+  }
+
+  Widget _row(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -219,68 +142,14 @@ class TransactionDetailScreen extends StatelessWidget {
                 style: const TextStyle(color: colorGrey, fontSize: 14)),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                  color: valueColor,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600),
-              textAlign: TextAlign.right,
-            ),
+            child: Text(value,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                    color: colorText,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500)),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _divider() => Divider(
-        color: colorGrey.withValues(alpha: 0.08),
-        height: 1,
-        indent: 16,
-      );
-
-  void _confirmDelete(
-      String? id, int? accountId, int? destinationAccountId, int amount, bool isExpense, bool isTransfer) {
-    bool isDeleting = false;
-    Get.defaultDialog(
-      backgroundColor: colorCard,
-      title: 'Hapus Transaksi',
-      titleStyle: const TextStyle(
-          color: colorWhite, fontWeight: FontWeight.bold, fontSize: 16),
-      middleText:
-          'Transaksi akan dihapus permanen dan saldo rekening akan disesuaikan.',
-      middleTextStyle: const TextStyle(color: colorGrey, fontSize: 13),
-      radius: 12,
-      confirm: ElevatedButton(
-        style: ElevatedButton.styleFrom(backgroundColor: colorExpense),
-        onPressed: () async {
-          if (isDeleting) return;
-          isDeleting = true;
-          try {
-            if (id != null) {
-              await DatabaseHelper.instance.deleteTransactionWithBalanceUpdate(
-                  int.parse(id), accountId, destinationAccountId, amount, isExpense, isTransfer);
-              refreshAllGlobalData();
-            }
-            Get.back(); // close dialog
-            Get.back(); // go back
-            Get.snackbar(
-              'Berhasil',
-              'Transaksi telah dihapus',
-              backgroundColor: Colors.green.shade800,
-              colorText: colorWhite,
-              snackPosition: SnackPosition.BOTTOM,
-              margin: const EdgeInsets.all(16),
-            );
-          } finally {
-            isDeleting = false;
-          }
-        },
-        child: const Text('Hapus', style: TextStyle(color: colorWhite)),
-      ),
-      cancel: TextButton(
-        onPressed: () => Get.back(),
-        child: const Text('Batal', style: TextStyle(color: colorGrey)),
       ),
     );
   }

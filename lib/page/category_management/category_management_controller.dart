@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
 import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/widgets/components/app_feedback.dart';
 
 class CategoryManagementController extends GetxController {
   final currentTab = 'Pengeluaran'.obs;
@@ -17,7 +18,7 @@ class CategoryManagementController extends GetxController {
   final categoryName = ''.obs;
   final selectedIconPath = Rx<String?>(null);
   final selectedIconCode = Rx<int?>(null);
-  final selectedColor = (Colors.grey as Color).obs;
+  final selectedColor = categoryPalette.first.obs;
 
   // Edit mode
   final editingId = Rx<int?>(null);
@@ -37,13 +38,7 @@ class CategoryManagementController extends GetxController {
     'Pribadi': AppIcons.pribadi,
   };
 
-  final presetColors = <Color>[
-    Colors.red, Colors.pink, Colors.purple, Colors.deepPurple,
-    Colors.indigo, Colors.blue, Colors.lightBlue, Colors.cyan,
-    Colors.teal, Colors.green, Colors.lightGreen, Colors.lime,
-    Colors.yellow, Colors.amber, Colors.orange, Colors.deepOrange,
-    Colors.brown, Colors.grey, Colors.blueGrey, Colors.black,
-  ];
+  final presetColors = categoryPalette;
 
   @override
   void onInit() {
@@ -56,7 +51,7 @@ class CategoryManagementController extends GetxController {
     categoryName.value = '';
     selectedIconPath.value = null;
     selectedIconCode.value = null;
-    selectedColor.value = Colors.grey;
+    selectedColor.value = categoryPalette.first;
   }
 
   Future<void> loadCategories() async {
@@ -70,10 +65,7 @@ class CategoryManagementController extends GetxController {
       final iconPath = c['icon_path'];
       final colorVal = c['color_val'];
 
-      Color colorData = Colors.grey;
-      if (colorVal != null) {
-        colorData = Color(colorVal as int);
-      }
+      final colorData = colorVal != null ? Color(colorVal as int) : colorGrey;
 
       final item = {
         'id': c['id'],
@@ -100,8 +92,7 @@ class CategoryManagementController extends GetxController {
   Future<void> saveCategory() async {
     if (isWorking.value) return;
     if (categoryName.value.trim().isEmpty) {
-      Get.snackbar('Gagal', 'Nama kategori tidak boleh kosong',
-          snackPosition: SnackPosition.BOTTOM);
+      AppToast.warning('Gagal', 'Nama kategori tidak boleh kosong');
       return;
     }
 
@@ -119,13 +110,11 @@ class CategoryManagementController extends GetxController {
       if (isEditMode) {
         await DatabaseHelper.instance.updateCategory(editingId.value!, data);
         Get.back();
-        Get.snackbar('Berhasil', 'Kategori berhasil diperbarui',
-            snackPosition: SnackPosition.BOTTOM);
+        AppToast.success('Berhasil', 'Kategori berhasil diperbarui');
       } else {
         await DatabaseHelper.instance.insertCategory(data);
         Get.back();
-        Get.snackbar('Berhasil', 'Kategori baru disimpan',
-            snackPosition: SnackPosition.BOTTOM);
+        AppToast.success('Berhasil', 'Kategori baru disimpan');
       }
 
       resetForm();
@@ -136,48 +125,27 @@ class CategoryManagementController extends GetxController {
     }
   }
 
-  void deleteCategory(int id) async {
-    Get.defaultDialog(
-      backgroundColor: const Color(0xFF1E1E1E),
+  Future<void> deleteCategory(int id) async {
+    final ok = await AppDialog.confirm(
       title: 'Hapus Kategori',
-      titleStyle: const TextStyle(
-          color: Colors.white, fontWeight: FontWeight.bold),
-      middleText:
-          'Kategori ini akan dihapus. Transaksi yang sudah ada tidak akan terpengaruh.',
-      middleTextStyle:
-          const TextStyle(color: Colors.grey, fontSize: 13),
-      radius: 8,
-      confirm: ElevatedButton(
-        style:
-            ElevatedButton.styleFrom(backgroundColor: Colors.red),
-        onPressed: () async {
-          if (isWorking.value) return;
-          isWorking.value = true;
-          try {
-            await DatabaseHelper.instance.deleteCategory(id);
-            Get.back();
-            loadCategories();
-            refreshAllGlobalData();
-            Get.snackbar('Berhasil', 'Kategori dihapus',
-                snackPosition: SnackPosition.BOTTOM);
-          } catch (e) {
-            Get.back();
-            Get.snackbar('Gagal', 'Tidak dapat menghapus kategori yang sudah digunakan pada transaksi.',
-                snackPosition: SnackPosition.BOTTOM,
-                backgroundColor: Colors.red,
-                colorText: Colors.white);
-          } finally {
-            isWorking.value = false;
-          }
-        },
-        child:
-            const Text('Hapus', style: TextStyle(color: Colors.white)),
-      ),
-      cancel: TextButton(
-        onPressed: () => Get.back(),
-        child: const Text('Batal',
-            style: TextStyle(color: Colors.grey)),
-      ),
+      message:
+          'Kategori yang sudah dipakai pada transaksi tidak dapat dihapus. '
+          'Anggaran dan transaksi berulang untuk kategori ini ikut terhapus.',
+      confirmLabel: 'Hapus',
+      destructive: true,
     );
+    if (!ok || isWorking.value) return;
+    isWorking.value = true;
+    try {
+      await DatabaseHelper.instance.deleteCategory(id);
+      loadCategories();
+      refreshAllGlobalData();
+      AppToast.success('Berhasil', 'Kategori dihapus');
+    } catch (e) {
+      AppToast.error('Tidak Dapat Dihapus',
+          'Kategori ini sudah digunakan pada transaksi.');
+    } finally {
+      isWorking.value = false;
+    }
   }
 }

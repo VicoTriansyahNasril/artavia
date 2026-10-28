@@ -5,6 +5,9 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:artavia/model/transaction_model.dart';
 import 'package:artavia/core/database/database_helper.dart';
+import 'package:artavia/core/services/period_service.dart';
+import 'package:artavia/core/utils/finance_calc.dart';
+import 'package:artavia/widgets/commons/common.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 class HomeController extends GetxController {
@@ -14,16 +17,13 @@ class HomeController extends GetxController {
   final totalPengeluaran = 0.obs;
   final totalPemasukan = 0.obs;
   final saldoTotal = 0.obs;
-  final currentDate = DateTime.now().obs;
+  final budget = const BudgetSummary(0, 0, 0).obs;
   final hideBalance = false.obs;
   final currentIndex = 0.obs;
-  final isFabOpen = false.obs;
 
   final GlobalKey keyBottomNavProfile = GlobalKey();
 
-  String get currentMonth =>
-      DateFormat('MMM', 'id_ID').format(currentDate.value);
-  String get currentYear => currentDate.value.year.toString();
+  Period get period => PeriodService.to.active.value;
 
   void changePage(int index) {
     currentIndex.value = index;
@@ -33,77 +33,37 @@ class HomeController extends GetxController {
     hideBalance.value = !hideBalance.value;
   }
 
-  void prevMonth() {
-    currentDate.value = DateTime(
-        currentDate.value.year, currentDate.value.month - 1);
-    loadData();
-  }
-
-  void nextMonth() {
-    currentDate.value = DateTime(
-        currentDate.value.year, currentDate.value.month + 1);
-    loadData();
-  }
-
   @override
   void onInit() {
     super.onInit();
+    ever(PeriodService.to.active, (_) => loadData());
     loadData();
   }
-
-
 
   Future<void> loadData() async {
     isLoading.value = true;
     try {
-      final year = currentDate.value.year;
-      final month = currentDate.value.month;
-      final dbData =
-          await DatabaseHelper.instance.readTransactionsByMonth(year, month);
+      final p = period;
+      final rows =
+          await DatabaseHelper.instance.readTransactionsByRange(p.start, p.end);
+      final budgets =
+          await DatabaseHelper.instance.readBudgetsByMonth(p.year, p.month);
 
-      int inTotal = 0;
-      int exTotal = 0;
-
-      final List<TransactionModel> loaded = [];
-      for (var row in dbData) {
-        final amt = row['amount'] as int;
-        final type = row['type'] as String;
-
-        if (type == 'pemasukan') {
-          inTotal += amt;
-        } else if (type == 'pengeluaran') {
-          exTotal += amt;
-        }
-
-        loaded.add(TransactionModel(
-          id: row['id'] as int,
-          amount: type == 'pemasukan' ? amt : -amt,
-          date: DateTime.parse(row['date'] as String),
-          note: row['note'] as String,
-          type: type,
-          categoryId: row['category_id'] as int?,
-          categoryName: row['categoryName'] as String?,
-          accountId: row['account_id'] as int?,
-          accountName: row['accountName'] as String?,
-          destinationAccountId: row['destination_account_id'] as int?,
-          destinationAccountName: row['destinationAccountName'] as String?,
-          categoryIconCode: row['categoryIconCode'] as int?,
-          categoryIconPath: row['categoryIconPath'] as String?,
-          categoryColorVal: row['categoryColorVal'] as int?,
-        ));
-      }
-
-      totalPemasukan.value = inTotal;
-      totalPengeluaran.value = exTotal;
-      saldoTotal.value = inTotal - exTotal;
+      final loaded = rows.map(TransactionModel.fromDbRow).toList();
+      final income = _sum(rows, 'pemasukan');
+      final expense = _sum(rows, 'pengeluaran');
+      totalPemasukan.value = income;
+      totalPengeluaran.value = expense;
+      saldoTotal.value = income - expense;
       transactions.value = loaded;
+      budget.value = summarizeBudget(budgets, expenseByCategoryId(rows));
 
-      // Group by date to avoid doing it in the UI build method (fixing lag)
-      final Map<String, List<TransactionModel>> grouped = {};
-      for (var tx in loaded) {
+      // Group once here instead of in build() to keep scrolling smooth.
+      final grouped = <String, List<TransactionModel>>{};
+      for (final tx in loaded) {
         if (tx.date == null) continue;
-        final dateStr = DateFormat('d MMM · EEEE', 'id_ID').format(tx.date!);
-        grouped.putIfAbsent(dateStr, () => []).add(tx);
+        final key = DateFormat('EEEE, d MMM', 'id_ID').format(tx.date!);
+        grouped.putIfAbsent(key, () => []).add(tx);
       }
       groupedTransactions.value = grouped;
     } catch (e) {
@@ -112,6 +72,10 @@ class HomeController extends GetxController {
       isLoading.value = false;
     }
   }
+
+  int _sum(List<Map<String, dynamic>> rows, String type) => rows
+      .where((r) => r['type'] == type)
+      .fold(0, (s, r) => s + (r['amount'] as int));
 
   bool _hasShownTutorial = false;
 
@@ -125,6 +89,8 @@ class HomeController extends GetxController {
   }
 
   void _showTutorial() {
+    final context = keyBottomNavProfile.currentContext;
+    if (context == null) return;
     List<TargetFocus> targets = [
       TargetFocus(
         identify: "TargetProfileTab",
@@ -137,7 +103,8 @@ class HomeController extends GetxController {
               return TutorialCard(
                 controller: controller,
                 title: "Mulai Dari Sini!",
-                description: "Ketuk menu Saya untuk membuat dompet atau rekening pertama Anda agar bisa mulai mencatat.",
+                description:
+                    "Ketuk menu Saya untuk membuat dompet atau rekening pertama Anda agar bisa mulai mencatat.",
                 isLast: true,
               );
             },
@@ -146,24 +113,21 @@ class HomeController extends GetxController {
       )
     ];
 
+    void goToProfile() {
+      changePage(3);
+      Future.delayed(const Duration(milliseconds: 400), () {
+        Get.find<ProfileController>().showTutorialIfNoAccount();
+      });
+    }
+
     TutorialCoachMark(
       targets: targets,
-      colorShadow: Colors.black,
+      colorShadow: colorScrim,
       hideSkip: true,
       paddingFocus: 10,
       opacityShadow: 0.8,
-      onFinish: () {
-        changePage(3);
-        Future.delayed(const Duration(milliseconds: 400), () {
-          Get.find<ProfileController>().showTutorialIfNoAccount();
-        });
-      },
-      onClickTarget: (target) {
-        changePage(3);
-        Future.delayed(const Duration(milliseconds: 400), () {
-          Get.find<ProfileController>().showTutorialIfNoAccount();
-        });
-      },
-    ).show(context: keyBottomNavProfile.currentContext!);
+      onFinish: goToProfile,
+      onClickTarget: (_) => goToProfile(),
+    ).show(context: context);
   }
 }

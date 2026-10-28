@@ -5,6 +5,8 @@ import 'package:artavia/core/models/account_model.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/widgets/components/tutorial_card.dart';
+import 'package:artavia/page/routes.dart';
+import 'package:artavia/widgets/components/app_feedback.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 /// Defines account type metadata for the type selector grid
@@ -24,7 +26,7 @@ class AccountType {
 
 class AccountManagementController extends GetxController {
   final accountGroups = <Map<String, dynamic>>[].obs;
-  
+
   final GlobalKey keyAccountFAB = GlobalKey();
   final GlobalKey keyAddAccountForm = GlobalKey();
   final GlobalKey keyAddAccountSave = GlobalKey();
@@ -35,47 +37,47 @@ class AccountManagementController extends GetxController {
     AccountType(
       label: 'Kas Tunai',
       icon: Icons.payments,
-      defaultColorVal: 0xFFF5C842,
+      defaultColorVal: 0xFFE0B25C,
     ),
     AccountType(
       label: 'Bank',
       icon: Icons.account_balance,
-      defaultColorVal: 0xFF64B5F6,
+      defaultColorVal: 0xFF5FA8D3,
     ),
     AccountType(
       label: 'Kartu Kredit',
       icon: Icons.credit_card,
-      defaultColorVal: 0xFFE57373,
+      defaultColorVal: 0xFFE07A7A,
     ),
     AccountType(
       label: 'Dompet Digital',
       icon: Icons.phone_android,
-      defaultColorVal: 0xFF81C784,
+      defaultColorVal: 0xFF5FBF8F,
     ),
     AccountType(
       label: 'Tabungan',
       icon: Icons.savings,
-      defaultColorVal: 0xFF4DB6AC,
+      defaultColorVal: 0xFF4FB6B0,
     ),
     AccountType(
       label: 'Investasi',
       icon: Icons.trending_up,
-      defaultColorVal: 0xFFBA68C8,
+      defaultColorVal: 0xFF9D8CE6,
     ),
     AccountType(
       label: 'Pinjaman',
       icon: Icons.account_balance_wallet,
-      defaultColorVal: 0xFFFFB74D,
+      defaultColorVal: 0xFFE59A6B,
     ),
     AccountType(
       label: 'Investasi Aset',
       icon: Icons.real_estate_agent,
-      defaultColorVal: 0xFF90A4AE,
+      defaultColorVal: 0xFF8D94A3,
     ),
     AccountType(
       label: 'Lainnya',
       icon: Icons.more_horiz,
-      defaultColorVal: 0xFF8A8A8E,
+      defaultColorVal: 0xFF8D94A3,
     ),
   ];
 
@@ -98,20 +100,7 @@ class AccountManagementController extends GetxController {
 
   // ─── Preset Colors ────────────────────────────────────────────────────────
 
-  final presetColors = <Color>[
-    const Color(0xFFF5C842), // Amber
-    const Color(0xFF81C784), // Sage green
-    const Color(0xFF64B5F6), // Sky blue
-    const Color(0xFFE57373), // Rose
-    const Color(0xFFBA68C8), // Lavender
-    const Color(0xFFFFB74D), // Orange
-    const Color(0xFF4DB6AC), // Teal
-    const Color(0xFF90A4AE), // Blue-grey
-    const Color(0xFFF48FB1), // Pink
-    const Color(0xFFA5D6A7), // Light green
-    const Color(0xFF80DEEA), // Cyan
-    const Color(0xFFEF9A9A), // Salmon
-  ];
+  final presetColors = categoryPalette;
 
   // ─── Form State ──────────────────────────────────────────────────────────
 
@@ -125,7 +114,7 @@ class AccountManagementController extends GetxController {
 
   final selectedIconCode = Rx<int?>(Icons.payments_outlined.codePoint);
   final selectedIconPath = Rx<String?>(null);
-  final selectedColorVal = 0xFFF5C842.obs;
+  final selectedColorVal = categoryPalette[2].toARGB32().obs;
 
   // Edit mode
   final editingId = Rx<int?>(null);
@@ -164,8 +153,6 @@ class AccountManagementController extends GetxController {
     loadAccounts();
   }
 
-
-
   @override
   void onClose() {
     nameController.dispose();
@@ -201,6 +188,26 @@ class AccountManagementController extends GetxController {
     accountGroups.value = newGroups;
   }
 
+  /// Opens the add/edit form from anywhere (Aset tab, Kelola Rekening) with a
+  /// clean or pre-filled form. [account] is a raw `accounts` row or a row from
+  /// [accountGroups].
+  static Future<void> openEditor([Map<String, dynamic>? account]) async {
+    if (!Get.isRegistered<AccountManagementController>()) {
+      Get.put(AccountManagementController());
+    }
+    final c = Get.find<AccountManagementController>();
+    if (account == null) {
+      c.resetForm();
+    } else {
+      final excluded = account['is_excluded'];
+      c.startEditAccount({
+        ...account,
+        'is_excluded': excluded == true || excluded == 1,
+      });
+    }
+    await Get.toNamed(addAccountRoute);
+  }
+
   void startEditAccount(Map<String, dynamic> acc) {
     editingId.value = acc['id'] as int;
     accountName.value = acc['name'] as String;
@@ -211,8 +218,9 @@ class AccountManagementController extends GetxController {
     selectedIconCode.value =
         acc['icon_code'] as int? ?? Icons.payments_outlined.codePoint;
     selectedIconPath.value = acc['icon_path'] as String?;
-    selectedColorVal.value = acc['color_val'] as int? ?? 0xFFF5C842;
-    
+    selectedColorVal.value =
+        acc['color_val'] as int? ?? categoryPalette[2].toARGB32();
+
     nameController.text = accountName.value;
     balanceController.text = balance.value == 0 ? '' : balance.value.toString();
   }
@@ -226,7 +234,7 @@ class AccountManagementController extends GetxController {
     excludeFromTotal.value = false;
     selectedIconCode.value = Icons.payments_outlined.codePoint;
     selectedIconPath.value = null;
-    selectedColorVal.value = 0xFFF5C842;
+    selectedColorVal.value = categoryPalette[2].toARGB32();
 
     nameController.clear();
     balanceController.clear();
@@ -236,16 +244,7 @@ class AccountManagementController extends GetxController {
     if (isWorking.value) return;
     final name = accountName.value.trim();
     if (name.isEmpty) {
-      Get.snackbar(
-        'Gagal',
-        'Nama rekening tidak boleh kosong',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFF1C1C1F),
-        colorText: Colors.white,
-        margin: const EdgeInsets.all(16),
-        borderRadius: 12,
-        icon: const Icon(Icons.warning_amber_rounded, color: Colors.amber),
-      );
+      AppToast.warning('Gagal', 'Nama rekening tidak boleh kosong');
       return;
     }
 
@@ -264,14 +263,17 @@ class AccountManagementController extends GetxController {
       );
 
       if (isEditMode) {
-        await DatabaseHelper.instance.updateAccount(
-            editingId.value!, account.toJson()..remove('id'));
+        await DatabaseHelper.instance
+            .updateAccount(editingId.value!, account.toJson()..remove('id'));
         Get.back();
-        _showSuccessSnack('Rekening diperbarui', '${account.name} berhasil diperbarui');
+        _showSuccessSnack(
+            'Rekening diperbarui', '${account.name} berhasil diperbarui');
       } else {
-        await DatabaseHelper.instance.insertAccount(account.toJson()..remove('id'));
+        await DatabaseHelper.instance
+            .insertAccount(account.toJson()..remove('id'));
         Get.back();
-        _showSuccessSnack('Rekening ditambahkan', '${account.name} berhasil ditambahkan');
+        _showSuccessSnack(
+            'Rekening ditambahkan', '${account.name} berhasil ditambahkan');
       }
 
       resetForm();
@@ -283,70 +285,31 @@ class AccountManagementController extends GetxController {
   }
 
   Future<void> deleteAccount(int id, String name) async {
-    Get.defaultDialog(
-      backgroundColor: const Color(0xFF1C1C1F),
+    final ok = await AppDialog.confirm(
       title: 'Hapus Rekening',
-      titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      middleText:
-          'Hapus "$name"? Riwayat transaksi tidak akan ikut terhapus.',
-      middleTextStyle: const TextStyle(color: Colors.grey, fontSize: 13),
-      radius: 16,
-      confirm: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFE57373),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-        onPressed: () async {
-          if (isWorking.value) return;
-          isWorking.value = true;
-          try {
-            await DatabaseHelper.instance.deleteAccount(id);
-            Get.back();
-            loadAccounts();
-            refreshAllGlobalData();
-            Get.snackbar(
-              'Berhasil',
-              '"$name" telah dihapus',
-              snackPosition: SnackPosition.BOTTOM,
-              margin: const EdgeInsets.all(16),
-              borderRadius: 12,
-            );
-          } catch (e) {
-            Get.back();
-            Get.snackbar(
-              'Tidak Dapat Dihapus',
-              'Rekening ini memiliki riwayat transaksi.',
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: const Color(0xFFE57373).withValues(alpha: 0.9),
-              colorText: Colors.white,
-              margin: const EdgeInsets.all(16),
-              borderRadius: 12,
-            );
-          } finally {
-            isWorking.value = false;
-          }
-        },
-        child: const Text('Hapus', style: TextStyle(color: Colors.white)),
-      ),
-      cancel: TextButton(
-        onPressed: () => Get.back(),
-        child: const Text('Batal', style: TextStyle(color: Colors.grey)),
-      ),
+      message: 'Hapus "$name"? Rekening yang sudah memiliki riwayat transaksi '
+          'tidak dapat dihapus. Transaksi berulang yang memakai rekening ini '
+          'ikut terhapus.',
+      confirmLabel: 'Hapus',
+      destructive: true,
     );
+    if (!ok || isWorking.value) return;
+    isWorking.value = true;
+    try {
+      await DatabaseHelper.instance.deleteAccount(id);
+      loadAccounts();
+      refreshAllGlobalData();
+      AppToast.success('Berhasil', '"$name" telah dihapus');
+    } catch (e) {
+      AppToast.error('Tidak Dapat Dihapus',
+          'Rekening ini masih memiliki riwayat transaksi.');
+    } finally {
+      isWorking.value = false;
+    }
   }
 
-  void _showSuccessSnack(String title, String message) {
-    Get.snackbar(
-      title,
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: const Color(0xFF2E7D32).withValues(alpha: 0.9),
-      colorText: Colors.white,
-      margin: const EdgeInsets.all(16),
-      borderRadius: 12,
-      icon: const Icon(Icons.check_circle_outline, color: Colors.white),
-    );
-  }
+  void _showSuccessSnack(String title, String message) =>
+      AppToast.success(title, message);
 
   bool _hasShownMainTutorial = false;
 
@@ -372,7 +335,8 @@ class AccountManagementController extends GetxController {
               return TutorialCard(
                 controller: controller,
                 title: "Buat Rekening Baru",
-                description: "Ketuk tombol ini untuk membuat dompet Tunai, rekening Bank, atau jenis dompet lainnya.",
+                description:
+                    "Ketuk tombol ini untuk membuat dompet Tunai, rekening Bank, atau jenis dompet lainnya.",
                 isLast: true,
               );
             },
@@ -383,7 +347,7 @@ class AccountManagementController extends GetxController {
 
     TutorialCoachMark(
       targets: targets,
-      colorShadow: Colors.black,
+      colorShadow: colorScrim,
       hideSkip: true,
       paddingFocus: 10,
       opacityShadow: 0.8,
@@ -416,7 +380,8 @@ class AccountManagementController extends GetxController {
               return TutorialCard(
                 controller: controller,
                 title: "Langkah 1: Isi Detail",
-                description: "Mulai dengan mengisi nama rekening (mis: Dompet, BCA) beserta saldo awal Anda saat ini.",
+                description:
+                    "Mulai dengan mengisi nama rekening (mis: Dompet, BCA) beserta saldo awal Anda saat ini.",
                 isLast: false,
               );
             },
@@ -436,7 +401,8 @@ class AccountManagementController extends GetxController {
               return TutorialCard(
                 controller: controller,
                 title: "Langkah 2: Simpan",
-                description: "Jika sudah, tekan Simpan untuk membuat rekening pertama Anda. Mudah bukan?",
+                description:
+                    "Jika sudah, tekan Simpan untuk membuat rekening pertama Anda. Mudah bukan?",
                 isLast: true,
               );
             },
@@ -447,7 +413,7 @@ class AccountManagementController extends GetxController {
 
     TutorialCoachMark(
       targets: targets,
-      colorShadow: Colors.black,
+      colorShadow: colorScrim,
       hideSkip: true,
       paddingFocus: 10,
       opacityShadow: 0.8,

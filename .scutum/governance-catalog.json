@@ -1,0 +1,6 @@
+{
+  "marketplace": "scutum",
+  "governance_plugins": [
+    "tmf-oda-constitution"
+  ]
+}

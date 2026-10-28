@@ -4,6 +4,7 @@ import 'package:artavia/page/account_management/account_management_controller.da
 class AccountManagementBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<AccountManagementController>(() => AccountManagementController());
+    Get.lazyPut<AccountManagementController>(
+        () => AccountManagementController());
   }
 }

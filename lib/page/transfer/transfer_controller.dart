@@ -1,39 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
+import 'package:artavia/core/database/transaction_store.dart';
+import 'package:artavia/core/services/sound_service.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
+import 'package:artavia/widgets/components/app_feedback.dart';
 
+/// Transfer between accounts. "source" is what leaves the sender (incl. the
+/// admin fee), "dest" is what the receiver gets; fee = source − dest.
 class TransferController extends GetxController {
+  static const _maxDigits = 12;
+
   final sourceAmountStr = '0'.obs;
   final destAmountStr = '0'.obs;
   final activeField = 'source'.obs;
   final isSynced = true.obs;
-  
+
   final isNumpadVisible = false.obs;
 
   void toggleNumpad() {
     isNumpadVisible.value = !isNumpadVisible.value;
   }
-  
+
   final sourceAccountId = RxnInt();
-  final sourceAccountName = 'CASH'.obs;
+  final sourceAccountName = ''.obs;
   final destinationAccountId = RxnInt();
-  final destinationAccountName = 'BCA'.obs;
+  final destinationAccountName = ''.obs;
   final availableAccounts = <Map<String, dynamic>>[].obs;
   final isLoading = true.obs;
-  
+
   final selectedDate = DateTime.now().obs;
-  
-  int get sourceAccountBalance {
-    final account = availableAccounts.firstWhereOrNull((a) => a['id'] == sourceAccountId.value);
+
+  /// Id of the transfer being edited (FR-017); null when creating.
+  int? editId;
+  bool get isEdit => editId != null;
+
+  /// Read once from the route, before the async init finishes.
+  final bool isEditArgs = Get.arguments?['isEdit'] == true;
+
+  int get sourceAccountBalance => _balanceOf(sourceAccountId.value);
+  int get destinationAccountBalance => _balanceOf(destinationAccountId.value);
+
+  int _balanceOf(int? id) {
+    final account = availableAccounts.firstWhereOrNull((a) => a['id'] == id);
     return account?['balance'] as int? ?? 0;
   }
-  
-  int get destinationAccountBalance {
-    final account = availableAccounts.firstWhereOrNull((a) => a['id'] == destinationAccountId.value);
-    return account?['balance'] as int? ?? 0;
-  }
-  
+
   final noteTextController = TextEditingController();
   final note = ''.obs;
   final noteHistory = <String>[].obs;
@@ -42,28 +54,52 @@ class TransferController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _loadAccounts();
+    _init();
   }
 
-  Future<void> _loadAccounts() async {
+  Future<void> _init() async {
     isLoading.value = true;
-    final accs = await DatabaseHelper.instance.readAllAccounts();
-    availableAccounts.value = accs;
-    if (accs.isNotEmpty) {
-      sourceAccountId.value = accs.first['id'] as int;
-      sourceAccountName.value = accs.first['name'].toString();
-      if (accs.length > 1) {
-        destinationAccountId.value = accs[1]['id'] as int;
-        destinationAccountName.value = accs[1]['name'].toString();
-      } else {
-        destinationAccountId.value = accs.first['id'] as int;
-        destinationAccountName.value = accs.first['name'].toString();
-      }
-    } else {
-      sourceAccountName.value = '';
-      destinationAccountName.value = '';
+    availableAccounts.value = await DatabaseHelper.instance.readAllAccounts();
+    final args = Get.arguments;
+    if (args != null && args['isEdit'] == true) {
+      _fillFromArgs(args as Map);
+    } else if (availableAccounts.isNotEmpty) {
+      _select(true, availableAccounts.first['id'] as int);
+      _select(false,
+          availableAccounts[availableAccounts.length > 1 ? 1 : 0]['id'] as int);
     }
     isLoading.value = false;
+  }
+
+  void _fillFromArgs(Map args) {
+    editId = int.tryParse('${args['id']}');
+    final received = args['amount'] as int? ?? 0;
+    final fee = args['admin_fee'] as int? ?? 0;
+    final senderPaysFee = (args['admin_fee_type'] ?? 'Pengirim') == 'Pengirim';
+    destAmountStr.value = '${senderPaysFee ? received : received - fee}';
+    sourceAmountStr.value = '${senderPaysFee ? received + fee : received}';
+    isSynced.value = fee == 0;
+    _select(true, args['account_id'] as int?);
+    _select(false, args['destination_account_id'] as int?);
+    note.value = args['note'] as String? ?? '';
+    noteTextController.text = note.value;
+    if (args['date'] is DateTime) selectedDate.value = args['date'] as DateTime;
+    isNumpadVisible.value = true;
+  }
+
+  void selectAccount(bool isSource, Map<String, dynamic> account) =>
+      _select(isSource, account['id'] as int);
+
+  void _select(bool isSource, int? id) {
+    final acc = availableAccounts.firstWhereOrNull((a) => a['id'] == id);
+    if (acc == null) return;
+    if (isSource) {
+      sourceAccountId.value = acc['id'] as int;
+      sourceAccountName.value = acc['name'] as String;
+    } else {
+      destinationAccountId.value = acc['id'] as int;
+      destinationAccountName.value = acc['name'] as String;
+    }
   }
 
   @override
@@ -78,134 +114,99 @@ class TransferController extends GetxController {
   }
 
   Future<void> onNumpadPressed(String key) async {
-    if (key == 'delete') {
-      _handleDelete();
-    } else if (key == 'C') {
-      sourceAmountStr.value = '0';
-      destAmountStr.value = '0';
-      isSynced.value = true;
-      activeField.value = 'source';
-    } else if (key == 'confirm') {
-      _handleConfirm();
-    } else if (key == '+' || key == '-') {
-      // Operator placeholder
-    } else {
-      _handleDigit(key);
-    }
-  }
-
-  void _handleDelete() {
-    if (activeField.value == 'source') {
-      if (sourceAmountStr.value.length > 1) {
-        sourceAmountStr.value = sourceAmountStr.value.substring(0, sourceAmountStr.value.length - 1);
-      } else {
+    switch (key) {
+      case 'delete':
+        _editActive((s) => s.length > 1 ? s.substring(0, s.length - 1) : '0');
+      case 'C':
         sourceAmountStr.value = '0';
-      }
-      if (isSynced.value) destAmountStr.value = sourceAmountStr.value;
-    } else {
-      if (destAmountStr.value.length > 1) {
-        destAmountStr.value = destAmountStr.value.substring(0, destAmountStr.value.length - 1);
-      } else {
         destAmountStr.value = '0';
-      }
+        isSynced.value = true;
+        activeField.value = 'source';
+      case 'confirm':
+        await _handleConfirm();
+      case '+' || '-':
+        break; // operators are not supported for transfers
+      default:
+        _editActive((s) => s == '0' ? key : s + key);
     }
   }
 
-  void _handleDigit(String key) {
-    if (activeField.value == 'source') {
-      if (sourceAmountStr.value.length >= 12) {
-        if (!Get.isSnackbarOpen) {
-          Get.snackbar('Batas Maksimal', 'Maksimal 12 digit angka', snackPosition: SnackPosition.BOTTOM);
-        }
-        return;
-      }
-      if (sourceAmountStr.value == '0') {
-        sourceAmountStr.value = key;
-      } else {
-        sourceAmountStr.value += key;
-      }
-      if (isSynced.value) destAmountStr.value = sourceAmountStr.value;
-    } else {
-      if (destAmountStr.value.length >= 12) {
-        if (!Get.isSnackbarOpen) {
-          Get.snackbar('Batas Maksimal', 'Maksimal 12 digit angka', snackPosition: SnackPosition.BOTTOM);
-        }
-        return;
-      }
-      if (destAmountStr.value == '0') {
-        destAmountStr.value = key;
-      } else {
-        destAmountStr.value += key;
-      }
+  /// Applies [change] to the active amount and mirrors it while synced.
+  void _editActive(String Function(String current) change) {
+    final isSource = activeField.value == 'source';
+    final target = isSource ? sourceAmountStr : destAmountStr;
+    final next = (int.tryParse(change(target.value)) ?? 0).toString();
+    if (next.length > _maxDigits) {
+      AppToast.warning('Batas Maksimal', 'Maksimal $_maxDigits digit angka');
+      return;
     }
+    target.value = next;
+    if (isSource && isSynced.value) destAmountStr.value = next;
+  }
+
+  String? _validationError(int sent, int received) {
+    if (sourceAccountId.value == null || destinationAccountId.value == null) {
+      return 'Pilih rekening asal dan tujuan';
+    }
+    if (sourceAccountId.value == destinationAccountId.value) {
+      return 'Rekening asal dan tujuan tidak boleh sama';
+    }
+    if (sent <= 0 || received <= 0) return 'Nominal tidak boleh 0';
+    if (sent < received) {
+      return 'Nominal dikirim tidak boleh lebih kecil dari yang diterima';
+    }
+    return null;
   }
 
   Future<void> _handleConfirm() async {
     if (isWorking.value) return;
-    
-    final sAmount = int.tryParse(sourceAmountStr.value) ?? 0;
-    final dAmount = int.tryParse(destAmountStr.value) ?? 0;
-    
-    if (sourceAccountId.value == destinationAccountId.value) {
-      if (!Get.isSnackbarOpen) {
-        Get.snackbar('Peringatan', 'Rekening asal dan tujuan tidak boleh sama',
-            backgroundColor: Colors.orange.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
-      }
-      return;
-    }
-
-    if (sAmount <= 0 || dAmount <= 0) {
-      if (!Get.isSnackbarOpen) {
-        Get.snackbar('Peringatan', 'Nominal tidak boleh 0',
-            backgroundColor: Colors.orange.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
-      }
-      return;
-    }
-
-    if (sAmount < dAmount) {
-      if (!Get.isSnackbarOpen) {
-        Get.snackbar('Peringatan', 'Nominal dipotong tidak boleh lebih kecil dari yang diterima',
-            backgroundColor: Colors.orange.shade800, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
-      }
+    final sent = int.tryParse(sourceAmountStr.value) ?? 0;
+    final received = int.tryParse(destAmountStr.value) ?? 0;
+    final error = _validationError(sent, received);
+    if (error != null) {
+      AppToast.warning('Peringatan', error);
       return;
     }
 
     if (note.value.isNotEmpty && !noteHistory.contains(note.value)) {
       noteHistory.insert(0, note.value);
     }
-    
-    final adminFee = sAmount - dAmount;
 
-    final transaction = {
+    // The receiver gets `amount`; the sender also pays the fee.
+    final row = {
       'type': 'transfer',
-      'amount': dAmount, // Baseline is what destination gets
+      'amount': received,
       'category_id': null,
       'note': note.value,
       'account_id': sourceAccountId.value,
       'destination_account_id': destinationAccountId.value,
       'date': selectedDate.value.toIso8601String(),
-      'admin_fee': adminFee,
-      'admin_fee_type': 'Pengirim', // D deducted + (S-D) = S total deducted. Works perfectly!
+      'admin_fee': sent - received,
+      'admin_fee_type': 'Pengirim',
     };
-    
+
     isWorking.value = true;
     try {
-      await DatabaseHelper.instance.insertTransferWithBalanceUpdate(
-          transaction, sourceAccountId.value!, destinationAccountId.value!, dAmount, adminFee, 'Pengirim');
+      final db = DatabaseHelper.instance;
+      if (isEdit) {
+        await db.replaceTransaction(editId!, row);
+      } else {
+        await db.addTransaction(row);
+      }
       refreshAllGlobalData();
-
-      Get.back();
-      Get.snackbar(
-        'Berhasil', 
-        'Transfer berhasil disimpan',
-        backgroundColor: Colors.green.shade800,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(16),
-      );
+      SoundService.to.playSuccess();
+      if (isEdit) {
+        Get.until((route) => route.isFirst);
+      } else {
+        Get.back();
+      }
+      AppToast.success(
+          isEdit ? 'Diperbarui' : 'Berhasil',
+          isEdit
+              ? 'Transfer berhasil diperbarui'
+              : 'Transfer berhasil disimpan');
     } catch (e) {
-      Get.snackbar('Error', 'Gagal menyimpan transfer',
-          backgroundColor: Colors.red.shade800, colorText: Colors.white);
+      AppToast.error('Gagal', 'Transfer tidak dapat disimpan');
     } finally {
       isWorking.value = false;
     }
@@ -217,14 +218,15 @@ class TransferController extends GetxController {
   }
 
   Future<void> pickDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
       initialDate: selectedDate.value,
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
     );
-    if (picked != null && picked != selectedDate.value) {
-      selectedDate.value = picked;
-    }
+    if (picked == null) return;
+    final now = DateTime.now();
+    selectedDate.value =
+        DateTime(picked.year, picked.month, picked.day, now.hour, now.minute);
   }
 }
