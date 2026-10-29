@@ -1,232 +1,203 @@
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/database/transaction_store.dart';
-import 'package:artavia/core/services/sound_service.dart';
-import 'package:artavia/core/utils/data_refresh.dart';
-import 'package:artavia/widgets/components/app_feedback.dart';
+import 'package:artavia/core/services/settings_service.dart';
+import 'package:artavia/core/utils/calc_engine.dart';
+import 'package:artavia/core/utils/transfer_math.dart';
+import 'package:artavia/widgets/kobalt/keypad.dart';
 
-/// Transfer between accounts. "source" is what leaves the sender (incl. the
-/// admin fee), "dest" is what the receiver gets; fee = source − dest.
+/// Which field the Catat keypad fills while on the Transfer segment.
+enum TransferField { amount, fee }
+
+/// Transfer segment of Catat (US3). The amount is owned by Catat and shared
+/// through [amount] so switching segments keeps it (FR-006); this
+/// controller adds the account pair, the remembered admin fee (FR-011),
+/// who pays it (FR-012) and the live preview (FR-013).
 class TransferController extends GetxController {
-  static const _maxDigits = 12;
+  TransferController(this.amount);
 
-  final sourceAmountStr = '0'.obs;
-  final destAmountStr = '0'.obs;
-  final activeField = 'source'.obs;
-  final isSynced = true.obs;
+  final RxInt amount;
 
-  final isNumpadVisible = false.obs;
+  final accounts = <Map<String, dynamic>>[].obs;
+  final sourceId = RxnInt();
+  final destId = RxnInt();
 
-  void toggleNumpad() {
-    isNumpadVisible.value = !isNumpadVisible.value;
-  }
+  final fee = 0.obs;
+  final bearer = FeeBearer.sender.obs;
 
-  final sourceAccountId = RxnInt();
-  final sourceAccountName = ''.obs;
-  final destinationAccountId = RxnInt();
-  final destinationAccountName = ''.obs;
-  final availableAccounts = <Map<String, dynamic>>[].obs;
-  final isLoading = true.obs;
+  /// Fee remembered for the current pair (history-icon chip).
+  final remembered = Rxn<FeePref>();
 
-  final selectedDate = DateTime.now().obs;
+  /// "Isi sendiri" turns the chips into an active fee field.
+  final customFee = false.obs;
+  final activeField = TransferField.amount.obs;
+  final _feeCalc = CalcEngine();
 
-  /// Id of the transfer being edited (FR-017); null when creating.
-  int? editId;
-  bool get isEdit => editId != null;
+  /// Amount to preload into Catat when editing (set by [attach]).
+  int editAmount = 0;
+  bool _editing = false;
 
-  /// Read once from the route, before the async init finishes.
-  final bool isEditArgs = Get.arguments?['isEdit'] == true;
+  TransferFeeMemory get _memory => TransferFeeMemory(
+      SettingsService.to.get, (k, v) => SettingsService.to.set(k, v));
 
-  int get sourceAccountBalance => _balanceOf(sourceAccountId.value);
-  int get destinationAccountBalance => _balanceOf(destinationAccountId.value);
+  bool get editingFee => activeField.value == TransferField.fee;
 
-  int _balanceOf(int? id) {
-    final account = availableAccounts.firstWhereOrNull((a) => a['id'] == id);
-    return account?['balance'] as int? ?? 0;
-  }
+  int balanceOf(int? id) =>
+      accounts.firstWhereOrNull((a) => a['id'] == id)?['balance'] as int? ?? 0;
 
-  final noteTextController = TextEditingController();
-  final note = ''.obs;
-  final noteHistory = <String>[].obs;
-  final RxBool isWorking = false.obs;
+  String nameOf(int? id) =>
+      accounts.firstWhereOrNull((a) => a['id'] == id)?['name'] as String? ??
+      '—';
 
-  @override
-  void onInit() {
-    super.onInit();
-    _init();
-  }
+  TransferPreview get preview => TransferMath.preview(
+        amount: amount.value,
+        fee: fee.value,
+        bearer: bearer.value,
+        sourceBalance: balanceOf(sourceId.value),
+      );
 
-  Future<void> _init() async {
-    isLoading.value = true;
-    availableAccounts.value = await DatabaseHelper.instance.readAllAccounts();
-    final args = Get.arguments;
-    if (args != null && args['isEdit'] == true) {
-      _fillFromArgs(args as Map);
-    } else if (availableAccounts.isNotEmpty) {
-      _select(true, availableAccounts.first['id'] as int);
-      _select(false,
-          availableAccounts[availableAccounts.length > 1 ? 1 : 0]['id'] as int);
-    }
-    isLoading.value = false;
-  }
+  bool get canSave =>
+      sourceId.value != null &&
+      destId.value != null &&
+      sourceId.value != destId.value &&
+      preview.isValid;
 
-  void _fillFromArgs(Map args) {
-    editId = int.tryParse('${args['id']}');
-    final received = args['amount'] as int? ?? 0;
-    final fee = args['admin_fee'] as int? ?? 0;
-    final senderPaysFee = (args['admin_fee_type'] ?? 'Pengirim') == 'Pengirim';
-    destAmountStr.value = '${senderPaysFee ? received : received - fee}';
-    sourceAmountStr.value = '${senderPaysFee ? received + fee : received}';
-    isSynced.value = fee == 0;
-    _select(true, args['account_id'] as int?);
-    _select(false, args['destination_account_id'] as int?);
-    note.value = args['note'] as String? ?? '';
-    noteTextController.text = note.value;
-    if (args['date'] is DateTime) selectedDate.value = args['date'] as DateTime;
-    isNumpadVisible.value = true;
-  }
+  List<int> get feeChips => TransferFeeMemory.quickChips(remembered.value);
 
-  void selectAccount(bool isSource, Map<String, dynamic> account) =>
-      _select(isSource, account['id'] as int);
-
-  void _select(bool isSource, int? id) {
-    final acc = availableAccounts.firstWhereOrNull((a) => a['id'] == id);
-    if (acc == null) return;
-    if (isSource) {
-      sourceAccountId.value = acc['id'] as int;
-      sourceAccountName.value = acc['name'] as String;
-    } else {
-      destinationAccountId.value = acc['id'] as int;
-      destinationAccountName.value = acc['name'] as String;
-    }
-  }
-
-  @override
-  void onClose() {
-    noteTextController.dispose();
-    super.onClose();
-  }
-
-  void setActiveField(String field) {
-    activeField.value = field;
-    isSynced.value = false;
-  }
-
-  Future<void> onNumpadPressed(String key) async {
-    switch (key) {
-      case 'delete':
-        _editActive((s) => s.length > 1 ? s.substring(0, s.length - 1) : '0');
-      case 'C':
-        sourceAmountStr.value = '0';
-        destAmountStr.value = '0';
-        isSynced.value = true;
-        activeField.value = 'source';
-      case 'confirm':
-        await _handleConfirm();
-      case '+' || '-':
-        break; // operators are not supported for transfers
-      default:
-        _editActive((s) => s == '0' ? key : s + key);
-    }
-  }
-
-  /// Applies [change] to the active amount and mirrors it while synced.
-  void _editActive(String Function(String current) change) {
-    final isSource = activeField.value == 'source';
-    final target = isSource ? sourceAmountStr : destAmountStr;
-    final next = (int.tryParse(change(target.value)) ?? 0).toString();
-    if (next.length > _maxDigits) {
-      AppToast.warning('Batas Maksimal', 'Maksimal $_maxDigits digit angka');
+  /// Gives the controller its accounts; selects the edited pair or a
+  /// sensible default (preferred source, next account as destination).
+  void attach(
+    List<Map<String, dynamic>> available, {
+    Map? editArgs,
+    int? preferredSourceId,
+  }) {
+    accounts.assignAll(available);
+    if (editArgs != null) {
+      _editing = true;
+      final stored = editArgs['amount'] as int? ?? 0;
+      final storedFee = editArgs['admin_fee'] as int? ?? 0;
+      final storedBearer = FeeBearer.fromDb(editArgs['admin_fee_type']);
+      // Legacy rows keep the fee inside the transfer; the form amount is
+      // what left the source before the fee (Penerima: stored + fee).
+      editAmount =
+          storedBearer == FeeBearer.receiver ? stored + storedFee : stored;
+      sourceId.value = editArgs['account_id'] as int?;
+      destId.value = editArgs['destination_account_id'] as int?;
+      fee.value = storedFee;
+      bearer.value = storedBearer;
+      remembered.value = _memory.read(sourceId.value ?? -1, destId.value ?? -1);
       return;
     }
-    target.value = next;
-    if (isSource && isSynced.value) destAmountStr.value = next;
+    if (accounts.isEmpty) return;
+    final ids = accounts.map((a) => a['id'] as int).toList();
+    final src = ids.contains(sourceId.value)
+        ? sourceId.value!
+        : ids.contains(preferredSourceId)
+            ? preferredSourceId!
+            : ids.first;
+    sourceId.value = src;
+    if (!ids.contains(destId.value) || destId.value == src) {
+      destId.value = ids.firstWhereOrNull((id) => id != src);
+    }
+    _applyMemory();
   }
 
-  String? _validationError(int sent, int received) {
-    if (sourceAccountId.value == null || destinationAccountId.value == null) {
-      return 'Pilih rekening asal dan tujuan';
-    }
-    if (sourceAccountId.value == destinationAccountId.value) {
-      return 'Rekening asal dan tujuan tidak boleh sama';
-    }
-    if (sent <= 0 || received <= 0) return 'Nominal tidak boleh 0';
-    if (sent < received) {
-      return 'Nominal dikirim tidak boleh lebih kecil dari yang diterima';
-    }
-    return null;
-  }
+  // ─── Pair ────────────────────────────────────────────────────────────────
 
-  Future<void> _handleConfirm() async {
-    if (isWorking.value) return;
-    final sent = int.tryParse(sourceAmountStr.value) ?? 0;
-    final received = int.tryParse(destAmountStr.value) ?? 0;
-    final error = _validationError(sent, received);
-    if (error != null) {
-      AppToast.warning('Peringatan', error);
+  /// Picking the account already on the other side swaps them (from ≠ to).
+  void setSource(int id) {
+    if (id == destId.value) {
+      swap();
       return;
     }
-
-    if (note.value.isNotEmpty && !noteHistory.contains(note.value)) {
-      noteHistory.insert(0, note.value);
-    }
-
-    // The receiver gets `amount`; the sender also pays the fee.
-    final row = {
-      'type': 'transfer',
-      'amount': received,
-      'category_id': null,
-      'note': note.value,
-      'account_id': sourceAccountId.value,
-      'destination_account_id': destinationAccountId.value,
-      'date': selectedDate.value.toIso8601String(),
-      'admin_fee': sent - received,
-      'admin_fee_type': 'Pengirim',
-    };
-
-    isWorking.value = true;
-    try {
-      final db = DatabaseHelper.instance;
-      if (isEdit) {
-        await db.replaceTransaction(editId!, row);
-      } else {
-        await db.addTransaction(row);
-      }
-      refreshAllGlobalData();
-      SoundService.to.playSuccess();
-      if (isEdit) {
-        Get.until((route) => route.isFirst);
-      } else {
-        Get.back();
-      }
-      AppToast.success(
-          isEdit ? 'Diperbarui' : 'Berhasil',
-          isEdit
-              ? 'Transfer berhasil diperbarui'
-              : 'Transfer berhasil disimpan');
-    } catch (e) {
-      AppToast.error('Gagal', 'Transfer tidak dapat disimpan');
-    } finally {
-      isWorking.value = false;
-    }
+    sourceId.value = id;
+    _applyMemory();
   }
 
-  void onSuggestionTapped(String suggestion) {
-    noteTextController.text = suggestion;
-    note.value = suggestion;
+  void setDestination(int id) {
+    if (id == sourceId.value) {
+      swap();
+      return;
+    }
+    destId.value = id;
+    _applyMemory();
   }
 
-  Future<void> pickDate(BuildContext context) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate.value,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
+  void swap() {
+    final s = sourceId.value;
+    sourceId.value = destId.value;
+    destId.value = s;
+    _applyMemory();
+  }
+
+  /// FR-011: preselect the fee last used for this ordered pair.
+  void _applyMemory() {
+    final s = sourceId.value, d = destId.value;
+    if (s == null || d == null) return;
+    final pref = _memory.read(s, d);
+    remembered.value = pref;
+    if (_editing) return;
+    fee.value = pref?.fee ?? 0;
+    bearer.value = pref?.bearer ?? FeeBearer.sender;
+    customFee.value = false;
+    activeField.value = TransferField.amount;
+  }
+
+  // ─── Fee ─────────────────────────────────────────────────────────────────
+
+  void pickFee(int value) {
+    fee.value = value;
+    customFee.value = false;
+    activeField.value = TransferField.amount;
+  }
+
+  void startCustomFee() {
+    customFee.value = true;
+    activeField.value = TransferField.fee;
+    _feeCalc.setValue(fee.value);
+  }
+
+  void focusAmount() => activeField.value = TransferField.amount;
+
+  void focusFee() {
+    if (customFee.value) activeField.value = TransferField.fee;
+  }
+
+  /// Keypad input while the fee field is active: digits only.
+  void pressFeeKey(String key) {
+    if (KeypadKey.operators.contains(key)) return;
+    _feeCalc.press(key);
+    fee.value = _feeCalc.result;
+  }
+
+  void setBearer(FeeBearer value) => bearer.value = value;
+
+  // ─── Save ────────────────────────────────────────────────────────────────
+
+  /// Writes the transfer (+ fee expense) and remembers the fee for the pair.
+  Future<String?> save({
+    required String note,
+    required DateTime date,
+    int? replaceId,
+  }) async {
+    final p = preview;
+    final s = sourceId.value!, d = destId.value!;
+    await DatabaseHelper.instance.saveTransfer(
+      {
+        'type': 'transfer',
+        'amount': p.destDelta,
+        'category_id': null,
+        'note': note,
+        'account_id': s,
+        'destination_account_id': d,
+        'date': date.toIso8601String(),
+        'admin_fee': 0,
+        'admin_fee_type': null,
+      },
+      fee: p.fee,
+      replaceId: replaceId,
     );
-    if (picked == null) return;
-    final now = DateTime.now();
-    selectedDate.value =
-        DateTime(picked.year, picked.month, picked.day, now.hour, now.minute);
+    await _memory.write(s, d, FeePref(p.fee, bearer.value));
+    return null;
   }
 }

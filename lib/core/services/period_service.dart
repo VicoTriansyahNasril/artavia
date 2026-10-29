@@ -34,6 +34,14 @@ class Period {
   }
 
   String get label => '${IdNames.monthShort(month)} $year';
+
+  /// "Oktober 2026" (board period navigation).
+  String get longLabel => '${IdNames.monthLong(month)} $year';
+
+  Period shift(int months) {
+    final d = DateTime(year, month + months);
+    return Period.of(d.year, d.month, start.day);
+  }
 }
 
 /// Active month shared by Riwayat, Grafik (Bulan) and Anggaran (FR-021).

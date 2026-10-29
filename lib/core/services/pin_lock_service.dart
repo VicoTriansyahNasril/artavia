@@ -5,6 +5,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:artavia/core/services/settings_service.dart';
 
 /// PBKDF2-HMAC-SHA256 with 600k iterations (security-standard.md, passwords).
@@ -41,7 +42,16 @@ class PinLockService extends GetxService with WidgetsBindingObserver {
   static const maxAttempts = 5;
   static const cooldown = Duration(seconds: 30);
 
+  static const keyPinLength = 'pin_length';
+
+  /// New PINs are 6 digits (board); PINs made before v12 keep 4.
+  static const newPinLength = 6;
+
   final isLocked = false.obs;
+
+  /// Fingerprint / face unlock is possible on this device (FR-029).
+  final canUseBiometrics = false.obs;
+  final _auth = LocalAuthentication();
   DateTime? _pausedAt;
   int _failed = 0;
   DateTime? _blockedUntil;
@@ -55,6 +65,44 @@ class PinLockService extends GetxService with WidgetsBindingObserver {
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
     isLocked.value = enabled;
+    _checkBiometrics();
+  }
+
+  Future<void> _checkBiometrics() async {
+    try {
+      canUseBiometrics.value = await _auth.isDeviceSupported() &&
+          await _auth.canCheckBiometrics &&
+          (await _auth.getAvailableBiometrics()).isNotEmpty;
+    } catch (_) {
+      canUseBiometrics.value = false;
+    }
+  }
+
+  /// Digits of the stored PIN.
+  int get pinLength =>
+      int.tryParse(SettingsService.to.get(keyPinLength) ?? '') ?? 4;
+
+  /// Wrong tries left before the cooldown starts.
+  int get remainingAttempts => maxAttempts - _failed;
+
+  /// Unlocks with fingerprint / face; returns true on success.
+  Future<bool> unlockWithBiometrics() async {
+    if (!enabled || !canUseBiometrics.value) return false;
+    try {
+      final ok = await _auth.authenticate(
+        localizedReason: 'Buka Artavia',
+        biometricOnly: true,
+        persistAcrossBackgrounding: true,
+      );
+      if (ok) {
+        _failed = 0;
+        _blockedUntil = null;
+        unlock();
+      }
+      return ok;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override
@@ -112,6 +160,7 @@ class PinLockService extends GetxService with WidgetsBindingObserver {
     final settings = SettingsService.to;
     await settings.set(SettingsService.keyPinSalt, base64Encode(salt));
     await settings.set(SettingsService.keyPinHash, hash);
+    await settings.set(keyPinLength, '${pin.length}');
     await settings.set(SettingsService.keyAppLock, 'true');
   }
 
@@ -120,6 +169,7 @@ class PinLockService extends GetxService with WidgetsBindingObserver {
     await settings.set(SettingsService.keyAppLock, 'false');
     await settings.remove(SettingsService.keyPinSalt);
     await settings.remove(SettingsService.keyPinHash);
+    await settings.remove(keyPinLength);
     isLocked.value = false;
   }
 

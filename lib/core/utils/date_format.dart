@@ -55,6 +55,18 @@ class IdNames {
     'Desember',
   ];
   static const daysShort = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+  static const daysLong = [
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu',
+  ];
+
+  /// Weekday full name (Monday = Senin).
+  static String dayLong(DateTime date) => daysLong[date.weekday - 1];
 
   static String monthShort(int month) => monthsShort[month - 1];
   static String monthLong(int month) => monthsLong[month - 1];

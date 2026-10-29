@@ -1,149 +1,213 @@
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/database/database_helper.dart';
+import 'package:artavia/core/database/transaction_store.dart';
+import 'package:artavia/core/services/period_service.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
+import 'package:artavia/page/routes.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/widgets/components/app_feedback.dart';
 
+/// Kategori (US6): per-type list in manual order, drag to reorder,
+/// archive/restore, counts + budget subtitle, and the add/edit form with
+/// 12 colors and 107 icons (FR-025, FR-026, FR-021).
 class CategoryManagementController extends GetxController {
-  final currentTab = 'Pengeluaran'.obs;
+  static const maxName = 30;
 
-  final expenseCategories = <Map<String, dynamic>>[].obs;
-  final incomeCategories = <Map<String, dynamic>>[].obs;
+  /// 'pengeluaran' or 'pemasukan'.
+  final currentType = 'pengeluaran'.obs;
 
-  final isExpenseForm = true.obs;
+  final expense = <Map<String, dynamic>>[].obs;
+  final income = <Map<String, dynamic>>[].obs;
+  final archived = <Map<String, dynamic>>[].obs;
+  final counts = <int, int>{}.obs;
+  final budgets = <int, int>{}.obs;
+  final isWorking = false.obs;
 
-  final RxBool isWorking = false.obs;
-
-  final categoryName = ''.obs;
-  final selectedIconPath = Rx<String?>(null);
-  final selectedIconCode = Rx<int?>(null);
-  final selectedColor = categoryPalette.first.obs;
-
-  // Edit mode
-  final editingId = Rx<int?>(null);
+  // ─── Form ────────────────────────────────────────────────────────────────
+  final editingId = RxnInt();
   bool get isEditMode => editingId.value != null;
+  final name = ''.obs;
+  final formType = 'pengeluaran'.obs;
+  final iconKey = 'lainnya'.obs;
+  final colorVal = categoryPaletteValues.first.obs;
+  final formVersion = 0.obs;
 
-  final categorizedIcons = {
-    'Keuangan': AppIcons.keuangan,
-    'Makanan': AppIcons.makanan,
-    'Belanja': AppIcons.belanja,
-    'Transportasi': AppIcons.transportasi,
-    'Hiburan': AppIcons.hiburan,
-    'Kesehatan': AppIcons.kesehatan,
-    'Pendidikan': AppIcons.pendidikan,
-    'Olahraga': AppIcons.olahraga,
-    'Berpergian': AppIcons.berpergian,
-    'Kehidupan': AppIcons.kehidupan,
-    'Pribadi': AppIcons.pribadi,
-  };
-
-  final presetColors = categoryPalette;
+  List<Map<String, dynamic>> get visible =>
+      currentType.value == 'pengeluaran' ? expense : income;
 
   @override
   void onInit() {
     super.onInit();
+    final args = Get.arguments;
+    if (args is Map && args['type'] is String) {
+      currentType.value = args['type'] as String;
+      resetForm(type: currentType.value);
+    }
     loadCategories();
   }
 
-  void resetForm() {
-    editingId.value = null;
-    categoryName.value = '';
-    selectedIconPath.value = null;
-    selectedIconCode.value = null;
-    selectedColor.value = categoryPalette.first;
-  }
-
   Future<void> loadCategories() async {
-    final cats = await DatabaseHelper.instance.readAllCategories();
-    final exList = <Map<String, dynamic>>[];
-    final inList = <Map<String, dynamic>>[];
+    final db = DatabaseHelper.instance;
+    final cats = await db.readAllCategories();
+    counts.value = await db.transactionCountByCategory();
+    final p = PeriodService.to.active.value;
+    budgets.value = {
+      for (final b in await db.readBudgetsByMonth(p.year, p.month))
+        b['category_id'] as int: b['budget_amount'] as int,
+    };
+    final active = cats.where((c) => c['is_archived'] != 1);
+    expense.value = active.where((c) => c['type'] == 'pengeluaran').toList();
+    income.value = active.where((c) => c['type'] == 'pemasukan').toList();
+    archived.value = cats.where((c) => c['is_archived'] == 1).toList();
+  }
 
-    for (var c in cats) {
-      final type = c['type'];
-      final codePoint = c['icon_code'];
-      final iconPath = c['icon_path'];
-      final colorVal = c['color_val'];
+  void changeType(String type) => currentType.value = type;
 
-      final colorData = colorVal != null ? Color(colorVal as int) : colorGrey;
-
-      final item = {
-        'id': c['id'],
-        'name': c['name'],
-        'icon_code': codePoint,
-        'icon_path': iconPath,
-        'color': colorData,
-      };
-
-      if (type == 'pengeluaran') {
-        exList.add(item);
-      } else {
-        inList.add(item);
-      }
+  /// Drag-to-reorder within the visible type; persisted immediately.
+  /// [newIndex] is already adjusted for the removed item.
+  Future<void> reorder(int oldIndex, int newIndex) async {
+    final list = List<Map<String, dynamic>>.of(visible);
+    list.insert(newIndex, list.removeAt(oldIndex));
+    if (currentType.value == 'pengeluaran') {
+      expense.value = list;
+    } else {
+      income.value = list;
     }
-    expenseCategories.value = exList;
-    incomeCategories.value = inList;
+    await DatabaseHelper.instance
+        .saveSortOrder('categories', [for (final c in list) c['id'] as int]);
+    refreshAllGlobalData();
   }
 
-  void changeTab(String tab) {
-    currentTab.value = tab;
+  Future<void> setArchived(Map<String, dynamic> cat, bool value) async {
+    await DatabaseHelper.instance
+        .updateCategory(cat['id'] as int, {'is_archived': value ? 1 : 0});
+    await loadCategories();
+    refreshAllGlobalData();
+    AppToast.success(value ? 'Diarsipkan' : 'Dipulihkan',
+        '${cat['name']} ${value ? 'disembunyikan dari Catat' : 'aktif kembali'}');
   }
+
+  /// FR-021: a category with transactions offers Arsipkan first.
+  Future<void> deleteCategory(Map<String, dynamic> cat) async {
+    final id = cat['id'] as int;
+    final label = cat['name'] as String;
+    final count = counts[id] ?? 0;
+    final db = DatabaseHelper.instance;
+    if (count == 0) {
+      final ok = await AppDialog.confirm(
+        icon: LucideIcons.trash2,
+        title: 'Hapus $label?',
+        message: 'Kategori ini belum dipakai. Anggaran dan transaksi '
+            'berulangnya ikut terhapus.',
+        confirmLabel: 'Hapus kategori',
+        destructive: true,
+      );
+      if (!ok) return;
+      await db.deleteCategory(id);
+    } else {
+      final choice = await AppDialog.choose(
+        icon: LucideIcons.archive,
+        title: 'Hapus $label?',
+        message: 'Kategori ini dipakai di $count transaksi. Arsipkan agar '
+            'riwayat tetap utuh dan kategori tidak muncul di Catat.',
+        info: const DialogInfo(
+            'Menghapus juga menghapus semua transaksinya dan mengembalikan '
+            'saldo rekening.',
+            warning: true),
+        safeLabel: 'Arsipkan',
+        dangerLabel: 'Hapus beserta $count transaksi',
+      );
+      if (choice == DialogChoice.cancel) return;
+      if (choice == DialogChoice.safe) {
+        await setArchived(cat, true);
+        _closeForm();
+        return;
+      }
+      await db.deleteCategoryWithTransactions(id);
+    }
+    await loadCategories();
+    refreshAllGlobalData();
+    _closeForm();
+    AppToast.success('Dihapus', '$label telah dihapus');
+  }
+
+  void _closeForm() {
+    if (Get.currentRoute == addCategoryRoute) Get.back();
+  }
+
+  // ─── Form ────────────────────────────────────────────────────────────────
+
+  void openNew() {
+    resetForm(type: currentType.value);
+    Get.toNamed(addCategoryRoute);
+  }
+
+  void openEdit(Map<String, dynamic> cat) {
+    editingId.value = cat['id'] as int;
+    name.value = cat['name'] as String;
+    formType.value = cat['type'] as String;
+    iconKey.value = IconRegistry.contains(cat['icon_key'] as String?)
+        ? cat['icon_key'] as String
+        : IconRegistry.legacyToKey(
+            iconPath: cat['icon_path'] as String?,
+            iconCode: cat['icon_code'] as int?);
+    colorVal.value = nearestPaletteValue(
+        cat['color_val'] as int? ?? categoryPaletteValues.last);
+    formVersion.value++;
+    Get.toNamed(addCategoryRoute);
+  }
+
+  void resetForm({String type = 'pengeluaran'}) {
+    editingId.value = null;
+    name.value = '';
+    formType.value = type;
+    iconKey.value = type == 'pemasukan' ? 'gaji' : 'makan';
+    if (!IconRegistry.contains(iconKey.value)) {
+      iconKey.value = IconRegistry.fallbackKey;
+    }
+    colorVal.value = categoryPaletteValues[
+        (expense.length + income.length) % categoryPaletteValues.length];
+    formVersion.value++;
+  }
+
+  String? get nameError {
+    final n = name.value.trim();
+    if (n.isEmpty) return null;
+    final list = formType.value == 'pengeluaran' ? expense : income;
+    final taken = list.any((c) =>
+        c['id'] != editingId.value &&
+        (c['name'] as String).toLowerCase() == n.toLowerCase());
+    return taken ? 'Nama ini sudah dipakai' : null;
+  }
+
+  bool get canSave => name.value.trim().isNotEmpty && nameError == null;
 
   Future<void> saveCategory() async {
-    if (isWorking.value) return;
-    if (categoryName.value.trim().isEmpty) {
-      AppToast.warning('Gagal', 'Nama kategori tidak boleh kosong');
-      return;
-    }
-
+    if (isWorking.value || !canSave) return;
     isWorking.value = true;
     try {
-      final cVal = selectedColor.value.toARGB32();
       final data = {
-        'name': categoryName.value.trim(),
-        'type': isExpenseForm.value ? 'pengeluaran' : 'pemasukan',
-        'icon_code': selectedIconCode.value,
-        'icon_path': selectedIconPath.value,
-        'color_val': cVal,
+        'name': name.value.trim(),
+        'type': formType.value,
+        'icon_key': iconKey.value,
+        'color_val': colorVal.value,
       };
-
-      if (isEditMode) {
-        await DatabaseHelper.instance.updateCategory(editingId.value!, data);
-        Get.back();
-        AppToast.success('Berhasil', 'Kategori berhasil diperbarui');
+      final db = DatabaseHelper.instance;
+      final editing = isEditMode;
+      if (editing) {
+        await db.updateCategory(editingId.value!, data);
       } else {
-        await DatabaseHelper.instance.insertCategory(data);
-        Get.back();
-        AppToast.success('Berhasil', 'Kategori baru disimpan');
+        final list = formType.value == 'pengeluaran' ? expense : income;
+        await db.insertCategory({...data, 'sort_order': list.length});
       }
-
-      resetForm();
-      loadCategories();
+      Get.back();
+      AppToast.success(editing ? 'Kategori diperbarui' : 'Kategori dibuat',
+          '${data['name']} siap dipakai');
+      await loadCategories();
       refreshAllGlobalData();
-    } finally {
-      isWorking.value = false;
-    }
-  }
-
-  Future<void> deleteCategory(int id) async {
-    final ok = await AppDialog.confirm(
-      title: 'Hapus Kategori',
-      message:
-          'Kategori yang sudah dipakai pada transaksi tidak dapat dihapus. '
-          'Anggaran dan transaksi berulang untuk kategori ini ikut terhapus.',
-      confirmLabel: 'Hapus',
-      destructive: true,
-    );
-    if (!ok || isWorking.value) return;
-    isWorking.value = true;
-    try {
-      await DatabaseHelper.instance.deleteCategory(id);
-      loadCategories();
-      refreshAllGlobalData();
-      AppToast.success('Berhasil', 'Kategori dihapus');
-    } catch (e) {
-      AppToast.error('Tidak Dapat Dihapus',
-          'Kategori ini sudah digunakan pada transaksi.');
+    } catch (_) {
+      AppToast.error('Gagal', 'Kategori tidak dapat disimpan');
     } finally {
       isWorking.value = false;
     }

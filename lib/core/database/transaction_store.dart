@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:artavia/core/database/database_helper.dart';
+import 'package:artavia/widgets/commons/icon_registry.dart';
 
 /// Every write that touches `transactions` goes through here so the account
 /// balances change in the same DB transaction as the row (constitution IV).
@@ -12,9 +13,34 @@ extension TransactionStore on DatabaseHelper {
     return db.transaction((txn) => _insertWithEffect(txn, row));
   }
 
-  Future<void> deleteTransactionById(int id) async {
+  /// Deletes a transaction and returns the stored row, so the deletion can
+  /// be undone with [restoreTransaction] (FR-015).
+  Future<Map<String, dynamic>?> deleteTransactionById(int id) async {
     final db = await database;
-    await db.transaction((txn) => _deleteWithEffect(txn, id));
+    return db.transaction((txn) => _deleteWithEffect(txn, id));
+  }
+
+  /// Puts a deleted row back under its original id and re-applies its
+  /// balance effect.
+  Future<void> restoreTransaction(Map<String, dynamic> snapshot) async {
+    final db = await database;
+    await db.transaction((txn) => _insertWithEffect(txn, snapshot));
+  }
+
+  /// Copies a transaction to now ("Duplikat ke hari ini"); returns the new id.
+  Future<int?> duplicateToToday(int id) async {
+    final db = await database;
+    return db.transaction((txn) async {
+      final rows =
+          await txn.query('transactions', where: 'id = ?', whereArgs: [id]);
+      if (rows.isEmpty) return null;
+      final copy = Map<String, dynamic>.of(rows.first)
+        ..remove('id')
+        ..remove('updated_at')
+        ..['import_batch_id'] = null
+        ..['date'] = DateTime.now().toIso8601String();
+      return _insertWithEffect(txn, copy);
+    });
   }
 
   /// Edits a transaction by reverting and removing the old row, then
@@ -22,8 +48,66 @@ extension TransactionStore on DatabaseHelper {
   Future<int> replaceTransaction(int oldId, Map<String, dynamic> newRow) async {
     final db = await database;
     return db.transaction((txn) async {
-      await _deleteWithEffect(txn, oldId);
-      return _insertWithEffect(txn, newRow);
+      final old = await _deleteWithEffect(txn, oldId);
+      return _insertWithEffect(txn, _keepBatch(old, newRow));
+    });
+  }
+
+  /// Deletes an account with every transaction that touches it. Transfers
+  /// are reverted first, so the other account's balance stays correct.
+  /// Returns how many transactions were removed.
+  Future<int> deleteAccountWithTransactions(int accountId) async {
+    final db = await database;
+    return db.transaction((txn) async {
+      final rows = await txn.query('transactions',
+          columns: ['id'],
+          where: 'account_id = ? OR destination_account_id = ?',
+          whereArgs: [accountId, accountId]);
+      for (final r in rows) {
+        await _deleteWithEffect(txn, r['id'] as int);
+      }
+      await txn.delete('accounts', where: 'id = ?', whereArgs: [accountId]);
+      return rows.length;
+    });
+  }
+
+  /// Deletes a category with its transactions (balances reverted); budgets
+  /// and recurring rules go with it via ON DELETE CASCADE.
+  Future<int> deleteCategoryWithTransactions(int categoryId) async {
+    final db = await database;
+    return db.transaction((txn) async {
+      final rows = await txn.query('transactions',
+          columns: ['id'], where: 'category_id = ?', whereArgs: [categoryId]);
+      for (final r in rows) {
+        await _deleteWithEffect(txn, r['id'] as int);
+      }
+      await txn.delete('categories', where: 'id = ?', whereArgs: [categoryId]);
+      return rows.length;
+    });
+  }
+
+  /// Saves a transfer and, when [fee] > 0, its "Biaya admin" expense from
+  /// the source account in one DB transaction (FR-012). With [replaceId]
+  /// the old transfer is reverted and removed first (edit).
+  Future<void> saveTransfer(
+    Map<String, dynamic> transferRow, {
+    int fee = 0,
+    int? replaceId,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final old =
+          replaceId == null ? null : await _deleteWithEffect(txn, replaceId);
+      await _insertWithEffect(txn, _keepBatch(old, transferRow));
+      if (fee <= 0) return;
+      await _insertWithEffect(txn, {
+        'type': 'pengeluaran',
+        'amount': fee,
+        'category_id': await _feeCategoryId(txn),
+        'note': 'Biaya admin transfer',
+        'account_id': transferRow['account_id'],
+        'date': transferRow['date'],
+      });
     });
   }
 
@@ -45,13 +129,23 @@ extension TransactionStore on DatabaseHelper {
   }
 
   /// Imports already-validated rows that reference categories/accounts by
-  /// name, creating any missing category or account. All-or-nothing.
-  Future<int> importTransactions(
+  /// name in one DB transaction, creating any missing category or account,
+  /// and records them as an `import_batches` row (FR-034). The caller makes
+  /// the safety copy of the DB file first. Returns the batch id.
+  Future<int> importBatch(
+    String fileName,
     List<Map<String, dynamic>> rows, {
     required int Function(int index) newCategoryColor,
   }) async {
     final db = await database;
+    final createdAt = DateTime.now().toIso8601String();
     return db.transaction((txn) async {
+      final batchId = await txn.insert('import_batches', {
+        'file_name': fileName,
+        'created_at': createdAt,
+        'transaction_count': rows.length,
+        'status': 'active',
+      });
       final resolver = _NameResolver(txn, newCategoryColor);
       for (final r in rows) {
         final isTransfer = r['type'] == 'transfer';
@@ -70,25 +164,72 @@ extension TransactionStore on DatabaseHelper {
           'date': r['date'],
           'admin_fee': isTransfer ? r['admin_fee'] ?? 0 : 0,
           'admin_fee_type': isTransfer ? 'Pengirim' : null,
+          'import_batch_id': batchId,
+          // Equal to the batch time, so later edits are detectable.
+          'updated_at': createdAt,
         });
       }
+      return batchId;
+    });
+  }
+
+  /// Undoes an import (≤ 7 days, status active): its transactions are
+  /// removed through the balance-reverting path. With [keepEdited], rows
+  /// changed after the import stay. Returns how many were removed.
+  Future<int> cancelImport(int batchId, {bool keepEdited = false}) async {
+    final db = await database;
+    return db.transaction((txn) async {
+      final batch = (await txn
+              .query('import_batches', where: 'id = ?', whereArgs: [batchId]))
+          .firstOrNull;
+      if (batch == null || batch['status'] != 'active') return 0;
+      final created = batch['created_at'] as String;
+      final rows = await txn.query('transactions',
+          columns: ['id'],
+          where: keepEdited
+              ? 'import_batch_id = ? AND (updated_at IS NULL OR updated_at <= ?)'
+              : 'import_batch_id = ?',
+          whereArgs: keepEdited ? [batchId, created] : [batchId]);
+      for (final r in rows) {
+        await _deleteWithEffect(txn, r['id'] as int);
+      }
+      await txn.update(
+          'import_batches',
+          {
+            'status': 'cancelled',
+            'cancelled_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [batchId]);
       return rows.length;
     });
   }
 }
 
+/// Edits keep the row in its import batch (so "Batalkan impor" still finds
+/// it and can tell it was changed).
+Map<String, dynamic> _keepBatch(
+        Map<String, dynamic>? old, Map<String, dynamic> row) =>
+    old?['import_batch_id'] == null || row.containsKey('import_batch_id')
+        ? row
+        : {...row, 'import_batch_id': old!['import_batch_id']};
+
 Future<int> _insertWithEffect(Transaction txn, Map<String, dynamic> row) async {
-  final id = await txn.insert('transactions', row);
+  final id = await txn.insert('transactions', {
+    ...row,
+    'updated_at': row['updated_at'] ?? DateTime.now().toIso8601String(),
+  });
   await _applyBalanceEffect(txn, row, 1);
   return id;
 }
 
-Future<void> _deleteWithEffect(Transaction txn, int id) async {
+Future<Map<String, dynamic>?> _deleteWithEffect(Transaction txn, int id) async {
   final rows =
       await txn.query('transactions', where: 'id = ?', whereArgs: [id]);
-  if (rows.isEmpty) return;
+  if (rows.isEmpty) return null;
   await _applyBalanceEffect(txn, rows.first, -1);
   await txn.delete('transactions', where: 'id = ?', whereArgs: [id]);
+  return Map<String, dynamic>.of(rows.first);
 }
 
 /// Applies (sign = 1) or reverts (sign = -1) a transaction's balance effect.
@@ -115,6 +256,23 @@ Future<void> _adjustBalance(Transaction txn, int? accountId, int delta) async {
       [delta, accountId]);
 }
 
+const feeCategoryName = 'Biaya admin';
+
+/// The expense category transfer fees are booked to, created on first use.
+Future<int> _feeCategoryId(Transaction txn) async {
+  final found = await txn.query('categories',
+      where: 'LOWER(name) = ? AND type = ?',
+      whereArgs: [feeCategoryName.toLowerCase(), 'pengeluaran'],
+      limit: 1);
+  if (found.isNotEmpty) return found.first['id'] as int;
+  return txn.insert('categories', {
+    'name': feeCategoryName,
+    'type': 'pengeluaran',
+    'icon_key': 'biaya_bank',
+    'color_val': 0xFF8D94A3,
+  });
+}
+
 /// Finds categories/accounts by (case-insensitive) name, creating them once.
 class _NameResolver {
   final Transaction txn;
@@ -139,6 +297,7 @@ class _NameResolver {
             'balance': 0,
             'currency_code': 'IDR',
             'is_excluded': 0,
+            'icon_key': IconRegistry.accountTypeKey('Lainnya'),
           });
     return _accounts[key] = id;
   }
@@ -157,6 +316,7 @@ class _NameResolver {
             'name': name.trim(),
             'type': type,
             'color_val': newCategoryColor(_created++),
+            'icon_key': IconRegistry.fallbackKey,
           });
     return _categories[key] = id;
   }

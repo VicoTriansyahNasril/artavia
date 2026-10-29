@@ -1,151 +1,65 @@
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/database/database_helper.dart';
+import 'package:artavia/core/database/transaction_store.dart';
 import 'package:artavia/core/models/account_model.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
-import 'package:artavia/widgets/commons/common.dart';
-import 'package:artavia/widgets/components/tutorial_card.dart';
+import 'package:artavia/core/utils/finance_calc.dart';
 import 'package:artavia/page/routes.dart';
+import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/widgets/components/app_feedback.dart';
-import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
-/// Defines account type metadata for the type selector grid
-class AccountType {
-  final String label;
-  final IconData icon;
-  final int defaultColorVal;
+/// One collapsible Rekening group with its subtotal.
+class AccountGroupView {
+  final String name;
+  final List<Map<String, dynamic>> accounts;
+  final int subtotal;
 
-  const AccountType({
-    required this.label,
-    required this.icon,
-    required this.defaultColorVal,
-  });
-
-  int get defaultIconCode => icon.codePoint;
+  const AccountGroupView(this.name, this.accounts, this.subtotal);
 }
 
+/// Rekening tab + account form (FR-020, FR-021).
 class AccountManagementController extends GetxController {
-  final accountGroups = <Map<String, dynamic>>[].obs;
-
-  final GlobalKey keyAccountFAB = GlobalKey();
-  final GlobalKey keyAddAccountForm = GlobalKey();
-  final GlobalKey keyAddAccountSave = GlobalKey();
-
-  // ─── Account Types ─────────────────────────────────────────────────────────
-
-  static const List<AccountType> accountTypes = [
-    AccountType(
-      label: 'Kas Tunai',
-      icon: Icons.payments,
-      defaultColorVal: 0xFFE0B25C,
-    ),
-    AccountType(
-      label: 'Bank',
-      icon: Icons.account_balance,
-      defaultColorVal: 0xFF5FA8D3,
-    ),
-    AccountType(
-      label: 'Kartu Kredit',
-      icon: Icons.credit_card,
-      defaultColorVal: 0xFFE07A7A,
-    ),
-    AccountType(
-      label: 'Dompet Digital',
-      icon: Icons.phone_android,
-      defaultColorVal: 0xFF5FBF8F,
-    ),
-    AccountType(
-      label: 'Tabungan',
-      icon: Icons.savings,
-      defaultColorVal: 0xFF4FB6B0,
-    ),
-    AccountType(
-      label: 'Investasi',
-      icon: Icons.trending_up,
-      defaultColorVal: 0xFF9D8CE6,
-    ),
-    AccountType(
-      label: 'Pinjaman',
-      icon: Icons.account_balance_wallet,
-      defaultColorVal: 0xFFE59A6B,
-    ),
-    AccountType(
-      label: 'Investasi Aset',
-      icon: Icons.real_estate_agent,
-      defaultColorVal: 0xFF8D94A3,
-    ),
-    AccountType(
-      label: 'Lainnya',
-      icon: Icons.more_horiz,
-      defaultColorVal: 0xFF8D94A3,
-    ),
+  /// Account types offered in the form (stored as `accounts.type`).
+  static const accountTypes = [
+    'Kas Tunai',
+    'Bank',
+    'Dompet Digital',
+    'Tabungan',
+    'Kartu Kredit',
+    'Pinjaman',
+    'Investasi',
+    'Investasi Aset',
+    'Lainnya',
   ];
 
-  static const List<String> keuanganIcons = AppIcons.keuangan;
+  // ─── List state ──────────────────────────────────────────────────────────
 
-  // ─── Supported Currencies ─────────────────────────────────────────────────
+  final groups = <AccountGroupView>[].obs;
+  final archived = <Map<String, dynamic>>[].obs;
+  final collapsed = <String>{}.obs;
+  final worth = const NetWorth(0, 0).obs;
+  final isLoading = false.obs;
 
-  static const List<Map<String, String>> supportedCurrencies = [
-    {'code': 'IDR', 'symbol': 'Rp', 'name': 'Rupiah'},
-    {'code': 'USD', 'symbol': '\$', 'name': 'US Dollar'},
-    {'code': 'EUR', 'symbol': '€', 'name': 'Euro'},
-    {'code': 'SGD', 'symbol': 'S\$', 'name': 'Sing. Dollar'},
-    {'code': 'MYR', 'symbol': 'RM', 'name': 'Ringgit'},
-    {'code': 'GBP', 'symbol': '£', 'name': 'British Pound'},
-    {'code': 'JPY', 'symbol': '¥', 'name': 'Yen'},
-    {'code': 'AUD', 'symbol': 'A\$', 'name': 'Aus. Dollar'},
-    {'code': 'CNY', 'symbol': '¥', 'name': 'Yuan'},
-    {'code': 'SAR', 'symbol': '﷼', 'name': 'Riyal'},
-  ];
+  // ─── Form state ──────────────────────────────────────────────────────────
 
-  // ─── Preset Colors ────────────────────────────────────────────────────────
-
-  final presetColors = categoryPalette;
-
-  // ─── Form State ──────────────────────────────────────────────────────────
-
+  final editingId = RxnInt();
+  bool get isEditMode => editingId.value != null;
   final typeValue = 'Kas Tunai'.obs;
   final accountName = ''.obs;
   final balance = 0.obs;
   final currencyCode = 'IDR'.obs;
   final excludeFromTotal = false.obs;
+  final iconKey = IconRegistry.accountTypeKey('Kas Tunai').obs;
+  final colorVal = categoryPaletteValues[7].obs;
+  final creditLimit = 0.obs;
+  final dueDay = RxnInt();
+  final isWorking = false.obs;
 
-  final RxBool isWorking = false.obs;
+  /// Bumped whenever the form is (re)filled so text fields reset.
+  final formVersion = 0.obs;
 
-  final selectedIconCode = Rx<int?>(Icons.payments_outlined.codePoint);
-  final selectedIconPath = Rx<String?>(null);
-  final selectedColorVal = categoryPalette[2].toARGB32().obs;
-
-  // Edit mode
-  final editingId = Rx<int?>(null);
-  bool get isEditMode => editingId.value != null;
-
-  final nameController = TextEditingController();
-  final balanceController = TextEditingController();
-
-  // ─── Actions ─────────────────────────────────────────────────────────────
-
-  void onTypeSelected(AccountType type) {
-    typeValue.value = type.label;
-    selectedIconCode.value = type.defaultIconCode;
-    selectedIconPath.value = null;
-    selectedColorVal.value = type.defaultColorVal;
-  }
-
-  void onIconSelected(String path) {
-    selectedIconPath.value = path;
-    selectedIconCode.value = null;
-  }
-
-  void onColorSelected(Color color) {
-    selectedColorVal.value = color.toARGB32();
-  }
-
-  void onCurrencySelected(String code) {
-    currencyCode.value = code;
-  }
-
-  // ─── Lifecycle ────────────────────────────────────────────────────────────
+  bool get isCreditCard => typeValue.value == 'Kartu Kredit';
 
   @override
   void onInit() {
@@ -153,44 +67,94 @@ class AccountManagementController extends GetxController {
     loadAccounts();
   }
 
-  @override
-  void onClose() {
-    nameController.dispose();
-    balanceController.dispose();
-    super.onClose();
-  }
-
   Future<void> loadAccounts() async {
-    final data = await DatabaseHelper.instance.readAllAccounts();
-
-    final Map<String, List<Map<String, dynamic>>> grouped = {};
-    for (var row in data) {
-      final account = AccountModel.fromJson(row);
-      final type = account.type;
-      grouped.putIfAbsent(type, () => []).add({
-        'id': account.id,
-        'name': account.name,
-        'type': account.type,
-        'balance': account.balance,
-        'currency_code': account.currencyCode,
-        'icon_code': account.iconCode,
-        'icon_path': account.iconPath,
-        'color_val': account.colorVal,
-        'is_excluded': account.isExcluded,
-      });
+    isLoading.value = true;
+    try {
+      final rows = await DatabaseHelper.instance.readAllAccounts();
+      final active = rows.where((a) => a['is_archived'] != 1).toList();
+      archived.value = rows.where((a) => a['is_archived'] == 1).toList();
+      worth.value = computeNetWorth(active);
+      groups.value = [
+        for (final g in accountGroups)
+          if (active.any((a) => accountGroup(a['type'] as String?) == g))
+            () {
+              final list = active
+                  .where((a) => accountGroup(a['type'] as String?) == g)
+                  .toList();
+              return AccountGroupView(g, list, computeNetWorth(list).net);
+            }(),
+      ];
+    } finally {
+      isLoading.value = false;
     }
-
-    final newGroups = <Map<String, dynamic>>[];
-    grouped.forEach((key, value) {
-      newGroups.add({'groupName': key, 'accounts': value});
-    });
-
-    accountGroups.value = newGroups;
   }
 
-  /// Opens the add/edit form from anywhere (Aset tab, Kelola Rekening) with a
-  /// clean or pre-filled form. [account] is a raw `accounts` row or a row from
-  /// [accountGroups].
+  void toggleGroup(String name) {
+    if (!collapsed.remove(name)) collapsed.add(name);
+  }
+
+  // ─── Archive / delete ────────────────────────────────────────────────────
+
+  Future<void> setArchived(Map<String, dynamic> account, bool value) async {
+    await DatabaseHelper.instance
+        .updateAccount(account['id'] as int, {'is_archived': value ? 1 : 0});
+    await loadAccounts();
+    refreshAllGlobalData();
+    AppToast.success(value ? 'Diarsipkan' : 'Dipulihkan',
+        '${account['name']} ${value ? 'disembunyikan dari pilihan' : 'aktif kembali'}');
+  }
+
+  /// FR-021: an account with history offers Arsipkan first.
+  Future<void> deleteAccount(Map<String, dynamic> account) async {
+    final id = account['id'] as int;
+    final name = account['name'] as String;
+    final db = DatabaseHelper.instance;
+    final count = await db.countAccountTransactions(id);
+
+    if (count == 0) {
+      final ok = await AppDialog.confirm(
+        icon: LucideIcons.trash2,
+        title: 'Hapus $name?',
+        message: 'Rekening ini belum punya transaksi dan akan dihapus.',
+        confirmLabel: 'Hapus rekening',
+        destructive: true,
+      );
+      if (!ok) return;
+      await db.deleteAccount(id);
+    } else {
+      final choice = await AppDialog.choose(
+        icon: LucideIcons.archive,
+        title: 'Hapus $name?',
+        message: 'Rekening ini punya $count transaksi. Arsipkan agar riwayat '
+            'tetap aman dan rekening tidak muncul di pilihan.',
+        info: const DialogInfo(
+            'Menghapus juga menghapus semua transaksinya dan mengubah saldo '
+            'rekening lain yang terkait transfer.',
+            warning: true),
+        safeLabel: 'Arsipkan',
+        dangerLabel: 'Hapus beserta $count transaksi',
+      );
+      if (choice == DialogChoice.cancel) return;
+      if (choice == DialogChoice.safe) {
+        await setArchived(account, true);
+        _closeFormIfOpen();
+        return;
+      }
+      await db.deleteAccountWithTransactions(id);
+    }
+    await loadAccounts();
+    refreshAllGlobalData();
+    _closeFormIfOpen();
+    AppToast.success('Dihapus', '$name telah dihapus');
+  }
+
+  void _closeFormIfOpen() {
+    if (Get.currentRoute == addAccountRoute) Get.back();
+  }
+
+  // ─── Form ────────────────────────────────────────────────────────────────
+
+  /// Opens the add/edit form from anywhere with a clean or filled form.
   static Future<void> openEditor([Map<String, dynamic>? account]) async {
     if (!Get.isRegistered<AccountManagementController>()) {
       Get.put(AccountManagementController());
@@ -199,30 +163,26 @@ class AccountManagementController extends GetxController {
     if (account == null) {
       c.resetForm();
     } else {
-      final excluded = account['is_excluded'];
-      c.startEditAccount({
-        ...account,
-        'is_excluded': excluded == true || excluded == 1,
-      });
+      c._fill(account);
     }
     await Get.toNamed(addAccountRoute);
   }
 
-  void startEditAccount(Map<String, dynamic> acc) {
-    editingId.value = acc['id'] as int;
-    accountName.value = acc['name'] as String;
-    typeValue.value = acc['type'] as String;
-    balance.value = acc['balance'] as int;
-    currencyCode.value = acc['currency_code'] as String? ?? 'IDR';
-    excludeFromTotal.value = acc['is_excluded'] as bool? ?? false;
-    selectedIconCode.value =
-        acc['icon_code'] as int? ?? Icons.payments_outlined.codePoint;
-    selectedIconPath.value = acc['icon_path'] as String?;
-    selectedColorVal.value =
-        acc['color_val'] as int? ?? categoryPalette[2].toARGB32();
-
-    nameController.text = accountName.value;
-    balanceController.text = balance.value == 0 ? '' : balance.value.toString();
+  void _fill(Map<String, dynamic> row) {
+    final a = AccountModel.fromJson(row);
+    editingId.value = a.id;
+    accountName.value = a.name;
+    typeValue.value = a.type;
+    balance.value = a.balance;
+    currencyCode.value = a.currencyCode;
+    excludeFromTotal.value = a.isExcluded;
+    iconKey.value = IconRegistry.contains(a.iconKey)
+        ? a.iconKey!
+        : IconRegistry.accountTypeKey(a.type);
+    colorVal.value = nearestPaletteValue(a.colorVal);
+    creditLimit.value = a.creditLimit ?? 0;
+    dueDay.value = a.dueDay;
+    formVersion.value++;
   }
 
   void resetForm() {
@@ -232,191 +192,60 @@ class AccountManagementController extends GetxController {
     balance.value = 0;
     currencyCode.value = 'IDR';
     excludeFromTotal.value = false;
-    selectedIconCode.value = Icons.payments_outlined.codePoint;
-    selectedIconPath.value = null;
-    selectedColorVal.value = categoryPalette[2].toARGB32();
+    iconKey.value = IconRegistry.accountTypeKey('Kas Tunai');
+    colorVal.value = categoryPaletteValues[7];
+    creditLimit.value = 0;
+    dueDay.value = null;
+    formVersion.value++;
+  }
 
-    nameController.clear();
-    balanceController.clear();
+  /// Picking a type also suggests its icon unless the user chose one.
+  void onTypeSelected(String type) {
+    final suggested = IconRegistry.accountTypeKey(typeValue.value);
+    typeValue.value = type;
+    if (iconKey.value == suggested) {
+      iconKey.value = IconRegistry.accountTypeKey(type);
+    }
   }
 
   Future<void> saveAccount() async {
     if (isWorking.value) return;
     final name = accountName.value.trim();
     if (name.isEmpty) {
-      AppToast.warning('Gagal', 'Nama rekening tidak boleh kosong');
+      AppToast.warning('Nama rekening', 'Nama rekening tidak boleh kosong');
       return;
     }
-
     isWorking.value = true;
     try {
-      final account = AccountModel(
-        id: editingId.value,
-        name: name,
-        type: typeValue.value,
-        balance: balance.value,
-        currencyCode: currencyCode.value,
-        iconCode: selectedIconCode.value ?? Icons.payments_outlined.codePoint,
-        iconPath: selectedIconPath.value,
-        colorVal: selectedColorVal.value,
-        isExcluded: excludeFromTotal.value,
-      );
-
-      if (isEditMode) {
-        await DatabaseHelper.instance
-            .updateAccount(editingId.value!, account.toJson()..remove('id'));
-        Get.back();
-        _showSuccessSnack(
-            'Rekening diperbarui', '${account.name} berhasil diperbarui');
+      final row = {
+        'name': name,
+        'type': typeValue.value,
+        'balance': balance.value,
+        'currency_code': currencyCode.value,
+        'icon_key': iconKey.value,
+        'color_val': colorVal.value,
+        'is_excluded': excludeFromTotal.value ? 1 : 0,
+        'credit_limit':
+            isCreditCard && creditLimit.value > 0 ? creditLimit.value : null,
+        'due_day': isCreditCard ? dueDay.value : null,
+      };
+      final db = DatabaseHelper.instance;
+      final editing = isEditMode;
+      if (editing) {
+        await db.updateAccount(editingId.value!, row);
       } else {
-        await DatabaseHelper.instance
-            .insertAccount(account.toJson()..remove('id'));
-        Get.back();
-        _showSuccessSnack(
-            'Rekening ditambahkan', '${account.name} berhasil ditambahkan');
+        await db.insertAccount(row);
       }
-
+      Get.back();
+      AppToast.success(editing ? 'Rekening diperbarui' : 'Rekening ditambahkan',
+          '$name berhasil ${editing ? 'diperbarui' : 'ditambahkan'}');
       resetForm();
-      loadAccounts();
+      await loadAccounts();
       refreshAllGlobalData();
+    } catch (_) {
+      AppToast.error('Gagal', 'Rekening tidak dapat disimpan');
     } finally {
       isWorking.value = false;
     }
-  }
-
-  Future<void> deleteAccount(int id, String name) async {
-    final ok = await AppDialog.confirm(
-      title: 'Hapus Rekening',
-      message: 'Hapus "$name"? Rekening yang sudah memiliki riwayat transaksi '
-          'tidak dapat dihapus. Transaksi berulang yang memakai rekening ini '
-          'ikut terhapus.',
-      confirmLabel: 'Hapus',
-      destructive: true,
-    );
-    if (!ok || isWorking.value) return;
-    isWorking.value = true;
-    try {
-      await DatabaseHelper.instance.deleteAccount(id);
-      loadAccounts();
-      refreshAllGlobalData();
-      AppToast.success('Berhasil', '"$name" telah dihapus');
-    } catch (e) {
-      AppToast.error('Tidak Dapat Dihapus',
-          'Rekening ini masih memiliki riwayat transaksi.');
-    } finally {
-      isWorking.value = false;
-    }
-  }
-
-  void _showSuccessSnack(String title, String message) =>
-      AppToast.success(title, message);
-
-  bool _hasShownMainTutorial = false;
-
-  Future<void> showTutorialIfNoAccount() async {
-    if (_hasShownMainTutorial) return;
-    final accounts = await DatabaseHelper.instance.readAllAccounts();
-    if (accounts.isEmpty) {
-      _hasShownMainTutorial = true;
-      _showTutorial();
-    }
-  }
-
-  void _showTutorial() {
-    List<TargetFocus> targets = [
-      TargetFocus(
-        identify: "TargetAddAccountFAB",
-        keyTarget: keyAccountFAB,
-        alignSkip: Alignment.topLeft,
-        contents: [
-          TargetContent(
-            align: ContentAlign.top,
-            builder: (context, controller) {
-              return TutorialCard(
-                controller: controller,
-                title: "Buat Rekening Baru",
-                description:
-                    "Ketuk tombol ini untuk membuat dompet Tunai, rekening Bank, atau jenis dompet lainnya.",
-                isLast: true,
-              );
-            },
-          )
-        ],
-      )
-    ];
-
-    TutorialCoachMark(
-      targets: targets,
-      colorShadow: colorScrim,
-      hideSkip: true,
-      paddingFocus: 10,
-      opacityShadow: 0.8,
-    ).show(context: keyAccountFAB.currentContext!);
-  }
-
-  bool _hasShownAddTutorial = false;
-
-  Future<void> showAddAccountTutorialIfNoAccount(BuildContext context) async {
-    if (_hasShownAddTutorial) return;
-    final accounts = await DatabaseHelper.instance.readAllAccounts();
-    if (accounts.isEmpty && context.mounted) {
-      _hasShownAddTutorial = true;
-      _showAddAccountTutorial(context);
-    }
-  }
-
-  void _showAddAccountTutorial(BuildContext context) {
-    List<TargetFocus> targets = [
-      TargetFocus(
-        identify: "TargetAddAccountForm",
-        keyTarget: keyAddAccountForm,
-        shape: ShapeLightFocus.RRect,
-        radius: 16,
-        alignSkip: Alignment.topRight,
-        contents: [
-          TargetContent(
-            align: ContentAlign.bottom,
-            builder: (context, controller) {
-              return TutorialCard(
-                controller: controller,
-                title: "Langkah 1: Isi Detail",
-                description:
-                    "Mulai dengan mengisi nama rekening (mis: Dompet, BCA) beserta saldo awal Anda saat ini.",
-                isLast: false,
-              );
-            },
-          )
-        ],
-      ),
-      TargetFocus(
-        identify: "TargetAddAccountSave",
-        keyTarget: keyAddAccountSave,
-        shape: ShapeLightFocus.RRect,
-        radius: 12,
-        alignSkip: Alignment.topRight,
-        contents: [
-          TargetContent(
-            align: ContentAlign.bottom,
-            builder: (context, controller) {
-              return TutorialCard(
-                controller: controller,
-                title: "Langkah 2: Simpan",
-                description:
-                    "Jika sudah, tekan Simpan untuk membuat rekening pertama Anda. Mudah bukan?",
-                isLast: true,
-              );
-            },
-          )
-        ],
-      )
-    ];
-
-    TutorialCoachMark(
-      targets: targets,
-      colorShadow: colorScrim,
-      hideSkip: true,
-      paddingFocus: 10,
-      opacityShadow: 0.8,
-    ).show(context: context);
   }
 }

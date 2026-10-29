@@ -15,6 +15,9 @@ class TransactionModel {
   int? categoryIconCode;
   String? categoryIconPath;
   int? categoryColorVal;
+  String? categoryIconKey;
+  int? importBatchId;
+  DateTime? updatedAt;
 
   TransactionModel({
     this.id,
@@ -33,6 +36,9 @@ class TransactionModel {
     this.categoryIconCode,
     this.categoryIconPath,
     this.categoryColorVal,
+    this.categoryIconKey,
+    this.importBatchId,
+    this.updatedAt,
   });
 
   TransactionModel.fromJson(Map<String, dynamic> json) {
@@ -52,6 +58,9 @@ class TransactionModel {
     categoryIconCode = json['categoryIconCode'];
     categoryIconPath = json['categoryIconPath'];
     categoryColorVal = json['categoryColorVal'];
+    categoryIconKey = json['categoryIconKey'];
+    importBatchId = json['import_batch_id'];
+    updatedAt = DateTime.tryParse(json['updated_at'] ?? '');
   }
 
   /// From a joined DB row; income is positive, everything else negative.
@@ -77,6 +86,7 @@ class TransactionModel {
     data['category_id'] = categoryId;
     data['account_id'] = accountId;
     data['destination_account_id'] = destinationAccountId;
+    data['import_batch_id'] = importBatchId;
     return data;
   }
 }

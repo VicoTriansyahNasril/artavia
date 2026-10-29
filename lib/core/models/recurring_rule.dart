@@ -33,6 +33,7 @@ class RecurringRule {
   final int? categoryIconCode;
   final String? categoryIconPath;
   final int? categoryColorVal;
+  final String? categoryIconKey;
 
   const RecurringRule({
     this.id,
@@ -50,6 +51,7 @@ class RecurringRule {
     this.categoryIconCode,
     this.categoryIconPath,
     this.categoryColorVal,
+    this.categoryIconKey,
   });
 
   factory RecurringRule.fromRow(Map<String, dynamic> row) {
@@ -70,6 +72,7 @@ class RecurringRule {
       categoryIconCode: row['categoryIconCode'] as int?,
       categoryIconPath: row['categoryIconPath'] as String?,
       categoryColorVal: row['categoryColorVal'] as int?,
+      categoryIconKey: row['categoryIconKey'] as String?,
     );
   }
 

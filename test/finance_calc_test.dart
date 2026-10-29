@@ -88,4 +88,74 @@ void main() {
     expect(summary.used, 800);
     expect(summary.overCount, 1);
   });
+
+  group('weeklyInsight', () {
+    // Thursday 29 Oct 2026.
+    final now = DateTime(2026, 10, 29, 20);
+
+    test('compares Mon to today with the same span last week', () {
+      final i = weeklyInsight([
+        tx('pengeluaran', 80000, DateTime(2026, 10, 26)),
+        tx('pengeluaran', 100000, DateTime(2026, 10, 20)),
+        tx('pengeluaran', 999, DateTime(2026, 10, 23)), // last Fri: outside
+        tx('pemasukan', 500000, DateTime(2026, 10, 27)),
+      ], now);
+      expect(i.thisWeek, 80000);
+      expect(i.lastWeek, 100000);
+      expect(i.percent, -20);
+      expect(i.isLower, isTrue);
+      expect(i.text, contains('20% lebih hemat'));
+    });
+
+    test('no comparison when last week is empty', () {
+      final i =
+          weeklyInsight([tx('pengeluaran', 5000, DateTime(2026, 10, 27))], now);
+      expect(i.percent, isNull);
+      expect(i.text, 'Belum ada pembanding dari minggu lalu.');
+    });
+  });
+
+  group('budget helpers', () {
+    test('budgetStatus thresholds', () {
+      expect(budgetStatus(79, 100), BudgetLevel.safe);
+      expect(budgetStatus(80, 100), BudgetLevel.near);
+      expect(budgetStatus(100, 100), BudgetLevel.near);
+      expect(budgetStatus(101, 100), BudgetLevel.over);
+    });
+
+    test('safeDailySpend', () {
+      expect(safeDailySpend(300000, 3), 100000);
+      expect(safeDailySpend(-1, 3), 0);
+      expect(safeDailySpend(1000, 0), 0);
+    });
+
+    test('suggestions average over months with data, rounded up to 50.000', () {
+      final s = budgetSuggestions([
+        tx('pengeluaran', 400000, DateTime(2026, 8, 3), cat: 1),
+        tx('pengeluaran', 420000, DateTime(2026, 9, 3), cat: 1),
+        tx('pengeluaran', 10000, DateTime(2026, 9, 4), cat: 2),
+        tx('pemasukan', 9000000, DateTime(2026, 9, 1), cat: 3),
+      ]);
+      expect(s, {1: 450000, 2: 50000});
+      expect(budgetSuggestions([]), isEmpty);
+    });
+  });
+
+  group('accounts', () {
+    test('accountGroup maps types to board groups', () {
+      expect(accountGroup('Bank'), 'Kas & bank');
+      expect(accountGroup('Dompet Digital'), 'E-wallet');
+      expect(accountGroup('Kartu Kredit'), 'Kartu kredit & utang');
+      expect(accountGroup('???'), 'Lainnya');
+    });
+
+    test('archived accounts are left out of net worth', () {
+      expect(
+          computeNetWorth([
+            {'balance': 1000},
+            {'balance': 700, 'is_archived': 1},
+          ]).net,
+          1000);
+    });
+  });
 }

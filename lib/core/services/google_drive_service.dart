@@ -1,11 +1,8 @@
-import 'dart:io';
 import 'dart:developer' as developer;
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart' as sign_in;
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' as p;
 
 class GoogleAuthClient extends http.BaseClient {
   final Map<String, String> _headers;
@@ -19,169 +16,98 @@ class GoogleAuthClient extends http.BaseClient {
   }
 }
 
+/// Google sign-in and an authorized Drive client — nothing else. Backups
+/// live in `BackupService` (research R10).
+///
+/// Scopes: `drive.appdata` (Artavia's hidden folder) plus `drive.file`,
+/// which only reaches files Artavia created itself — needed to read a legacy
+/// `artavia_backup.db` from before v12.
 class GoogleDriveService extends GetxService {
-  sign_in.GoogleSignInAccount? _currentUser;
-  drive.DriveApi? _driveApi;
+  static GoogleDriveService get to => Get.find();
 
-  final RxBool isConnecting = false.obs;
-  final RxBool isConnected = false.obs;
-  final RxBool isWorking = false.obs;
+  static const scopes = [
+    drive.DriveApi.driveAppdataScope,
+    drive.DriveApi.driveFileScope,
+  ];
+
+  sign_in.GoogleSignInAccount? _user;
+  drive.DriveApi? _api;
+
+  final isConnecting = false.obs;
+  final isConnected = false.obs;
+  final email = RxnString();
 
   @override
   void onInit() {
     super.onInit();
-    _initDrive();
+    _init();
   }
 
-  Future<void> _initDrive() async {
+  Future<void> _init() async {
     try {
       await sign_in.GoogleSignIn.instance.initialize(
         serverClientId:
             'GANTI_DENGAN_WEB_CLIENT_ID_ANDA.apps.googleusercontent.com',
       );
-      sign_in.GoogleSignIn.instance.authenticationEvents
-          .listen((sign_in.GoogleSignInAuthenticationEvent event) {
+      sign_in.GoogleSignIn.instance.authenticationEvents.listen((event) {
         if (event is sign_in.GoogleSignInAuthenticationEventSignIn) {
-          _currentUser = event.user;
-          isConnected.value = true;
+          _setUser(event.user);
         } else if (event is sign_in.GoogleSignInAuthenticationEventSignOut) {
-          _currentUser = null;
-          isConnected.value = false;
+          _setUser(null);
         }
       });
       await sign_in.GoogleSignIn.instance.attemptLightweightAuthentication();
     } catch (e) {
-      developer.log('Google Drive Init Error: $e', name: 'GoogleDriveService');
+      developer.log('Google sign-in init: $e', name: 'GoogleDriveService');
     }
   }
 
-  Future<bool> signIn() async {
-    if (isConnecting.value || isWorking.value) return false;
+  void _setUser(sign_in.GoogleSignInAccount? user) {
+    _user = user;
+    if (user == null) _api = null;
+    isConnected.value = user != null;
+    email.value = user?.email;
+  }
+
+  /// Interactive sign-in with the backup scopes.
+  Future<bool> connect() async {
+    if (isConnecting.value) return false;
     isConnecting.value = true;
     try {
-      _currentUser = await sign_in.GoogleSignIn.instance
-          .authenticate(scopeHint: [drive.DriveApi.driveFileScope]);
-      if (_currentUser != null) {
-        final headers = await sign_in.GoogleSignIn.instance.authorizationClient
-            .authorizationHeaders(
-          [drive.DriveApi.driveFileScope],
-          promptIfNecessary: true,
-        );
-        if (headers != null) {
-          final authenticateClient = GoogleAuthClient(headers);
-          _driveApi = drive.DriveApi(authenticateClient);
-          isConnected.value = true;
-          return true;
-        }
-      }
+      final user =
+          await sign_in.GoogleSignIn.instance.authenticate(scopeHint: scopes);
+      _setUser(user);
+      return await api(prompt: true) != null;
     } catch (e) {
-      // Ignored print
+      developer.log('Google sign-in: $e', name: 'GoogleDriveService');
+      return false;
     } finally {
       isConnecting.value = false;
     }
-    return false;
   }
 
-  Future<void> signOut() async {
-    if (isConnecting.value || isWorking.value) return;
-    isConnecting.value = true;
+  Future<void> disconnect() async {
     try {
       await sign_in.GoogleSignIn.instance.disconnect();
-      _currentUser = null;
-      _driveApi = null;
-      isConnected.value = false;
     } finally {
-      isConnecting.value = false;
+      _setUser(null);
     }
   }
 
-  Future<void> backupDatabase() async {
-    if (isWorking.value) return;
-    isWorking.value = true;
-
+  /// Authorized Drive client, or null when not signed in / not authorized.
+  /// [prompt] may show the consent screen (only from a user action).
+  Future<drive.DriveApi?> api({bool prompt = false}) async {
+    if (_api != null) return _api;
+    final user = _user;
+    if (user == null) return null;
     try {
-      if (_driveApi == null) {
-        final success = await signIn();
-        if (!success) throw Exception('Google Sign-In required');
-      }
-      final dbPath = await getDatabasesPath();
-      final localDbFile = File(p.join(dbPath, 'artavia.db'));
-
-      if (!localDbFile.existsSync()) {
-        throw Exception('Database lokal tidak ditemukan.');
-      }
-
-      // Check if backup already exists
-      const q = "name = 'artavia_backup.db' and trashed = false";
-      final fileList = await _driveApi!.files.list(q: q, spaces: 'drive');
-
-      final media =
-          drive.Media(localDbFile.openRead(), localDbFile.lengthSync());
-
-      if (fileList.files != null && fileList.files!.isNotEmpty) {
-        // Update existing file
-        final fileId = fileList.files!.first.id!;
-        final driveFile = drive.File();
-        await _driveApi!.files.update(
-          driveFile,
-          fileId,
-          uploadMedia: media,
-        );
-      } else {
-        // Create new file
-        final driveFile = drive.File()
-          ..name = 'artavia_backup.db'
-          ..description = 'Artavia App Database Backup';
-        await _driveApi!.files.create(
-          driveFile,
-          uploadMedia: media,
-        );
-      }
+      final headers = await sign_in.GoogleSignIn.instance.authorizationClient
+          .authorizationHeaders(scopes, promptIfNecessary: prompt);
+      if (headers == null) return null;
+      return _api = drive.DriveApi(GoogleAuthClient(headers));
     } catch (e) {
-      throw Exception('Gagal melakukan backup: $e');
-    } finally {
-      isWorking.value = false;
-    }
-  }
-
-  Future<void> restoreDatabase() async {
-    if (isWorking.value) return;
-    isWorking.value = true;
-
-    try {
-      if (_driveApi == null) {
-        final success = await signIn();
-        if (!success) throw Exception('Google Sign-In required');
-      }
-      const q = "name = 'artavia_backup.db' and trashed = false";
-      final fileList = await _driveApi!.files.list(q: q, spaces: 'drive');
-
-      if (fileList.files == null || fileList.files!.isEmpty) {
-        throw Exception('File backup tidak ditemukan di Google Drive Anda.');
-      }
-
-      final fileId = fileList.files!.first.id!;
-
-      // We actually need to download the file contents:
-      final fullMedia = await _driveApi!.files.get(
-        fileId,
-        downloadOptions: drive.DownloadOptions.fullMedia,
-      ) as drive.Media;
-
-      final dbPath = await getDatabasesPath();
-      final restorePath = p.join(dbPath, 'artavia.db');
-      final localDbFile = File(restorePath);
-
-      final List<int> dataStore = [];
-      await fullMedia.stream.listen((data) {
-        dataStore.insertAll(dataStore.length, data);
-      }).asFuture();
-
-      await localDbFile.writeAsBytes(dataStore, flush: true);
-    } catch (e) {
-      throw Exception('Gagal memulihkan backup: $e');
-    } finally {
-      isWorking.value = false;
+      developer.log('Drive authorization: $e', name: 'GoogleDriveService');
+      return null;
     }
   }
 }

@@ -1,595 +1,560 @@
 import 'package:flutter/material.dart';
-import 'package:artavia/core/utils/currency_format.dart';
 import 'package:get/get.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/core/utils/date_format.dart';
 import 'package:artavia/page/add_transaction/add_transaction_controller.dart';
-import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/page/routes.dart';
-import 'package:artavia/widgets/components/type_switcher.dart';
-import 'package:artavia/widgets/components/menu_group.dart';
+import 'package:artavia/page/transfer/transfer_section.dart';
+import 'package:artavia/widgets/kobalt/kobalt.dart';
 
+/// Catat (board "Catat transaksi"): segment, amount + expression, category
+/// grid (or the transfer section), and a glass sheet with account, date,
+/// note and the keypad.
 class AddTransactionScreen extends GetView<AddTransactionController> {
   const AddTransactionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _buildAppBar(),
+    return AppScaffold(
+      leading: ScaffoldLeading.close,
+      title: controller.isEdit ? 'Ubah transaksi' : 'Catat transaksi',
       body: Obx(() {
         if (controller.isLoading.value) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (controller.availableAccounts.isEmpty) return _buildNoAccountState();
-        return ContentWidth(child: _buildForm(context));
-      }),
-    );
-  }
-
-  /// Shown instead of the form when there is no account to record into (FR-012).
-  Widget _buildNoAccountState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.account_balance_wallet_outlined,
-                size: 48, color: colorGrey),
-            const SizedBox(height: 16),
-            const Text('Buat rekening terlebih dahulu',
-                style: TextStyle(
-                    color: colorText,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            const Text('Transaksi dicatat ke dompet atau rekening bank Anda.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: colorGrey, fontSize: 13)),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: controller.createAccount,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Buat Rekening'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: KSegment<String>(
+                items: {for (final t in AddTransactionController.tabs) t: t},
+                value: controller.currentTab.value,
+                onChanged: controller.onTabChanged,
+              ),
+            ),
+            Expanded(
+              child: controller.isTransfer
+                  ? const TransferSection()
+                  : const _EntryBody(),
             ),
           ],
-        ),
-      ),
+        );
+      }),
+      bottom: const _KeypadSheet(),
     );
   }
+}
 
-  Widget _buildForm(BuildContext context) {
-    return Column(
+/// Amount + category grid for Pengeluaran / Pemasukan.
+class _EntryBody extends GetView<AddTransactionController> {
+  const _EntryBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
       children: [
-        _buildTypeSwitcher(),
-        Expanded(child: _buildCategoryGrid()),
-        Obx(() {
-          if (controller.selectedCategoryId.value == null) {
-            return const SizedBox.shrink();
-          }
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildAmountDisplay(),
-              _buildNoteRow(),
-              _buildQuickAmounts(),
-              _buildCustomNumpad(context),
-            ],
-          );
-        }),
+        const AmountDisplay(),
+        const SizedBox(height: 8),
+        SectionHeader(
+          title: 'Kategori',
+          action: KButton.text(
+            label: 'Lihat semua',
+            compact: true,
+            expand: false,
+            onPressed: () => _showAllCategories(context),
+          ),
+        ),
+        Obx(() => _CategoryGrid(
+              categories: controller.gridCategories,
+              selectedId: controller.selectedCategoryId.value,
+              onSelect: controller.selectCategory,
+              onAdd: _addCategory,
+            )),
       ],
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      centerTitle: true,
-      leading: IconButton(
-        icon: const Icon(Icons.close_rounded),
-        tooltip: 'Tutup',
-        onPressed: () => Get.back(),
-      ),
-      title: Text(controller.isEditArgs ? 'Edit Transaksi' : 'Catat Transaksi'),
-    );
+  Future<void> _addCategory() async {
+    await Get.toNamed(addCategoryRoute, arguments: {
+      'type': controller.currentTab.value == 'Pemasukan'
+          ? 'pemasukan'
+          : 'pengeluaran',
+    });
+    await controller.reloadCategories();
   }
 
-  Widget _buildTypeSwitcher() {
-    if (controller.isEditArgs) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      child: Obx(() => TransactionTypeSwitcher(
-            selected: controller.currentTab.value,
-            onChanged: controller.onTabChanged,
-          )),
-    );
-  }
-
-  // Top bar removed
-  void _showAccountBottomSheet() {
+  void _showAllCategories(BuildContext context) {
     Get.bottomSheet(
-      Material(
-        color: colorCard,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 36,
-              height: 3,
-              decoration: BoxDecoration(
-                color: colorGrey.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Pilih Rekening',
-                    style: TextStyle(
-                        color: colorText,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15)),
-              ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                child: Obx(() => Column(
-                      children: controller.availableAccounts.map((acc) {
-                        return ListTile(
-                          leading: const Icon(
-                              Icons.account_balance_wallet_outlined,
-                              color: colorGrey),
-                          title: Text(acc['name'] as String,
-                              style: const TextStyle(color: colorText)),
-                          subtitle: Text(
-                              CurrencyService.to
-                                  .format(acc['balance'] as int? ?? 0),
-                              style: const TextStyle(
-                                  color: colorGrey, fontSize: 12)),
-                          onTap: () {
-                            controller.selectAccount(acc);
+      SafeArea(
+        child: ConstrainedBox(
+          constraints:
+              BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .7),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Semua kategori',
+                    style: AppText.title3.copyWith(color: colorText)),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Obx(() => _CategoryGrid(
+                          categories: controller.rankedCategories,
+                          selectedId: controller.selectedCategoryId.value,
+                          onSelect: (id) {
+                            controller.selectCategory(id);
                             Get.back();
                           },
-                        );
-                      }).toList(),
-                    )),
+                          onAdd: () {
+                            Get.back();
+                            _addCategory();
+                          },
+                        )),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+}
+
+/// Expression line above the big amount; red with an error when ≤ 0.
+class AmountDisplay extends GetView<AddTransactionController> {
+  const AmountDisplay({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final value = controller.amount.value;
+      final error = controller.amountError;
+      final tone = error != null ? colorDanger : colorText;
+      final expr = controller.expression.value;
+      return Semantics(
+        liveRegion: true,
+        label:
+            'Jumlah ${CurrencyService.to.money(value, signed: value < 0, maskable: false)}',
+        excludeSemantics: true,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 20,
+                child: Text(expr,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.bodySmall.muted),
+              ),
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text('${value < 0 ? CurrencyService.minus : ''}Rp ',
+                        style: AppText.currencyPrefix
+                            .copyWith(color: error != null ? tone : colorGrey)),
+                    Text(
+                        CurrencyService.to.digits(value.abs(), maskable: false),
+                        style: AppText.amountXL.copyWith(color: tone)),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 20,
+                child: error == null
+                    ? null
+                    : Text(error,
+                        style: AppText.caption.copyWith(color: colorDanger)),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class _CategoryGrid extends StatelessWidget {
+  final List<Map<String, dynamic>> categories;
+  final int? selectedId;
+  final ValueChanged<int> onSelect;
+  final VoidCallback onAdd;
+
+  const _CategoryGrid({
+    required this.categories,
+    required this.selectedId,
+    required this.onSelect,
+    required this.onAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Cell height follows the text size so labels never clip (SC-006).
+    final labelHeight = MediaQuery.textScalerOf(context).scale(16);
+    return GridView(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 5,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 4,
+        mainAxisExtent: 58 + labelHeight,
+      ),
+      children: [
+        for (var i = 0; i < categories.length; i++)
+          _CategoryCell(
+            category: categories[i],
+            index: i,
+            selected: categories[i]['id'] == selectedId,
+            onTap: () => onSelect(categories[i]['id'] as int),
+          ),
+        _AddCell(onTap: onAdd),
+      ],
+    );
+  }
+}
+
+class _CategoryCell extends StatelessWidget {
+  final Map<String, dynamic> category;
+  final int index;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CategoryCell({
+    required this.category,
+    required this.index,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        themedColor(category['color_val'] as int?, fallbackIndex: index);
+    final name = category['name'] as String;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: name,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: selected ? colorAccent : Colors.transparent,
+                    width: 2),
+              ),
+              child: CategoryIcon.round(
+                iconKey: category['icon_key'] as String?,
+                iconPath: category['icon_path'] as String?,
+                iconCode: category['icon_code'] as int?,
+                color: color,
+                diameter: 44,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
+            Text(name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: AppText.caption.copyWith(
+                    color: selected ? colorAccent : colorText,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400)),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildCategoryGrid() {
-    return Obx(() {
-      if (controller.availableCategories.isEmpty) {
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.category_outlined, size: 40, color: colorGrey),
-              const SizedBox(height: 12),
-              const Text('Belum ada kategori',
-                  style: TextStyle(color: colorGrey)),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () async {
-                  await Get.toNamed(addCategoryRoute);
-                  controller.reloadCategories();
-                },
-                child: const Text('Tambah Kategori',
-                    style: TextStyle(color: colorAccent)),
+class _AddCell extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AddCell({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Kategori baru',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(3),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colorDivider, width: 1.5),
+                ),
+                child: Icon(LucideIcons.plus, size: 20, color: colorGrey),
               ),
-            ],
-          ),
-        );
-      }
-
-      return GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 85,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 0.8,
+            ),
+            const SizedBox(height: 4),
+            Text('Baru',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.caption.muted),
+          ],
         ),
-        itemCount: controller.availableCategories.length + 1,
-        itemBuilder: (context, index) {
-          if (index == controller.availableCategories.length) {
-            return GestureDetector(
-              onTap: () {
-                Get.toNamed(addCategoryRoute)?.then((_) {
-                  controller.reloadCategories();
-                });
-              },
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: colorCard,
-                    child: Icon(Icons.add, color: colorGrey, size: 24),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    'Tambah',
-                    style: TextStyle(color: colorGrey, fontSize: 11),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final cat = controller.availableCategories[index];
-          final catColor = cat['color_val'] != null
-              ? Color(cat['color_val'] as int)
-              : paletteColorAt(index);
-          return Obx(() {
-            final isSelected = controller.selectedCategoryId.value == cat['id'];
-            return GestureDetector(
-              onTap: () => controller.selectCategory(
-                  cat['id'] as int, cat['name'] as String),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: isSelected
-                        ? catColor.withValues(alpha: 0.28)
-                        : colorCard,
-                    child: CategoryIcon(
-                      iconCode: cat['icon_code'] as int?,
-                      iconPath: cat['icon_path'] as String?,
-                      color: isSelected
-                          ? catColor
-                          : catColor.withValues(alpha: 0.75),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: Text(
-                      cat['name'] as String,
-                      style: TextStyle(
-                        color: isSelected ? colorText : colorGrey,
-                        fontSize: 11,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          });
-        },
-      );
-    });
+      ),
+    );
   }
+}
 
-  Widget _buildAmountDisplay() {
-    return GestureDetector(
-        onTap: () => controller.toggleNumpad(),
-        child: Container(
-          color: colorCard,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Obx(() {
-            final hasPending = controller.pendingOperator.value.isNotEmpty;
-            final isExpense = controller.currentTab.value == 'Pengeluaran';
-            final amtColor = isExpense ? colorExpense : colorIncome;
+/// Glass "tipis" sheet: account/date/note chips and the keypad.
+class _KeypadSheet extends GetView<AddTransactionController> {
+  const _KeypadSheet();
 
-            return Row(
-              children: [
-                // Account picker
-                GestureDetector(
-                  onTap: _showAccountBottomSheet,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: colorSurface,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.account_balance_wallet_outlined,
-                                color: colorGrey, size: 14),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                controller.selectedAccountName.value,
-                                style: const TextStyle(
-                                    color: colorText, fontSize: 13),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const Icon(Icons.arrow_drop_down,
-                                color: colorGrey, size: 16),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Saldo: ${CurrencyService.to.format(controller.selectedAccountBalance)}',
-                          style:
-                              const TextStyle(color: colorGrey, fontSize: 10),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Amount Display
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      if (hasPending) ...[
-                        Text(
-                          '${CurrencyService.to.formatWithoutSymbol(controller.pendingValue.value)} ${controller.pendingOperator.value}',
-                          style:
-                              const TextStyle(color: colorGrey, fontSize: 18),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      Expanded(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            CurrencyService.to.formatWithoutSymbol(
-                                int.tryParse(controller.amountStr.value) ?? 0),
-                            style: TextStyle(
-                                color: amtColor,
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          }),
-        ));
-  }
-
-  Widget _buildNoteRow() {
-    return Container(
-      color: colorCard,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+  @override
+  Widget build(BuildContext context) {
+    final tall = MediaQuery.sizeOf(context).height > 760;
+    return GlassCard(
+      level: GlassLevel.thin,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      padding: EdgeInsets.fromLTRB(
+          12, 10, 12, 12 + MediaQuery.paddingOf(context).bottom),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Divider(height: 1),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.edit_outlined, color: colorGrey, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: controller.noteTextController,
-                  maxLines: 1,
-                  decoration: const InputDecoration(
-                    hintText: 'Tambahkan catatan...',
-                    hintStyle: TextStyle(color: colorGrey),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  style: const TextStyle(color: colorText, fontSize: 14),
-                  onChanged: (val) => controller.note.value = val,
-                ),
-              ),
-            ],
-          ),
-          Obx(() {
-            if (controller.noteHistory.isEmpty) {
-              return const SizedBox.shrink();
-            }
-            return Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: SingleChildScrollView(
+          Obx(() => SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children:
-                      controller.noteHistory.map((t) => _buildChip(t)).toList(),
+                  children: [
+                    if (!controller.isTransfer) ...[
+                      _MetaChip(
+                        icon: LucideIcons.wallet,
+                        label: controller.selectedAccount?['name'] as String? ??
+                            'Pilih rekening',
+                        semantic: 'Pilih rekening',
+                        onTap: () => _pickAccount(context),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    _MetaChip(
+                      icon: LucideIcons.calendar,
+                      label: _dateLabel(controller.selectedDate.value),
+                      semantic: 'Pilih tanggal',
+                      onTap: () => controller.pickDate(context),
+                    ),
+                    const SizedBox(width: 8),
+                    _MetaChip(
+                      icon: LucideIcons.stickyNote,
+                      label: controller.note.value.isEmpty
+                          ? 'Catatan'
+                          : controller.note.value,
+                      semantic: 'Catatan',
+                      onTap: _editNote,
+                    ),
+                  ],
                 ),
-              ),
-            );
-          }),
+              )),
+          const SizedBox(height: 10),
+          Obx(() => Keypad(
+                onKey: controller.onKey,
+                onSave: controller.save,
+                saveEnabled: controller.canSave && !controller.isWorking.value,
+                rowHeight: tall ? 56 : 52,
+              )),
         ],
       ),
     );
   }
 
-  Widget _buildChip(String text) {
-    return GestureDetector(
-      onTap: () => controller.onSuggestionTapped(text),
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: colorSurface,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child:
-            Text(text, style: const TextStyle(color: colorGrey, fontSize: 11)),
-      ),
+  static String _dateLabel(DateTime d) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(d.year, d.month, d.day);
+    if (day == today) return 'Hari ini';
+    if (day == today.subtract(const Duration(days: 1))) return 'Kemarin';
+    return IdNames.shortDate(d);
+  }
+
+  void _pickAccount(BuildContext context) {
+    showAccountPicker(
+      accounts: controller.availableAccounts,
+      selectedId: controller.selectedAccountId.value,
+      onSelect: controller.selectAccount,
+      onCreate: controller.createAccount,
     );
   }
 
-  Widget _buildQuickAmounts() {
-    return Container(
-      color: colorBackground,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: controller.quickAmounts.map((amount) {
-            return GestureDetector(
-              onTap: () => controller.addQuickAmount(amount),
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: colorCard,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  '+${CurrencyService.to.compact(amount)}',
-                  style: const TextStyle(color: colorGrey, fontSize: 12),
-                ),
+  void _editNote() {
+    final text = TextEditingController(text: controller.note.value);
+    Get.bottomSheet(
+      SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+              16, 0, 16, 16 + MediaQuery.viewInsetsOf(Get.context!).bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Catatan', style: AppText.title3.copyWith(color: colorText)),
+              const SizedBox(height: 12),
+              KField(
+                controller: text,
+                hint: 'Mis. Makan siang',
+                autofocus: true,
+                maxLength: 80,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (v) {
+                  controller.setNote(v);
+                  Get.back();
+                },
               ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCustomNumpad(BuildContext context) {
-    return Obx(() {
-      if (!controller.isNumpadVisible.value) {
-        return const SizedBox.shrink();
-      }
-      return Container(
-        color: colorCard,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(children: [
-              _key('7'),
-              _key('8'),
-              _key('9'),
-              _buildDateKey(context),
-            ]),
-            Row(children: [
-              _key('4'),
-              _key('5'),
-              _key('6'),
-              _key('+', textColor: colorAccent),
-            ]),
-            Row(children: [
-              _key('1'),
-              _key('2'),
-              _key('3'),
-              _key('-', textColor: colorAccent),
-            ]),
-            Row(children: [
-              _key('0'),
-              _key('000'),
-              _iconKey(Icons.backspace_outlined, colorGrey,
-                  onTap: () => controller.onNumpadPressed('delete')),
-              // Confirm — colorAccent background
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => controller.onNumpadPressed('confirm'),
-                  child: Container(
-                    height: 60,
-                    color: colorAccent,
-                    child: const Center(
-                      child: Icon(Icons.check, color: colorOnAccent, size: 26),
-                    ),
-                  ),
-                ),
+              const SizedBox(height: 12),
+              KButton(
+                label: 'Simpan catatan',
+                onPressed: () {
+                  controller.setNote(text.text);
+                  Get.back();
+                },
               ),
-            ]),
-          ],
-        ),
-      );
-    });
-  }
-
-  Widget _buildDateKey(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => controller.pickDate(context),
-        child: Container(
-          height: 60,
-          decoration: BoxDecoration(
-            color: colorCard,
-            border: Border.all(
-                color: colorBackground.withValues(alpha: 0.6), width: 0.5),
+            ],
           ),
-          child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.calendar_today, color: colorAccent, size: 14),
-                const SizedBox(width: 4),
-                Obx(() => Text(
-                      DateFormatter.formatWithRelative(
-                              controller.selectedDate.value)
-                          .replaceAll(
-                              RegExp(r' \(\d{2} [a-zA-Z]+ \d{4}\)'), ''),
-                      style: const TextStyle(
-                          color: colorAccent,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold),
-                    )),
-              ],
+        ),
+      ),
+      isScrollControlled: true,
+    ).whenComplete(text.dispose);
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String semantic;
+  final VoidCallback onTap;
+
+  const _MetaChip({
+    required this.icon,
+    required this.label,
+    required this.semantic,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '$semantic: $label',
+      excludeSemantics: true,
+      child: Material(
+        color: colorSurface,
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 36, maxWidth: 200),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 16, color: colorGrey),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.label.copyWith(color: colorText)),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(LucideIcons.chevronDown, size: 14, color: colorGrey),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _key(String label, {Color textColor = colorText}) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => controller.onNumpadPressed(label),
-        child: Container(
-          height: 60,
-          decoration: BoxDecoration(
-            color: colorCard,
-            border: Border.all(
-                color: colorBackground.withValues(alpha: 0.6), width: 0.5),
-          ),
-          child: Center(
-            child: Text(label,
-                style: TextStyle(
-                    color: textColor,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w400)),
-          ),
+/// Bottom sheet listing accounts with balances (shared by Catat/Transfer).
+void showAccountPicker({
+  required List<Map<String, dynamic>> accounts,
+  required int? selectedId,
+  required ValueChanged<int> onSelect,
+  VoidCallback? onCreate,
+  String title = 'Pilih rekening',
+}) {
+  Get.bottomSheet(
+    SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: AppText.title3.copyWith(color: colorText)),
+            const SizedBox(height: 12),
+            Flexible(
+              child: SingleChildScrollView(
+                child: ListGroup(
+                  children: [
+                    for (var i = 0; i < accounts.length; i++)
+                      NavRow(
+                        leading: CategoryIcon.round(
+                          iconKey: accounts[i]['icon_key'] as String? ??
+                              IconRegistry.accountTypeKey(
+                                  accounts[i]['type'] as String? ?? ''),
+                          color: themedColor(accounts[i]['color_val'] as int?,
+                              fallbackIndex: i),
+                        ),
+                        title: accounts[i]['name'] as String,
+                        subtitle: CurrencyService.to
+                            .money(accounts[i]['balance'] as int? ?? 0),
+                        showChevron: false,
+                        trailing:
+                            KRadio(selected: accounts[i]['id'] == selectedId),
+                        onTap: () {
+                          onSelect(accounts[i]['id'] as int);
+                          Get.back();
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            if (onCreate != null) ...[
+              const SizedBox(height: 12),
+              KButton.text(
+                label: 'Tambah rekening',
+                icon: LucideIcons.plus,
+                onPressed: () {
+                  Get.back();
+                  onCreate();
+                },
+              ),
+            ],
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _iconKey(IconData icon, Color color, {VoidCallback? onTap}) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 60,
-          decoration: BoxDecoration(
-            color: colorCard,
-            border: Border.all(
-                color: colorBackground.withValues(alpha: 0.6), width: 0.5),
-          ),
-          child: Center(child: Icon(icon, color: color, size: 20)),
-        ),
-      ),
-    );
-  }
+    ),
+    isScrollControlled: true,
+  );
 }

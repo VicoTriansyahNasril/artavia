@@ -3,11 +3,10 @@ import 'package:get/get.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/database/transaction_store.dart';
-import 'package:artavia/core/utils/date_format.dart';
 import 'package:artavia/model/transaction_model.dart';
-import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/page/routes.dart';
-import 'package:artavia/widgets/commons/common.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:artavia/widgets/kobalt/kobalt.dart';
 import 'package:artavia/widgets/components/app_feedback.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
 
@@ -19,8 +18,9 @@ Map<String, dynamic> transactionArgs(TransactionModel tx) {
     'type': tx.type,
     'amount': (tx.amount ?? 0).abs(),
     'category': tx.categoryName,
+    'category_id': tx.categoryId,
     'note': tx.note,
-    'account': tx.accountName ?? '-',
+    'account': tx.accountName ?? '—',
     'account_id': tx.accountId,
     'destination_account': tx.destinationAccountName,
     'destination_account_id': tx.destinationAccountId,
@@ -29,32 +29,33 @@ Map<String, dynamic> transactionArgs(TransactionModel tx) {
     'date': tx.date,
     'icon_code': visual.iconCode,
     'icon_path': visual.iconPath,
+    'icon_key': tx.type == 'transfer' ? 'transfer' : tx.categoryIconKey,
     'color_val': visual.color.toARGB32(),
   };
 }
 
-/// Opens the right edit form for the transaction type (FR-011).
+/// Opens Catat in edit mode; the type picks the segment.
 void openTransactionEditor(Map<String, dynamic> args) {
-  final route =
-      args['type'] == 'transfer' ? transferRoute : addTransactionRoute;
-  Get.toNamed(route, arguments: {'isEdit': true, ...args});
+  Get.toNamed(addTransactionRoute, arguments: {'isEdit': true, ...args});
 }
 
-/// Confirms, deletes (balances restored from the stored row) and refreshes.
-Future<bool> confirmDeleteTransaction(int? id) async {
+/// Deletes right away and offers "Urungkan" for 5 seconds (FR-015); undo
+/// puts the row back under the same id with its balance effect.
+Future<bool> deleteTransactionWithUndo(int? id, {String? label}) async {
   if (id == null) return false;
-  final ok = await AppDialog.confirm(
-    title: 'Hapus Transaksi',
-    message:
-        'Transaksi ini akan dihapus permanen dan saldo rekening disesuaikan kembali.',
-    confirmLabel: 'Hapus',
-    destructive: true,
-  );
-  if (!ok) return false;
+  final db = DatabaseHelper.instance;
   try {
-    await DatabaseHelper.instance.deleteTransactionById(id);
+    final snapshot = await db.deleteTransactionById(id);
+    if (snapshot == null) return false;
     refreshAllGlobalData();
-    AppToast.success('Berhasil', 'Transaksi telah dihapus');
+    final name = (label ?? '').trim();
+    AppToast.undo(
+      name.isEmpty ? 'Transaksi dihapus' : '“$name” dihapus',
+      onUndo: () async {
+        await db.restoreTransaction(snapshot);
+        refreshAllGlobalData();
+      },
+    );
     return true;
   } catch (e) {
     AppToast.error('Gagal', 'Transaksi tidak dapat dihapus');
@@ -81,7 +82,7 @@ class TransactionVisual {
     if (tx.categoryColorVal != null && tx.categoryColorVal != 0) {
       final hasIcon =
           tx.categoryIconCode != null || tx.categoryIconPath != null;
-      return TransactionVisual(Color(tx.categoryColorVal!),
+      return TransactionVisual(themedColor(tx.categoryColorVal),
           hasIcon ? tx.categoryIconCode : fallbackIcon, tx.categoryIconPath);
     }
     return TransactionVisual(
@@ -92,25 +93,13 @@ class TransactionVisual {
 class TransactionItem extends StatelessWidget {
   final TransactionModel tx;
   final bool showDate;
-  const TransactionItem({super.key, required this.tx, this.showDate = false});
+  final String? highlight;
+  const TransactionItem(
+      {super.key, required this.tx, this.showDate = false, this.highlight});
 
   @override
   Widget build(BuildContext context) {
-    final isExpense = tx.type == 'pengeluaran';
-    final isTransfer = tx.type == 'transfer';
-    final visual = TransactionVisual.of(tx);
-    final amountColor = isTransfer
-        ? colorGrey
-        : isExpense
-            ? colorExpense
-            : colorIncome;
-    final prefix = isTransfer
-        ? ''
-        : isExpense
-            ? '-'
-            : '+';
     final args = transactionArgs(tx);
-
     return Slidable(
       key: ValueKey(tx.id),
       endActionPane: ActionPane(
@@ -121,71 +110,25 @@ class TransactionItem extends StatelessWidget {
             onPressed: (_) => openTransactionEditor(args),
             backgroundColor: colorSurface,
             foregroundColor: colorAccent,
-            icon: Icons.edit_outlined,
-            label: 'Edit',
+            icon: LucideIcons.pencil,
+            label: 'Ubah',
           ),
           SlidableAction(
-            onPressed: (_) => confirmDeleteTransaction(tx.id),
+            onPressed: (_) => deleteTransactionWithUndo(tx.id,
+                label: tx.note?.isNotEmpty == true ? tx.note : tx.categoryName),
             backgroundColor: colorSurface,
-            foregroundColor: colorExpense,
-            icon: Icons.delete_outline,
+            foregroundColor: colorDanger,
+            icon: LucideIcons.trash2,
             label: 'Hapus',
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: TxRow(
+        tx: tx,
+        showDate: showDate,
+        highlight: highlight,
         onTap: () => Get.toNamed(transactionDetailRoute, arguments: args),
-        leading: CircleAvatar(
-          radius: 20,
-          backgroundColor: visual.color.withValues(alpha: 0.14),
-          child: CategoryIcon(
-            iconCode: visual.iconCode,
-            iconPath: visual.iconPath,
-            color: visual.color,
-            size: 18,
-          ),
-        ),
-        title: Text(
-          tx.note?.isNotEmpty == true
-              ? tx.note!
-              : (tx.categoryName ?? 'Transfer'),
-          style: const TextStyle(
-            color: colorText,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Text(
-            _subtitle(isTransfer),
-            style: const TextStyle(color: colorGrey, fontSize: 12),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        trailing: Text(
-          '$prefix${CurrencyService.to.format((tx.amount ?? 0).abs())}',
-          style: TextStyle(
-            color: amountColor,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
       ),
     );
-  }
-
-  String _subtitle(bool isTransfer) {
-    final parts = <String>[
-      if (showDate && tx.date != null) IdNames.shortDate(tx.date!),
-      isTransfer && tx.destinationAccountName != null
-          ? '${tx.accountName ?? '-'} → ${tx.destinationAccountName}'
-          : tx.accountName ?? '-',
-    ];
-    return parts.join(' · ');
   }
 }

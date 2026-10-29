@@ -15,7 +15,17 @@ class SettingsService extends GetxService {
   static const keyPinSalt = 'pin_salt';
   static const keyPinHash = 'pin_hash';
   static const keyNumberFormat = 'number_format';
-  static const keySoundEffect = 'sound_effect';
+  static const keyHaptics = 'haptics';
+  static const keyHideOnOpen = 'hide_on_open';
+  static const keyLastAccountId = 'last_account_id';
+  static const keyRecentSearches = 'recent_searches';
+  static const keyBackupAuto = 'backup_auto';
+  static const keyBackupWifiOnly = 'backup_wifi_only';
+  static const keyBackupLocked = 'backup_locked';
+  static const keyBackupHint = 'backup_hint';
+  static const keyLastBackupAt = 'last_backup_at';
+  static const keyLastBackupBytes = 'last_backup_bytes';
+  static const keyLastBackupTx = 'last_backup_tx';
 
   final _values = <String, String>{}.obs;
 
@@ -46,7 +56,38 @@ class SettingsService extends GetxService {
 
   bool get dailyReminder => _bool(keyDailyReminder);
   bool get appLock => _bool(keyAppLock);
-  bool get soundEffect => _bool(keySoundEffect);
+  bool get hideOnOpen => _bool(keyHideOnOpen);
+
+  /// Haptics default on (board "Getaran"); only an explicit "false" turns it off.
+  bool get haptics => _values[keyHaptics] != 'false';
+
+  int? get lastAccountId => int.tryParse(_values[keyLastAccountId] ?? '');
+
+  bool get backupAuto => _values[keyBackupAuto] != 'false';
+  bool get backupWifiOnly => _values[keyBackupWifiOnly] != 'false';
+  bool get backupLocked => _bool(keyBackupLocked);
+  String? get backupHint => _values[keyBackupHint];
+  DateTime? get lastBackupAt =>
+      DateTime.tryParse(_values[keyLastBackupAt] ?? '');
+  int get lastBackupBytes =>
+      int.tryParse(_values[keyLastBackupBytes] ?? '') ?? 0;
+  int get lastBackupTx => int.tryParse(_values[keyLastBackupTx] ?? '') ?? 0;
+
+  /// Most recent search queries, newest first (max 5), stored '|'-separated.
+  List<String> get recentSearches {
+    final raw = _values[keyRecentSearches];
+    if (raw == null || raw.isEmpty) return const [];
+    return raw.split('|').where((e) => e.isNotEmpty).toList();
+  }
+
+  Future<void> addRecentSearch(String query) async {
+    final q = query.trim().replaceAll('|', ' ');
+    if (q.isEmpty) return;
+    final list = [q, ...recentSearches.where((e) => e != q)].take(5);
+    await set(keyRecentSearches, list.join('|'));
+  }
+
+  Future<void> clearRecentSearches() => remove(keyRecentSearches);
 
   TimeOfDay get reminderTime {
     final parts = (_values[keyReminderTime] ?? '20:00').split(':');

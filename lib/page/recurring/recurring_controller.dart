@@ -69,7 +69,8 @@ class RecurringController extends GetxController {
     accountId.value = rule?.accountId ?? accounts.first['id'] as int;
     frequency.value = rule?.frequency ?? RecurringFrequency.monthly;
     startDate.value = rule?.startDate ?? DateTime.now();
-    amountController.text = rule == null ? '' : '${rule.amount}';
+    amountController.text =
+        rule == null || rule.amount == 0 ? '' : '${rule.amount}';
     noteController.text = rule?.note ?? '';
   }
 
@@ -162,16 +163,25 @@ class RecurringController extends GetxController {
     await loadRules();
   }
 
-  Future<void> delete(RecurringRule rule) async {
+  /// "Hapus" from the edit form.
+  Future<void> deleteEditing() async {
+    final rule = _editing;
+    if (rule == null) return;
+    if (await delete(rule)) Get.back();
+  }
+
+  Future<bool> delete(RecurringRule rule) async {
     final ok = await AppDialog.confirm(
       title: 'Hapus transaksi berulang?',
       message: 'Transaksi yang sudah tercatat tidak ikut terhapus.',
       confirmLabel: 'Hapus',
       destructive: true,
     );
-    if (!ok) return;
+    if (!ok) return false;
     await DatabaseHelper.instance.deleteRecurringRule(rule.id!);
     await loadRules();
+    refreshAllGlobalData();
     AppToast.success('Dihapus', 'Transaksi berulang telah dihapus');
+    return true;
   }
 }

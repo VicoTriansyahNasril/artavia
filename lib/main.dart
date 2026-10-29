@@ -5,10 +5,14 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:artavia/page/routes.dart';
 import 'package:artavia/page/pin/lock_overlay.dart';
 import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/core/services/backup_service.dart';
 import 'package:artavia/core/services/google_drive_service.dart';
+import 'package:artavia/page/backup/backup_controller.dart';
 import 'package:artavia/core/services/settings_service.dart';
+import 'package:artavia/core/services/theme_service.dart';
+import 'package:artavia/core/services/privacy_service.dart';
+import 'package:artavia/core/services/haptics_service.dart';
 import 'package:artavia/core/services/period_service.dart';
-import 'package:artavia/core/services/sound_service.dart';
 import 'package:artavia/core/services/pin_lock_service.dart';
 import 'package:artavia/core/services/recurring_service.dart';
 import 'package:artavia/core/services/notification_service.dart';
@@ -19,21 +23,17 @@ void main() async {
 
   Get.put(GoogleDriveService(), permanent: true);
   await Get.putAsync(() => SettingsService().init(), permanent: true);
+  Get.put(ThemeService().init(), permanent: true);
+  Get.put(PrivacyService().init(), permanent: true);
+  Get.put(HapticsService(), permanent: true);
   Get.put(PeriodService(), permanent: true);
-  Get.put(SoundService(), permanent: true);
   Get.put(PinLockService(), permanent: true);
+  Get.put(BackupService(), permanent: true)
+    ..onAutoBackupFailed = showBackupFailed
+    ..onBackupFoundOnEmptyDevice = () => Get.toNamed(restoreFoundRoute);
   Get.put(RecurringService(), permanent: true);
   await RecurringService.to.runDue();
   await Get.putAsync(() => NotificationService().init(), permanent: true);
-
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: colorCard,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
 
   runApp(const MyApp());
 }
@@ -43,157 +43,219 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeService.to;
     return GetMaterialApp(
       title: nameApp,
       debugShowCheckedModeBanner: false,
       defaultTransition: Transition.cupertino,
       transitionDuration: const Duration(milliseconds: 280),
-      theme: buildAppTheme(),
+      theme: buildAppTheme(AppPalette.light),
+      darkTheme: buildAppTheme(AppPalette.dark),
+      themeMode: theme.themeMode,
       initialRoute: homeRoute,
       getPages: route,
       // The PIN lock sits above the navigator so it covers every route/dialog.
-      builder: (context, child) =>
-          LockOverlay(child: child ?? const SizedBox()),
+      builder: (context, child) {
+        _syncSystemBars();
+        final scaler = theme.textScaler;
+        final app = LockOverlay(child: child ?? const SizedBox());
+        if (scaler == null) return app;
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: scaler),
+          child: app,
+        );
+      },
     );
+  }
+
+  static void _syncSystemBars() {
+    final dark = AppPalette.current.isDark;
+    final icons = dark ? Brightness.light : Brightness.dark;
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: icons,
+      statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: colorCard,
+      systemNavigationBarIconBrightness: icons,
+    ));
   }
 }
 
-ThemeData buildAppTheme() {
+/// Material theme derived from one Kobalt [AppPalette] (dark or light).
+ThemeData buildAppTheme(AppPalette p) {
   final rounded12 =
       RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
-  final rounded10 =
-      RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
+  final rounded20 =
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(20));
+  final base = p.isDark ? ThemeData.dark() : ThemeData.light();
+  final scheme = p.isDark
+      ? ColorScheme.dark(
+          primary: p.accent,
+          onPrimary: p.onAccent,
+          secondary: p.accent,
+          onSecondary: p.onAccent,
+          surface: p.card,
+          onSurface: p.text,
+          surfaceContainerHighest: p.surface,
+          error: p.danger,
+          onError: p.onAccent,
+          outline: p.divider,
+        )
+      : ColorScheme.light(
+          primary: p.accent,
+          onPrimary: p.onAccent,
+          secondary: p.accent,
+          onSecondary: p.onAccent,
+          surface: p.card,
+          onSurface: p.text,
+          surfaceContainerHighest: p.surface,
+          error: p.danger,
+          onError: p.onAccent,
+          outline: p.divider,
+        );
   return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
-    scaffoldBackgroundColor: colorBackground,
-    canvasColor: colorBackground,
-    fontFamily: 'Roboto',
-    colorScheme: const ColorScheme.dark(
-      primary: colorAccent,
-      onPrimary: colorOnAccent,
-      secondary: colorAccent,
-      onSecondary: colorOnAccent,
-      surface: colorCard,
-      onSurface: colorText,
-      surfaceContainerHighest: colorSurface,
-      error: colorExpense,
-      onError: colorOnAccent,
-      outline: colorDivider,
-    ),
-    textTheme: ThemeData.dark().textTheme.apply(
-          bodyColor: colorText,
-          displayColor: colorText,
+    brightness: p.brightness,
+    scaffoldBackgroundColor: p.background,
+    canvasColor: p.background,
+    fontFamily: AppText.family,
+    colorScheme: scheme,
+    textTheme: base.textTheme
+        .apply(
+          fontFamily: AppText.family,
+          bodyColor: p.text,
+          displayColor: p.text,
+        )
+        .copyWith(
+          bodyMedium: AppText.bodySmall.copyWith(color: p.text),
+          bodyLarge: AppText.body.copyWith(color: p.text),
         ),
-    iconTheme: const IconThemeData(color: colorText),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: colorBackground,
-      foregroundColor: colorText,
+    iconTheme: IconThemeData(color: p.text),
+    appBarTheme: AppBarTheme(
+      backgroundColor: Colors.transparent,
+      foregroundColor: p.text,
       elevation: 0,
       scrolledUnderElevation: 0,
-      titleTextStyle: TextStyle(
-        color: colorText,
-        fontSize: 17,
-        fontWeight: FontWeight.w600,
-      ),
-      iconTheme: IconThemeData(color: colorText),
+      centerTitle: false,
+      titleTextStyle: AppText.title2.copyWith(color: p.text),
+      iconTheme: IconThemeData(color: p.text),
     ),
-    dividerTheme:
-        const DividerThemeData(color: colorDivider, thickness: 1, space: 1),
+    dividerTheme: DividerThemeData(color: p.divider, thickness: 1, space: 1),
     dialogTheme: DialogThemeData(
-      backgroundColor: colorCard,
+      backgroundColor: p.glassThick,
       surfaceTintColor: Colors.transparent,
-      shape: rounded12,
-      titleTextStyle: const TextStyle(
-          color: colorText, fontSize: 17, fontWeight: FontWeight.w600),
-      contentTextStyle:
-          const TextStyle(color: colorGrey, fontSize: 14, height: 1.4),
+      shape: rounded20,
+      titleTextStyle: AppText.title3.copyWith(fontSize: 18, color: p.text),
+      contentTextStyle: AppText.bodySmall.copyWith(color: p.textOnGlass),
     ),
-    bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: colorCard,
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: p.card,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      showDragHandle: true,
+      dragHandleColor: p.divider,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
     ),
     datePickerTheme: DatePickerThemeData(
-      backgroundColor: colorCard,
+      backgroundColor: p.card,
       surfaceTintColor: Colors.transparent,
-      headerBackgroundColor: colorSurface,
-      headerForegroundColor: colorText,
-      shape: rounded12,
+      headerBackgroundColor: p.surface,
+      headerForegroundColor: p.text,
+      shape: rounded20,
     ),
     timePickerTheme: TimePickerThemeData(
-      backgroundColor: colorCard,
-      dialBackgroundColor: colorSurface,
-      hourMinuteColor: colorSurface,
-      shape: rounded12,
+      backgroundColor: p.card,
+      dialBackgroundColor: p.surface,
+      hourMinuteColor: p.surface,
+      shape: rounded20,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: colorSurface,
-      labelStyle: const TextStyle(color: colorGrey),
-      hintStyle: const TextStyle(color: colorGrey),
-      prefixStyle: const TextStyle(color: colorGrey),
+      fillColor: p.surface,
+      labelStyle: TextStyle(color: p.textMuted),
+      hintStyle: TextStyle(color: p.textMuted),
+      prefixStyle: TextStyle(color: p.textMuted),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+          borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: colorAccent),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: p.accent, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: p.danger, width: 1.5),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: colorAccent,
-        foregroundColor: colorOnAccent,
-        shape: rounded10,
+        backgroundColor: p.accent,
+        foregroundColor: p.onAccent,
+        minimumSize: const Size(44, 48),
+        textStyle: AppText.body.w600,
+        shape: rounded12,
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: colorAccent,
-        foregroundColor: colorOnAccent,
+        backgroundColor: p.accent,
+        foregroundColor: p.onAccent,
         elevation: 0,
-        shape: rounded10,
+        minimumSize: const Size(44, 48),
+        textStyle: AppText.body.w600,
+        shape: rounded12,
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: colorText,
-        side: const BorderSide(color: colorDivider),
-        shape: rounded10,
+        foregroundColor: p.text,
+        side: BorderSide(color: p.divider),
+        minimumSize: const Size(44, 48),
+        shape: rounded12,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: colorAccent),
+      style: TextButton.styleFrom(
+        foregroundColor: p.accent,
+        minimumSize: const Size(44, 44),
+        textStyle: AppText.bodySmall.w600,
+      ),
     ),
-    floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: colorAccent,
-      foregroundColor: colorOnAccent,
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: p.accent,
+      foregroundColor: p.onAccent,
       elevation: 0,
     ),
-    chipTheme: const ChipThemeData(
-      backgroundColor: colorSurface,
-      selectedColor: colorAccentDim,
-      labelStyle: TextStyle(color: colorText),
+    chipTheme: ChipThemeData(
+      backgroundColor: p.surface,
+      selectedColor: p.accentSoft,
+      labelStyle: AppText.label.copyWith(color: p.text),
       side: BorderSide.none,
-      shape: StadiumBorder(),
+      shape: const StadiumBorder(),
     ),
-    progressIndicatorTheme:
-        const ProgressIndicatorThemeData(color: colorAccent),
-    listTileTheme:
-        const ListTileThemeData(iconColor: colorGrey, textColor: colorText),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: p.accent),
+    listTileTheme: ListTileThemeData(iconColor: p.textMuted, textColor: p.text),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(
-        (s) => s.contains(WidgetState.selected) ? colorOnAccent : colorGrey,
+        (s) => s.contains(WidgetState.selected) ? p.onAccent : p.switchThumbOff,
       ),
       trackColor: WidgetStateProperty.resolveWith(
-        (s) => s.contains(WidgetState.selected) ? colorAccent : colorSurface,
+        (s) => s.contains(WidgetState.selected) ? p.accent : p.switchOff,
       ),
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
-    snackBarTheme: const SnackBarThemeData(
-      backgroundColor: colorSurface,
-      contentTextStyle: TextStyle(color: colorText),
+    checkboxTheme: CheckboxThemeData(
+      fillColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? p.accent : null),
+      checkColor: WidgetStateProperty.all(p.onAccent),
+      side: BorderSide(color: p.switchOff, width: 2),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: p.glassThick,
+      contentTextStyle: AppText.bodySmall.copyWith(color: p.text),
       behavior: SnackBarBehavior.floating,
     ),
   );

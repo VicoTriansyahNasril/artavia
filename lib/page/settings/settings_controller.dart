@@ -1,32 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
-import 'package:artavia/core/services/csv_service.dart';
+import 'package:artavia/core/database/dummy_data.dart';
 import 'package:artavia/core/services/notification_service.dart';
 import 'package:artavia/core/services/period_service.dart';
 import 'package:artavia/core/services/pin_lock_service.dart';
+import 'package:artavia/core/services/privacy_service.dart';
 import 'package:artavia/core/services/settings_service.dart';
+import 'package:artavia/core/services/theme_service.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
-import 'package:artavia/page/home/home_controller.dart';
 import 'package:artavia/page/routes.dart';
 import 'package:artavia/widgets/components/app_feedback.dart';
 
-/// Every item on the Pengaturan screen performs a real action (FR-031).
-/// State is read straight from [SettingsService], whose map is reactive.
+/// Pengaturan tab (FR-027): every row performs a real action. State is read
+/// straight from [SettingsService] / [ThemeService], which are reactive.
 class SettingsController extends GetxController {
   SettingsService get settings => SettingsService.to;
+  ThemeService get theme => ThemeService.to;
 
   final isWorking = false.obs;
+  final accountCount = 0.obs;
+  final categoryCount = 0.obs;
+  final recurringCount = 0.obs;
 
   String get reminderLabel {
     final t = settings.reminderTime;
-    return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    return '${t.hour.toString().padLeft(2, '0')}.${t.minute.toString().padLeft(2, '0')}';
   }
 
   String get numberFormatLabel =>
       settings.numberFormat == 'comma' ? '1,000' : '1.000';
 
-  // ─── Pengingat Harian ────────────────────────────────────────────────────
+  @override
+  void onInit() {
+    super.onInit();
+    loadStats();
+  }
+
+  Future<void> loadStats() async {
+    final db = DatabaseHelper.instance;
+    accountCount.value =
+        (await db.readAllAccounts()).where((a) => a['is_archived'] != 1).length;
+    categoryCount.value = (await db.readAllCategories())
+        .where((c) => c['is_archived'] != 1)
+        .length;
+    recurringCount.value = (await db.readRecurringRules()).length;
+  }
+
+  // ─── Tampilan ────────────────────────────────────────────────────────────
+
+  Future<void> setTheme(ThemePref p) => theme.setTheme(p);
+
+  Future<void> setReduceTransparency(bool v) => theme.setReduceTransparency(v);
+
+  Future<void> setMonthStartDay(int day) async {
+    await settings.set(SettingsService.keyMonthStartDay, '$day');
+    PeriodService.to.resetToToday();
+    refreshAllGlobalData();
+  }
+
+  Future<void> setNumberFormat(String format) async {
+    await settings.setNumberFormat(format);
+    refreshAllGlobalData();
+    Get.forceAppUpdate();
+  }
+
+  // ─── Pengingat ───────────────────────────────────────────────────────────
 
   Future<void> toggleReminder(bool on) async {
     if (!on) {
@@ -54,15 +93,7 @@ class SettingsController extends GetxController {
     await NotificationService.to.enable(picked);
   }
 
-  // ─── Mulai Bulan Pada ────────────────────────────────────────────────────
-
-  Future<void> setMonthStartDay(int day) async {
-    await settings.set(SettingsService.keyMonthStartDay, '$day');
-    PeriodService.to.resetToToday();
-    refreshAllGlobalData();
-  }
-
-  // ─── Kunci PIN ───────────────────────────────────────────────────────────
+  // ─── Keamanan ────────────────────────────────────────────────────────────
 
   Future<void> togglePin(bool on) async {
     final done = await Get.toNamed(pinRoute,
@@ -75,75 +106,25 @@ class SettingsController extends GetxController {
     }
   }
 
+  /// "Sembunyikan saldo saat dibuka" also hides amounts right now.
+  Future<void> toggleHideOnOpen(bool on) async {
+    await settings.set(SettingsService.keyHideOnOpen, '$on');
+    if (on != PrivacyService.to.masked.value) PrivacyService.to.toggle();
+  }
+
+  Future<void> toggleHaptics(bool on) =>
+      settings.set(SettingsService.keyHaptics, '$on');
+
   // ─── Data ────────────────────────────────────────────────────────────────
-
-  /// "Cadangkan Data" reuses the Cloud Backup section on the Saya tab.
-  void openBackup() {
-    Get.until((route) => route.isFirst);
-    if (Get.isRegistered<HomeController>()) {
-      Get.find<HomeController>().changePage(3);
-    }
-  }
-
-  Future<void> exportCsv() async {
-    if (isWorking.value) return;
-    isWorking.value = true;
-    try {
-      final count = await CsvService.exportAndShare();
-      if (count == 0) {
-        AppToast.info('Ekspor CSV', 'Belum ada transaksi untuk diekspor');
-      }
-    } catch (e) {
-      AppToast.error('Ekspor gagal', 'File CSV tidak dapat dibuat');
-    } finally {
-      isWorking.value = false;
-    }
-  }
-
-  Future<void> importCsv() async {
-    if (isWorking.value) return;
-    isWorking.value = true;
-    try {
-      final result = await CsvService.pickAndValidate();
-      if (result == null) return;
-      if (result.valid.isEmpty) {
-        AppToast.error('Impor gagal',
-            result.errors.isEmpty ? 'File kosong' : result.errors.first);
-        return;
-      }
-      if (!await _confirmImport(result)) return;
-      final count = await CsvService.import(result.valid);
-      refreshAllGlobalData();
-      AppToast.success('Impor selesai', '$count transaksi berhasil diimpor');
-    } catch (e) {
-      AppToast.error('Impor gagal', 'File tidak dapat dibaca atau disimpan');
-    } finally {
-      isWorking.value = false;
-    }
-  }
-
-  Future<bool> _confirmImport(CsvImportResult result) {
-    final skipped = result.errors.length;
-    final details = result.errors.take(3).join('\n');
-    return AppDialog.confirm(
-      title: 'Impor ${result.valid.length} transaksi?',
-      message: [
-        'Transaksi akan ditambahkan ke data yang ada dan saldo rekening disesuaikan.',
-        if (skipped > 0)
-          '\n$skipped baris dilewati:\n$details${skipped > 3 ? '\n…' : ''}',
-      ].join('\n'),
-      confirmLabel: 'Impor',
-    );
-  }
 
   Future<void> resetAllData() async {
     final ok = await AppDialog.confirm(
-      title: 'Reset Seluruh Data',
+      title: 'Reset seluruh data?',
       message:
-          'Semua transaksi, rekening, kategori kustom, anggaran, transaksi '
-          'berulang, dan pengaturan (termasuk PIN) akan dihapus permanen. '
-          'Tindakan ini tidak dapat dibatalkan.',
-      confirmLabel: 'Reset',
+          'Semua transaksi, rekening, kategori, anggaran, transaksi berulang, '
+          'dan pengaturan (termasuk PIN) akan dihapus permanen dari HP ini. '
+          'Cadangan di Google Drive tidak ikut terhapus.',
+      confirmLabel: 'Reset seluruh data',
       destructive: true,
     );
     if (!ok) return;
@@ -161,14 +142,17 @@ class SettingsController extends GetxController {
     }
   }
 
-  // ─── Tampilan & Suara ────────────────────────────────────────────────────
-
-  Future<void> setNumberFormat(String format) async {
-    await settings.setNumberFormat(format);
-    refreshAllGlobalData();
-    Get.forceAppUpdate();
+  /// Debug only (constitution V): the menu row is behind `kDebugMode`.
+  Future<void> generateDummyData() async {
+    try {
+      AppDialog.showProgress();
+      await DummyDataGenerator.generate(await DatabaseHelper.instance.database);
+      AppDialog.hideProgress();
+      refreshAllGlobalData();
+      AppToast.success('Berhasil', 'Data dummy berhasil ditambahkan');
+    } catch (e) {
+      AppDialog.hideProgress();
+      AppToast.error('Gagal', '$e');
+    }
   }
-
-  Future<void> toggleSound(bool on) =>
-      settings.set(SettingsService.keySoundEffect, '$on');
 }

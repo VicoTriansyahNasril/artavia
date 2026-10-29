@@ -1,125 +1,128 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/services/period_service.dart';
+import 'package:artavia/core/services/privacy_service.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/core/utils/date_format.dart';
+import 'package:artavia/core/utils/finance_calc.dart';
 import 'package:artavia/page/home/home_controller.dart';
-import 'package:artavia/page/chart/chart_screen.dart';
+import 'package:artavia/page/account_management/account_management_screen.dart';
 import 'package:artavia/page/report/report_screen.dart';
-import 'package:artavia/page/profile/profile_screen.dart';
+import 'package:artavia/page/settings/settings_screen.dart';
 import 'package:artavia/page/routes.dart';
-import 'package:artavia/widgets/commons/common.dart';
-import 'package:artavia/widgets/components/bouncy_button.dart';
+import 'package:artavia/widgets/components/app_feedback.dart';
+import 'package:artavia/widgets/kobalt/kobalt.dart';
 import 'package:artavia/widgets/transaction/transaction_item.dart';
-import 'package:artavia/model/transaction_model.dart';
 
 class HomeScreen extends GetView<HomeController> {
   const HomeScreen({super.key});
 
+  static const _titles = ['Transaksi', 'Laporan', 'Rekening', 'Pengaturan'];
+
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) controller.showTutorialIfNoAccount();
-    });
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Artavia',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            tooltip: 'Cari',
-            onPressed: () => Get.toNamed(searchRoute),
+      backgroundColor: colorBackground,
+      extendBody: true,
+      body: Stack(
+        children: [
+          const AmbientOrb(),
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                Obx(() => _TabHeader(index: controller.currentIndex.value)),
+                Expanded(
+                  child: Obx(() => IndexedStack(
+                        index: controller.currentIndex.value,
+                        children: const [
+                          HistoryView(),
+                          ReportScreen(),
+                          AccountListView(),
+                          SettingsView(),
+                        ],
+                      )),
+                ),
+              ],
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.calendar_month_outlined),
-            tooltip: 'Kalender',
-            onPressed: () => Get.toNamed(calendarRoute),
-          ),
-          const SizedBox(width: 4),
         ],
       ),
-      body: Obx(() => IndexedStack(
+      bottomNavigationBar: Obx(() => KBottomNav(
             index: controller.currentIndex.value,
-            children: const [
-              HistoryView(),
-              ChartScreen(),
-              ReportScreen(),
-              ProfileScreen(),
-            ],
+            onTap: controller.changePage,
+            onCatat: _openCatat,
           )),
-      bottomNavigationBar: const _BottomNav(),
-      floatingActionButton: BouncyButton(
-        onPressed: () => Get.toNamed(addTransactionRoute),
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration:
-              const BoxDecoration(color: colorAccent, shape: BoxShape.circle),
-          child: const Icon(Icons.add_rounded, color: colorOnAccent, size: 28),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
+  }
+
+  /// FR-018: Catat needs an account first.
+  void _openCatat() {
+    if (controller.hasAccounts.value == false) {
+      controller.changePage(0);
+      AppToast.info('Buat rekening dulu',
+          'Isi rekening pertamamu di beranda untuk mulai mencatat.');
+      return;
+    }
+    Get.toNamed(addTransactionRoute);
   }
 }
 
-class _BottomNav extends GetView<HomeController> {
-  const _BottomNav();
+/// Per-tab title row; money tabs get the privacy eye, Transaksi also gets
+/// Cari and Kalender.
+class _TabHeader extends StatelessWidget {
+  final int index;
+  const _TabHeader({required this.index});
 
   @override
   Widget build(BuildContext context) {
-    return BottomAppBar(
-      color: colorCard,
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 6,
-      height: 64,
-      padding: EdgeInsets.zero,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _item(Icons.receipt_long_outlined, Icons.receipt_long, 'Riwayat', 0),
-          _item(Icons.pie_chart_outline, Icons.pie_chart, 'Grafik', 1),
-          const SizedBox(width: 48),
-          _item(Icons.account_balance_wallet_outlined,
-              Icons.account_balance_wallet, 'Aset', 2),
-          _item(Icons.person_outline, Icons.person, 'Saya', 3,
-              key: controller.keyBottomNavProfile),
-        ],
+    final masked = PrivacyService.to.masked.value;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+      child: SizedBox(
+        height: 48,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(HomeScreen._titles[index],
+                  style: AppText.title2.copyWith(color: colorText)),
+            ),
+            if (index < 3)
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: masked ? colorAccentDim : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: KIconButton(
+                  icon: masked ? LucideIcons.eyeOff : LucideIcons.eye,
+                  color: masked ? colorAccent : null,
+                  semanticLabel:
+                      masked ? 'Tampilkan nominal' : 'Sembunyikan nominal',
+                  onPressed: PrivacyService.to.toggle,
+                ),
+              ),
+            if (index == 0) ...[
+              KIconButton(
+                icon: LucideIcons.search,
+                semanticLabel: 'Cari transaksi',
+                onPressed: () => Get.toNamed(searchRoute),
+              ),
+              KIconButton(
+                icon: LucideIcons.calendarDays,
+                semanticLabel: 'Kalender',
+                onPressed: () => Get.toNamed(calendarRoute),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
-
-  Widget _item(IconData off, IconData on, String label, int index, {Key? key}) {
-    return Obx(() {
-      final active = controller.currentIndex.value == index;
-      final color = active ? colorAccent : colorGrey;
-      return BouncyButton(
-        key: key,
-        onPressed: () => controller.changePage(index),
-        child: Container(
-          color: Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(active ? on : off, color: color, size: 22),
-              const SizedBox(height: 2),
-              Text(label,
-                  style: TextStyle(
-                      color: color,
-                      fontSize: 10,
-                      fontWeight:
-                          active ? FontWeight.w600 : FontWeight.normal)),
-            ],
-          ),
-        ),
-      );
-    });
-  }
 }
 
+/// Transaksi tab (board "Transaksi").
 class HistoryView extends GetView<HomeController> {
   const HistoryView({super.key});
 
@@ -128,17 +131,22 @@ class HistoryView extends GetView<HomeController> {
     return RefreshIndicator(
       onRefresh: controller.loadData,
       backgroundColor: colorCard,
+      color: colorAccent,
       child: Obx(() {
-        final grouped = controller.groupedTransactions;
-        final keys = grouped.keys.toList();
+        if (controller.hasAccounts.value == false) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+            children: const [_WelcomeCard()],
+          );
+        }
+        final groups = controller.dayGroups;
         return ListView.builder(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 96),
-          itemCount: keys.length + 1,
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+          itemCount: groups.length + 1,
           itemBuilder: (context, index) {
             if (index == 0) return const _HistoryHeader();
-            final key = keys[index - 1];
-            return _DayGroup(title: key, items: grouped[key]!);
+            return _DaySection(group: groups[index - 1]);
           },
         );
       }),
@@ -146,282 +154,308 @@ class HistoryView extends GetView<HomeController> {
   }
 }
 
-/// Period picker, monthly totals, budget card and loading/empty states.
 class _HistoryHeader extends GetView<HomeController> {
   const _HistoryHeader();
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final empty = controller.transactions.isEmpty;
+      final empty = controller.dayGroups.isEmpty;
+      final b = controller.budget.value;
+      final insight = controller.insight.value;
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _SummaryCard(),
-          if (controller.budget.value.total > 0) const _BudgetCard(),
+          BalanceHero(
+            header: _PeriodRow(greeting: controller.greeting),
+            label: 'Sisa periode ini',
+            amount: controller.saldoTotal.value,
+            figures: [
+              HeroFigure(
+                  label: 'Pemasukan',
+                  amount: controller.totalPemasukan.value,
+                  color: colorIncome,
+                  icon: LucideIcons.arrowDownLeft),
+              HeroFigure(
+                  label: 'Pengeluaran',
+                  amount: controller.totalPengeluaran.value,
+                  color: colorDanger,
+                  icon: LucideIcons.arrowUpRight),
+            ],
+            insight: insight.text,
+            insightIcon: insight.isLower
+                ? LucideIcons.trendingDown
+                : LucideIcons.trendingUp,
+          ),
+          if (b.summary.total > 0) ...[
+            const SizedBox(height: 12),
+            _BudgetCard(budget: b),
+          ],
+          const SizedBox(height: 4),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final f in HomeController.filters) ...[
+                  KChip(
+                    label: f,
+                    selected: controller.filter.value == f,
+                    onTap: () => controller.setFilter(f),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ],
+            ),
+          ),
           if (controller.isLoading.value && empty)
             const Padding(
               padding: EdgeInsets.all(48),
               child: Center(child: CircularProgressIndicator()),
             )
           else if (empty)
-            const _EmptyState(),
+            EmptyState(
+              icon: LucideIcons.receiptText,
+              title: controller.filter.value == 'Semua'
+                  ? 'Belum ada transaksi'
+                  : 'Tidak ada ${controller.filter.value.toLowerCase()}',
+              body: 'Ketuk tombol + untuk mulai mencatat.',
+            ),
         ],
       );
     });
   }
 }
 
-class _SummaryCard extends GetView<HomeController> {
-  const _SummaryCard();
+/// Greeting and ‹ Oktober 2026 › inside the hero card.
+class _PeriodRow extends StatelessWidget {
+  final String greeting;
+  const _PeriodRow({required this.greeting});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      decoration: BoxDecoration(
-        color: colorCard,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () => showPeriodPicker(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(children: [
-                    Obx(() => Text(controller.period.label,
-                        style: const TextStyle(
-                            color: colorText,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600))),
-                    const Icon(Icons.keyboard_arrow_down_rounded,
-                        color: colorGrey, size: 20),
-                  ]),
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Sembunyikan saldo',
-                onPressed: controller.toggleHideBalance,
-                icon: Obx(() => Icon(
-                      controller.hideBalance.value
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: colorGrey,
-                      size: 18,
-                    )),
-              ),
-            ],
+    final service = PeriodService.to;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(greeting,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.bodySmall.w600.copyWith(color: colorText)),
+        ),
+        KIconButton(
+          icon: LucideIcons.chevronLeft,
+          size: 18,
+          semanticLabel: 'Periode sebelumnya',
+          onPressed: () => service.shift(-1),
+        ),
+        Flexible(
+          flex: 2,
+          child: GestureDetector(
+            onTap: showPeriodPicker,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Obx(() => Text(service.active.value.longLabel,
+                  style: AppText.label.copyWith(color: colorText))),
+            ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _stat('Pengeluaran', () => controller.totalPengeluaran.value,
-                  colorExpense),
-              _stat('Pemasukan', () => controller.totalPemasukan.value,
-                  colorIncome),
-              _stat('Saldo', () => controller.saldoTotal.value, colorText),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _stat(String label, int Function() value, Color color) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(color: colorGrey, fontSize: 12)),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Obx(() => Text(
-                  controller.hideBalance.value
-                      ? '••••••'
-                      : CurrencyService.to.formatWithoutSymbol(value()),
-                  style: TextStyle(
-                      color: color, fontSize: 16, fontWeight: FontWeight.w600),
-                )),
-          ),
-        ],
-      ),
+        ),
+        KIconButton(
+          icon: LucideIcons.chevronRight,
+          size: 18,
+          semanticLabel: 'Periode berikutnya',
+          onPressed: () => service.shift(1),
+        ),
+      ],
     );
   }
 }
 
-class _BudgetCard extends GetView<HomeController> {
-  const _BudgetCard();
+class _BudgetCard extends StatelessWidget {
+  final HomeBudget budget;
+  const _BudgetCard({required this.budget});
 
   @override
   Widget build(BuildContext context) {
-    final b = controller.budget.value;
-    final tone = b.overCount > 0
-        ? colorExpense
-        : b.ratio >= 0.8
-            ? colorWarning
-            : colorAccent;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Material(
-        color: colorCard,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => Get.toNamed(budgetRoute),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final s = budget.summary;
+    final level = budgetStatus(s.used, s.total);
+    final tone = switch (level) {
+      BudgetLevel.over => KTone.danger,
+      BudgetLevel.near => KTone.warning,
+      BudgetLevel.safe => KTone.accent,
+    };
+    final attentionColor =
+        budget.attentionLevel == BudgetLevel.over ? colorDanger : colorWarning;
+    final money = CurrencyService.to;
+    return GestureDetector(
+      onTap: () => Get.toNamed(budgetRoute),
+      child: KCard(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(children: [
-                  const Text('Anggaran',
-                      style: TextStyle(color: colorGrey, fontSize: 12)),
-                  const Spacer(),
-                  Text(
-                    '${CurrencyService.to.formatWithoutSymbol(b.used)} / '
-                    '${CurrencyService.to.formatWithoutSymbol(b.total)}',
-                    style: const TextStyle(color: colorText, fontSize: 12),
-                  ),
-                ]),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: b.ratio.clamp(0, 1).toDouble(),
-                    minHeight: 6,
-                    backgroundColor: colorSurface,
-                    valueColor: AlwaysStoppedAnimation(tone),
-                  ),
+                Expanded(
+                  child: Text('Anggaran bulan ini',
+                      style: AppText.bodySmall.w600.copyWith(color: colorText)),
                 ),
-                if (b.overCount > 0) ...[
-                  const SizedBox(height: 8),
-                  Text('${b.overCount} kategori melewati batas',
-                      style:
-                          const TextStyle(color: colorExpense, fontSize: 12)),
-                ],
+                Text('${(s.ratio * 100).round()}%',
+                    style: AppText.label.copyWith(color: toneColor(tone))),
               ],
             ),
-          ),
+            const SizedBox(height: 4),
+            Text('${money.money(s.used)} dari ${money.money(s.total)}',
+                style: AppText.caption.muted),
+            const SizedBox(height: 10),
+            KProgress(value: s.ratio, tone: tone),
+            if (budget.attentionName != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(LucideIcons.triangleAlert,
+                      size: 14, color: attentionColor),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      budget.attentionLevel == BudgetLevel.over
+                          ? '${budget.attentionName} melewati batas'
+                          : '${budget.attentionName} hampir mencapai batas',
+                      style: AppText.caption.copyWith(color: attentionColor),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+class _DaySection extends StatelessWidget {
+  final DayGroup group;
+  const _DaySection({required this.group});
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 64, horizontal: 32),
-      child: Column(
-        children: [
-          Icon(Icons.receipt_long_outlined, size: 48, color: colorGrey),
-          SizedBox(height: 16),
-          Text('Belum ada transaksi pada periode ini',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: colorText, fontSize: 15, fontWeight: FontWeight.w500)),
-          SizedBox(height: 6),
-          Text('Ketuk + untuk mulai mencatat',
-              style: TextStyle(color: colorGrey, fontSize: 13)),
-        ],
-      ),
+    final net = group.income - group.expense;
+    return ListGroup(
+      title: group.label,
+      titleAction: group.income == 0 && group.expense == 0
+          ? null
+          : Text(CurrencyService.to.money(net, signed: true),
+              style: AppText.caption.copyWith(
+                  color: net >= 0 ? colorIncome : colorGrey,
+                  fontWeight: FontWeight.w600)),
+      children: [for (final tx in group.items) TransactionItem(tx: tx)],
     );
   }
 }
 
-class _DayGroup extends StatelessWidget {
-  final String title;
-  final List<TransactionModel> items;
-
-  const _DayGroup({required this.title, required this.items});
+/// New-user card with the first-account form (FR-018).
+class _WelcomeCard extends GetView<HomeController> {
+  const _WelcomeCard();
 
   @override
   Widget build(BuildContext context) {
-    final expense = items
-        .where((t) => t.type == 'pengeluaran')
-        .fold<int>(0, (s, t) => s + (t.amount ?? 0).abs());
-    final income = items
-        .where((t) => t.type == 'pemasukan')
-        .fold<int>(0, (s, t) => s + (t.amount ?? 0).abs());
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
-            child: Row(
-              children: [
-                Text(title,
-                    style: const TextStyle(color: colorGrey, fontSize: 12)),
-                const Spacer(),
-                if (income > 0)
-                  Text('+${CurrencyService.to.formatWithoutSymbol(income)}',
-                      style: const TextStyle(color: colorIncome, fontSize: 11)),
-                if (income > 0 && expense > 0) const SizedBox(width: 8),
-                if (expense > 0)
-                  Text('-${CurrencyService.to.formatWithoutSymbol(expense)}',
-                      style:
-                          const TextStyle(color: colorExpense, fontSize: 11)),
-              ],
-            ),
-          ),
-          Material(
-            color: colorCard,
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                for (var i = 0; i < items.length; i++) ...[
-                  if (i > 0) const Divider(indent: 68),
-                  TransactionItem(tx: items[i]),
+    return GlassCard(
+      padding: const EdgeInsets.all(20),
+      child: Obx(() => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                      color: colorAccentDim, shape: BoxShape.circle),
+                  child: Icon(LucideIcons.wallet, color: colorAccent),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text('Mulai dengan satu rekening',
+                  style: AppText.title1.copyWith(color: colorText)),
+              const SizedBox(height: 6),
+              Text(
+                  'Rekening adalah tempat uangmu berada: dompet, bank, atau '
+                  'e-wallet. Kamu bisa menambah yang lain nanti.',
+                  style: AppText.bodySmall.onGlass),
+              const SizedBox(height: 18),
+              KField(
+                label: 'Nama rekening',
+                hint: 'Mis. Dompet, BCA, GoPay',
+                maxLength: 30,
+                onChanged: (v) => controller.starterName.value = v,
+              ),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Text('Jenis', style: AppText.caption.muted),
+              ),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final t in HomeController.starterTypes.keys)
+                    KChip(
+                      label: t,
+                      selected: controller.starterType.value == t,
+                      onTap: () => controller.starterType.value = t,
+                    ),
                 ],
-              ],
-            ),
-          ),
-        ],
-      ),
+              ),
+              const SizedBox(height: 10),
+              KField(
+                label: 'Saldo awal',
+                hint: '0',
+                prefix: Text('Rp', style: AppText.body.muted),
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(12),
+                ],
+                onChanged: (v) =>
+                    controller.starterBalance.value = int.tryParse(v) ?? 0,
+              ),
+              const SizedBox(height: 18),
+              KButton(
+                label: 'Buat rekening',
+                icon: LucideIcons.plus,
+                onPressed: controller.isCreating.value
+                    ? null
+                    : controller.createFirstAccount,
+              ),
+            ],
+          )),
     );
   }
 }
 
-/// Bottom sheet to pick the shared active month (FR-021, FR-022).
+/// Bottom sheet to pick the shared active month.
 void showPeriodPicker() {
   final service = PeriodService.to;
   final year = service.active.value.year.obs;
   Get.bottomSheet(
     SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left_rounded),
+                KIconButton(
+                  icon: LucideIcons.chevronLeft,
+                  semanticLabel: 'Tahun sebelumnya',
                   onPressed: () => year.value--,
                 ),
                 Obx(() => Text('${year.value}',
-                    style: const TextStyle(
-                        color: colorText,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600))),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right_rounded),
+                    style: AppText.title3.copyWith(color: colorText))),
+                KIconButton(
+                  icon: LucideIcons.chevronRight,
+                  semanticLabel: 'Tahun berikutnya',
                   onPressed: () => year.value++,
                 ),
               ],
@@ -451,11 +485,8 @@ void showPeriodPicker() {
                       child: Center(
                         child: Text(
                           IdNames.monthShort(i + 1),
-                          style: TextStyle(
-                            color: selected ? colorOnAccent : colorText,
-                            fontWeight:
-                                selected ? FontWeight.w600 : FontWeight.normal,
-                          ),
+                          style: AppText.label.copyWith(
+                              color: selected ? colorOnAccent : colorText),
                         ),
                       ),
                     ),

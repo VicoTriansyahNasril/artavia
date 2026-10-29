@@ -102,8 +102,12 @@ Konsistensi penamaan adalah kunci. Ikuti konvensi berikut dengan ketat:
   // ❌ Salah: Ekstrak menjadi method (menyebabkan build keseluruhan ulang)
   Widget _buildHeaderCard() { return Container(...); }
   ```
-- **Pemanfaatan Tema (Theme):**
-  Hindari melakukan _hardcode_ warna atau ukuran font langsung di dalam UI. Gunakan pengaturan tema dari `main.dart` atau konstanta dari `lib/widgets/commons/`.
+- **Warna (wajib):** semua warna berasal dari `lib/widgets/commons/colors.dart`. Nama `colorX` adalah *getter* atas palet aktif (`AppPalette.dark` / `AppPalette.light`), jadi **jangan** membungkusnya dengan `const`. Tes `test/kobalt/no_hardcoded_colors_test.dart` gagal bila ada `Color(0x…)` atau `Colors.*` (selain `transparent`) di luar file itu. Warna kategori/rekening disimpan sebagai nilai kanonik dan ditampilkan lewat `themedColor(colorVal)`.
+- **Teks:** pakai skala `AppText` (`display`, `amountXL`, `amountL`, `title1–3`, `body`, `bodySmall`, `label`, `caption`, `rowAmount`) dengan helper `.muted`, `.onGlass`, `.accent`, `.w600`. Ukuran minimum 12. Nominal selalu lewat `CurrencyService.to.money()/digits()/short()` agar mode privasi dan tanda minus (U+2212) konsisten.
+- **Komponen Kobalt:** layar dibangun dari `lib/widgets/kobalt/` (impor `kobalt.dart`): `AppScaffold`, `GlassCard`/`KCard`, `KButton`, `KChip`, `KSegment`, `KField`, `KSwitch`/`KCheck`/`KRadio`/`KProgress`, `ListGroup`/`NavRow`, `TxRow`, `BalanceHero`, `StatTiles`, `EmptyState`, `StepHeader`, `Keypad`, `KBottomNav`, `PaletteColorPicker`, `IconPicker`. Jangan menata ulang tombol, chip, kolom, atau baris sendiri di layar.
+- **Ikon:** ikon kategori/rekening memakai kunci dari `IconRegistry` (107 ikon Lucide); simpan `icon_key`, bukan path gambar.
+- **Aksesibilitas:** setiap kontrol ikon saja punya label (`KIconButton.semanticLabel`); area sentuh ≥ 44 px; teks dan nominal harus tetap muat di 150 % (`Flexible`, `FittedBox(scaleDown)`), diperiksa oleh `test/kobalt/screens_render_test.dart`.
+- **Obx:** baca setiap nilai Rx yang ditampilkan *di dalam* builder `Obx` (widget anak biasa yang membaca Rx di `build`-nya sendiri tidak ikut diperbarui).
 
 ---
 

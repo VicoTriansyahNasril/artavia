@@ -1,4 +1,14 @@
 import 'package:get/get.dart';
+import 'package:artavia/page/data_transfer/data_transfer_binding.dart';
+import 'package:artavia/page/data_transfer/export_screen.dart';
+import 'package:artavia/page/data_transfer/import_history_screen.dart';
+import 'package:artavia/page/data_transfer/import_mapping_screen.dart';
+import 'package:artavia/page/data_transfer/import_review_screen.dart';
+import 'package:artavia/page/backup/backup_binding.dart';
+import 'package:artavia/page/backup/backup_screen.dart';
+import 'package:artavia/page/backup/restore_found_screen.dart';
+import 'package:artavia/page/text_size/text_size_screen.dart';
+import 'package:artavia/page/text_size/text_size_binding.dart';
 import 'package:artavia/page/home/home_screen.dart';
 import 'package:artavia/page/home/home_binding.dart';
 import 'package:artavia/page/add_transaction/add_transaction_screen.dart';
@@ -23,8 +33,6 @@ import 'package:artavia/page/recurring/recurring_form_screen.dart';
 import 'package:artavia/page/recurring/recurring_binding.dart';
 import 'package:artavia/page/budget/budget_screen.dart';
 import 'package:artavia/page/budget/budget_binding.dart';
-import 'package:artavia/page/transfer/transfer_screen.dart';
-import 'package:artavia/page/transfer/transfer_binding.dart';
 
 const homeRoute = '/';
 const transferRoute = '/transfer';
@@ -41,6 +49,13 @@ const settingsRoute = '/settings';
 const pinRoute = '/pin';
 const recurringRoute = '/recurring';
 const recurringFormRoute = '/recurring/form';
+const textSizeRoute = '/text-size';
+const backupRoute = '/backup';
+const restoreFoundRoute = '/backup/restore';
+const exportRoute = '/data/export';
+const importMappingRoute = '/data/import/mapping';
+const importReviewRoute = '/data/import/review';
+const importHistoryRoute = '/data/import/history';
 
 var route = [
   GetPage(
@@ -107,14 +122,50 @@ var route = [
     page: () => const RecurringFormScreen(),
     binding: RecurringBinding(),
   ),
+  // Transfer is a segment of Catat (FR-006); the route opens it there.
   GetPage(
     name: transferRoute,
-    page: () => const TransferScreen(),
-    binding: TransferBinding(),
+    page: () => const AddTransactionScreen(),
+    binding: AddTransactionBinding(initialTab: 'Transfer'),
   ),
   GetPage(
     name: budgetRoute,
     page: () => const BudgetScreen(),
     binding: BudgetBinding(),
+  ),
+  GetPage(
+    name: textSizeRoute,
+    page: () => const TextSizeScreen(),
+    binding: TextSizeBinding(),
+  ),
+  GetPage(
+    name: backupRoute,
+    page: () => const BackupScreen(),
+    binding: BackupBinding(),
+  ),
+  GetPage(
+    name: restoreFoundRoute,
+    page: () => const RestoreFoundScreen(),
+    binding: BackupBinding(),
+  ),
+  GetPage(
+    name: exportRoute,
+    page: () => const ExportScreen(),
+    binding: DataTransferBinding(),
+  ),
+  GetPage(
+    name: importMappingRoute,
+    page: () => const ImportMappingScreen(),
+    binding: DataTransferBinding(),
+  ),
+  GetPage(
+    name: importReviewRoute,
+    page: () => const ImportReviewScreen(),
+    binding: DataTransferBinding(),
+  ),
+  GetPage(
+    name: importHistoryRoute,
+    page: () => const ImportHistoryScreen(),
+    binding: ImportHistoryBinding(),
   ),
 ];

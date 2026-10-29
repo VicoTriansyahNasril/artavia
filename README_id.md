@@ -8,13 +8,15 @@
 Artavia adalah aplikasi mobile manajemen keuangan dan pengeluaran yang mengutamakan privasi (*local-first*), dibangun dengan menggunakan Flutter. Didesain dengan estetika premium dan animasi mikro (*micro-animations*) yang halus, aplikasi ini membantu Anda mengelola keuangan harian, melacak berbagai rekening, dan menganalisis kebiasaan pengeluaran Anda—semuanya dilakukan sepenuhnya secara *offline*.
 
 ## ✨ Fitur Utama
-- **Utamakan Privasi (Lokal)**: Semua data tersimpan di perangkat (SQLite), tanpa pelacakan. Cadangan Google Drive bersifat opsional dan hanya berjalan saat Anda memintanya.
-- **Manajemen Multi-Rekening & Transfer**: Dompet, bank, dan uang digital, termasuk transfer dengan biaya admin.
-- **Analisis dalam Satu Tempat**: Ringkasan, pengeluaran per kategori, dan tren mingguan/bulanan/tahunan di tab Grafik; kekayaan bersih di tab Aset.
-- **Anggaran**: Batas per kategori dengan ringkasan di Riwayat dan peringatan saat melewati batas.
-- **Transaksi Berulang**: Gaji, sewa, atau langganan tercatat otomatis.
-- **Pengaturan Lengkap**: Pengingat harian, kunci PIN, awal bulan kustom, format angka, efek suara, serta ekspor/impor CSV.
-- **Tampilan Kalem**: Mode gelap dengan palet "slate" yang lembut dan kontras terukur agar nyaman di mata.
+- **Privasi (Lokal)**: Semua data tersimpan di HP (SQLite). Cadangan Google Drive opsional ke folder khusus Artavia dan bisa dikunci kata sandi (AES-256-GCM).
+- **Catat cepat**: Satu layar papan angka untuk pengeluaran, pemasukan, dan transfer, dengan + − × ÷, 10 kategori tersering, dan rekening terakhir.
+- **Transfer yang ingat biaya admin**: Biaya per pasangan rekening dipilih otomatis, bisa dipotong dari saldo asal atau dari uang diterima, dan dicatat sebagai pengeluaran "Biaya admin".
+- **Transaksi, Laporan, Rekening, Pengaturan**: Ringkasan periode dengan insight mingguan, kartu anggaran, dan daftar per hari; laporan minggu/bulan/tahun dengan grafik tren dan donat kategori; rekening per kelompok dengan kekayaan bersih dan arsip.
+- **Anggaran, Cari, Kalender**: "Perlu perhatian" dan "Aman" dengan batas aman harian, saran ejaan saat mencari, dan kalender bertitik pemasukan/pengeluaran.
+- **107 ikon, 12 warna**: Kategori memakai ikon Lucide dalam 13 kelompok, bisa diurutkan dan diarsipkan.
+- **Urungkan & privasi**: Hapus bisa diurungkan 5 detik; satu ketukan menyembunyikan semua nominal.
+- **Excel & CSV**: Ekspor per lembar, impor 3 langkah dengan deteksi duplikat dan pembatalan 7 hari.
+- **Desain "Kobalt"**: Tema gelap, terang, atau ikuti sistem, permukaan kaca, ukuran teks hingga 150 %, PIN dengan sidik jari.
 
 ## 🛠️ Teknologi yang Digunakan
 - **Framework**: [Flutter](https://flutter.dev/)

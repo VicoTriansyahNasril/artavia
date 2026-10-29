@@ -1,218 +1,203 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/page/category_management/category_management_controller.dart';
-import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/widgets/kobalt/kobalt.dart';
 
+/// Kategori (board): type segment with counts, "Tambah kategori", drag
+/// handles to reorder, archived link.
 class CategoryManagementScreen extends GetView<CategoryManagementController> {
   const CategoryManagementScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: colorBackground,
-      appBar: AppBar(
-        backgroundColor: colorBackground,
-        elevation: 0,
-        title: const Text(
-          'Pengaturan Kategori',
-          style: TextStyle(
-            color: colorText,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: colorText),
-          onPressed: () => Get.back(),
-        ),
-      ),
-      body: Column(
-        children: [
-          _buildTabBar(),
-          Expanded(child: _buildCategoryList()),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          controller.isExpenseForm.value =
-              controller.currentTab.value == 'Pengeluaran';
-          controller.resetForm();
-          Get.toNamed('/add-category');
-        },
-        backgroundColor: colorAccent,
-        icon: const Icon(Icons.add, color: colorOnAccent),
-        label: const Text(
-          'Tambah Kategori',
-          style: TextStyle(
-            color: colorOnAccent,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Obx(() {
-      final isExpense = controller.currentTab.value == 'Pengeluaran';
-      return Container(
-        color: colorBackground,
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: colorCard,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              _buildTab('Pengeluaran', isExpense),
-              _buildTab('Pemasukan', !isExpense),
-            ],
-          ),
-        ),
-      );
-    });
-  }
-
-  Widget _buildTab(String title, bool isSelected) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => controller.changeTab(title),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected ? colorAccent : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? colorOnAccent : colorGrey,
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+    return AppScaffold(
+      leading: ScaffoldLeading.back,
+      title: 'Kategori',
+      body: Obx(() {
+        final c = controller;
+        final list = c.visible;
+        c.counts.length;
+        c.budgets.length;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: KSegment<String>(
+                items: {
+                  'pengeluaran': 'Pengeluaran · ${c.expense.length}',
+                  'pemasukan': 'Pemasukan · ${c.income.length}',
+                },
+                value: c.currentType.value,
+                onChanged: c.changeType,
+              ),
             ),
-          ),
-        ),
-      ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: KButton.tonal(
+                label: 'Tambah kategori',
+                icon: LucideIcons.plus,
+                expand: true,
+                onPressed: c.openNew,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ReorderableListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                buildDefaultDragHandles: false,
+                header: Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                  child: Text('Tahan ⠿ lalu geser untuk mengubah urutan',
+                      style: AppText.caption.muted),
+                ),
+                itemCount: list.length,
+                onReorderItem: c.reorder,
+                proxyDecorator: (child, _, __) => Material(
+                  color: Colors.transparent,
+                  elevation: 0,
+                  child: child,
+                ),
+                footer: c.archived.isEmpty
+                    ? null
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Center(
+                          child: KButton.text(
+                            label: '${c.archived.length} kategori diarsipkan',
+                            icon: LucideIcons.archive,
+                            compact: true,
+                            expand: false,
+                            onPressed: _showArchived,
+                          ),
+                        ),
+                      ),
+                itemBuilder: (context, i) => _CategoryRow(
+                  key: ValueKey(list[i]['id']),
+                  category: list[i],
+                  index: i,
+                  first: i == 0,
+                  last: i == list.length - 1,
+                ),
+              ),
+            ),
+          ],
+        );
+      }),
     );
   }
 
-  Widget _buildCategoryList() {
-    return Obx(() {
-      final isExpense = controller.currentTab.value == 'Pengeluaran';
-      final list = isExpense
-          ? controller.expenseCategories
-          : controller.incomeCategories;
-
-      if (list.isEmpty) {
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.category_outlined,
-                size: 56,
-                color: colorGrey.withValues(alpha: 0.4),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Belum ada kategori',
-                style: TextStyle(
-                  color: colorText,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Ketuk + untuk menambah kategori baru',
-                style: TextStyle(color: colorGrey, fontSize: 13),
-              ),
-            ],
-          ),
-        );
-      }
-
-      return ListView.builder(
-        padding: const EdgeInsets.fromLTRB(0, 8, 0, 96),
-        itemCount: list.length,
-        itemBuilder: (context, index) {
-          final cat = list[index];
-          final color = cat['color'] as Color;
-          final iconCode = cat['icon_code'] as int?;
-          final iconPath = cat['icon_path'] as String?;
-          final id = cat['id'] as int;
-
-          return Column(
-            children: [
-              if (index > 0)
-                const Divider(
-                  color: colorBackground,
-                  height: 1,
-                  indent: 64,
-                ),
-              Material(
-                color: colorCard,
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  leading: CircleAvatar(
-                    radius: 22,
-                    backgroundColor: color.withValues(alpha: 0.18),
-                    child: CategoryIcon(
-                      iconCode: iconCode,
-                      iconPath: iconPath,
-                      color: color,
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    cat['name'] as String,
-                    style: const TextStyle(
-                      color: colorText,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+  void _showArchived() {
+    final c = controller;
+    Get.bottomSheet(
+      SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Obx(() => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Kategori diarsipkan',
+                      style: AppText.title3.copyWith(color: colorText)),
+                  const SizedBox(height: 12),
+                  ListGroup(
                     children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.edit_outlined,
-                          color: colorGrey,
-                          size: 20,
+                      for (final cat in c.archived)
+                        NavRow(
+                          leading: CategoryIcon.round(
+                            iconKey: cat['icon_key'] as String?,
+                            iconPath: cat['icon_path'] as String?,
+                            color: themedColor(cat['color_val'] as int?),
+                          ),
+                          title: cat['name'] as String,
+                          subtitle: cat['type'] == 'pemasukan'
+                              ? 'Pemasukan'
+                              : 'Pengeluaran',
+                          showChevron: false,
+                          trailing: KButton.tonal(
+                            label: 'Pulihkan',
+                            onPressed: () => c.setArchived(cat, false),
+                          ),
                         ),
-                        onPressed: () {
-                          controller.isExpenseForm.value = isExpense;
-                          controller.editingId.value = id;
-                          controller.categoryName.value = cat['name'] as String;
-                          controller.selectedIconCode.value = iconCode;
-                          controller.selectedIconPath.value = iconPath;
-                          controller.selectedColor.value =
-                              cat['color'] as Color;
-                          Get.toNamed('/add-category');
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: colorExpense,
-                          size: 20,
-                        ),
-                        onPressed: () => controller.deleteCategory(id),
-                      ),
                     ],
                   ),
+                ],
+              )),
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+}
+
+class _CategoryRow extends GetView<CategoryManagementController> {
+  final Map<String, dynamic> category;
+  final int index;
+  final bool first;
+  final bool last;
+
+  const _CategoryRow({
+    super.key,
+    required this.category,
+    required this.index,
+    required this.first,
+    required this.last,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final id = category['id'] as int;
+    final count = controller.counts[id] ?? 0;
+    final budget = controller.budgets[id];
+    final subtitle = [
+      '$count transaksi',
+      if (budget != null) 'Anggaran ${CurrencyService.to.short(budget)}',
+    ].join(' · ');
+    final radius = BorderRadius.vertical(
+      top: Radius.circular(first ? 16 : 0),
+      bottom: Radius.circular(last ? 16 : 0),
+    );
+    return Container(
+      decoration: BoxDecoration(
+        color: colorCard,
+        borderRadius: radius,
+      ),
+      child: Column(
+        children: [
+          NavRow(
+            leading: CategoryIcon.round(
+              iconKey: category['icon_key'] as String?,
+              iconPath: category['icon_path'] as String?,
+              iconCode: category['icon_code'] as int?,
+              color: themedColor(category['color_val'] as int?,
+                  fallbackIndex: index),
+            ),
+            title: category['name'] as String,
+            subtitle: subtitle,
+            showChevron: false,
+            trailing: ReorderableDragStartListener(
+              index: index,
+              child: Semantics(
+                label: 'Ubah urutan ${category['name']}',
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(LucideIcons.gripVertical,
+                      size: 20, color: colorGrey),
                 ),
               ),
-            ],
-          );
-        },
-      );
-    });
+            ),
+            onTap: () => controller.openEdit(category),
+          ),
+          if (!last)
+            Padding(
+              padding: const EdgeInsets.only(left: 68),
+              child: Divider(height: 1, color: colorDivider),
+            ),
+        ],
+      ),
+    );
   }
 }

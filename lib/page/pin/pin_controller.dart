@@ -15,14 +15,21 @@ class PinController extends GetxController {
   void onInit() {
     super.onInit();
     if (isSetup) {
-      message.value = 'Lupa PIN hanya bisa diatasi dengan Reset Seluruh Data.';
+      message.value = 'PIN hanya tersimpan di HP ini. Simpan cadangan di '
+          'Google Drive agar data bisa dipulihkan bila lupa.';
     }
   }
 
   String get title {
     if (!isSetup) return 'Masukkan PIN saat ini';
-    return step.value == 0 ? 'Buat PIN 4 digit' : 'Ulangi PIN';
+    return step.value == 0
+        ? 'Buat PIN ${PinLockService.newPinLength} digit'
+        : 'Ulangi PIN';
   }
+
+  /// Digits to enter: new PINs use the board length, checks use the stored.
+  int get length =>
+      isSetup ? PinLockService.newPinLength : PinLockService.to.pinLength;
 
   Future<void> onPinEntered(String pin) async {
     if (isSetup) return _setup(pin);
@@ -35,7 +42,9 @@ class PinController extends GetxController {
       return;
     }
     final wait = PinLockService.to.secondsBlocked;
-    _error(wait > 0 ? 'Coba lagi dalam $wait detik' : 'PIN salah');
+    _error(wait > 0
+        ? 'Coba lagi dalam $wait detik'
+        : 'PIN salah. Sisa ${PinLockService.to.remainingAttempts} percobaan.');
   }
 
   Future<void> _setup(String pin) async {

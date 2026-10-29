@@ -1,36 +1,89 @@
-import 'package:flutter/material.dart';
-import 'package:artavia/widgets/components/tutorial_card.dart';
-import 'package:artavia/page/profile/profile_controller.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 import 'package:artavia/model/transaction_model.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/services/period_service.dart';
+import 'package:artavia/core/utils/data_refresh.dart';
+import 'package:artavia/core/utils/date_format.dart';
 import 'package:artavia/core/utils/finance_calc.dart';
 import 'package:artavia/widgets/commons/common.dart';
-import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'package:artavia/widgets/components/app_feedback.dart';
+
+/// One day section on Transaksi with its own totals.
+class DayGroup {
+  final DateTime day;
+  final List<TransactionModel> items;
+  final int income;
+  final int expense;
+
+  const DayGroup(this.day, this.items, this.income, this.expense);
+
+  String get label {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (day == today) return 'Hari ini';
+    if (day == today.subtract(const Duration(days: 1))) return 'Kemarin';
+    return '${IdNames.dayLong(day)}, ${day.day} ${IdNames.monthShort(day.month)}';
+  }
+}
+
+/// Budget card data: overall usage plus the category closest to its limit.
+class HomeBudget {
+  final BudgetSummary summary;
+  final String? attentionName;
+  final BudgetLevel attentionLevel;
+
+  const HomeBudget(this.summary, this.attentionName, this.attentionLevel);
+}
 
 class HomeController extends GetxController {
+  static const filters = ['Semua', 'Pengeluaran', 'Pemasukan', 'Transfer'];
+
+  /// First-account form choices (label → stored account type).
+  static const starterTypes = {
+    'Tunai': 'Kas Tunai',
+    'Bank': 'Bank',
+    'E-wallet': 'Dompet Digital',
+    'Lainnya': 'Lainnya',
+  };
+
   final isLoading = false.obs;
   final transactions = <TransactionModel>[].obs;
-  final groupedTransactions = <String, List<TransactionModel>>{}.obs;
+  final dayGroups = <DayGroup>[].obs;
+  final filter = 'Semua'.obs;
   final totalPengeluaran = 0.obs;
   final totalPemasukan = 0.obs;
   final saldoTotal = 0.obs;
-  final budget = const BudgetSummary(0, 0, 0).obs;
-  final hideBalance = false.obs;
+  final budget =
+      const HomeBudget(BudgetSummary(0, 0, 0), null, BudgetLevel.safe).obs;
+  final insight = const WeeklyInsight(0, 0).obs;
   final currentIndex = 0.obs;
 
-  final GlobalKey keyBottomNavProfile = GlobalKey();
+  /// null until loaded; false shows the welcome card (FR-018).
+  final hasAccounts = RxnBool();
+
+  // First-account form
+  final starterName = ''.obs;
+  final starterType = 'Tunai'.obs;
+  final starterBalance = 0.obs;
+  final isCreating = false.obs;
 
   Period get period => PeriodService.to.active.value;
 
-  void changePage(int index) {
-    currentIndex.value = index;
+  String get greeting {
+    final h = DateTime.now().hour;
+    if (h >= 4 && h < 11) return 'Selamat pagi';
+    if (h < 15 && h >= 11) return 'Selamat siang';
+    if (h < 18 && h >= 15) return 'Selamat sore';
+    return 'Selamat malam';
   }
 
-  void toggleHideBalance() {
-    hideBalance.value = !hideBalance.value;
+  void changePage(int index) => currentIndex.value = index;
+
+  void shiftPeriod(int months) => PeriodService.to.shift(months);
+
+  void setFilter(String value) {
+    filter.value = value;
+    _group();
   }
 
   @override
@@ -43,29 +96,27 @@ class HomeController extends GetxController {
   Future<void> loadData() async {
     isLoading.value = true;
     try {
-      final p = period;
-      final rows =
-          await DatabaseHelper.instance.readTransactionsByRange(p.start, p.end);
-      final budgets =
-          await DatabaseHelper.instance.readBudgetsByMonth(p.year, p.month);
+      final db = DatabaseHelper.instance;
+      final accounts = await db.readAllAccounts();
+      hasAccounts.value = accounts.isNotEmpty;
 
-      final loaded = rows.map(TransactionModel.fromDbRow).toList();
+      final p = period;
+      final rows = await db.readTransactionsByRange(p.start, p.end);
+      final budgets = await db.readBudgetsByMonth(p.year, p.month);
+      final now = DateTime.now();
+      final recent = await db.readTransactionsByRange(
+          startOfWeek(now).subtract(const Duration(days: 7)),
+          DateTime(now.year, now.month, now.day + 1));
+
       final income = _sum(rows, 'pemasukan');
       final expense = _sum(rows, 'pengeluaran');
       totalPemasukan.value = income;
       totalPengeluaran.value = expense;
       saldoTotal.value = income - expense;
-      transactions.value = loaded;
-      budget.value = summarizeBudget(budgets, expenseByCategoryId(rows));
-
-      // Group once here instead of in build() to keep scrolling smooth.
-      final grouped = <String, List<TransactionModel>>{};
-      for (final tx in loaded) {
-        if (tx.date == null) continue;
-        final key = DateFormat('EEEE, d MMM', 'id_ID').format(tx.date!);
-        grouped.putIfAbsent(key, () => []).add(tx);
-      }
-      groupedTransactions.value = grouped;
+      transactions.value = rows.map(TransactionModel.fromDbRow).toList();
+      insight.value = weeklyInsight(recent, now);
+      budget.value = _budget(budgets, expenseByCategoryId(rows));
+      _group();
     } catch (e) {
       Get.log('Error loading data: $e');
     } finally {
@@ -73,61 +124,79 @@ class HomeController extends GetxController {
     }
   }
 
+  HomeBudget _budget(
+      List<Map<String, dynamic>> budgets, Map<int, int> usedByCategory) {
+    String? name;
+    var level = BudgetLevel.safe;
+    var worst = -1.0;
+    for (final b in budgets) {
+      final limit = b['budget_amount'] as int;
+      final used = usedByCategory[b['category_id']] ?? 0;
+      final ratio = limit == 0 ? 0.0 : used / limit;
+      final l = budgetStatus(used, limit);
+      if (l != BudgetLevel.safe && ratio > worst) {
+        worst = ratio;
+        name = b['categoryName'] as String?;
+        level = l;
+      }
+    }
+    return HomeBudget(summarizeBudget(budgets, usedByCategory), name, level);
+  }
+
+  /// Groups once here instead of in build() to keep scrolling smooth.
+  void _group() {
+    final groups = <DateTime, List<TransactionModel>>{};
+    for (final tx in transactions) {
+      if (tx.date == null || !matchesTypeFilter(tx.type ?? '', filter.value)) {
+        continue;
+      }
+      final d = tx.date!;
+      groups.putIfAbsent(DateTime(d.year, d.month, d.day), () => []).add(tx);
+    }
+    dayGroups.value = [
+      for (final e in groups.entries)
+        DayGroup(
+          e.key,
+          e.value,
+          e.value
+              .where((t) => t.type == 'pemasukan')
+              .fold(0, (s, t) => s + (t.amount ?? 0).abs()),
+          e.value
+              .where((t) => t.type == 'pengeluaran')
+              .fold(0, (s, t) => s + (t.amount ?? 0).abs()),
+        ),
+    ];
+  }
+
   int _sum(List<Map<String, dynamic>> rows, String type) => rows
       .where((r) => r['type'] == type)
       .fold(0, (s, r) => s + (r['amount'] as int));
 
-  bool _hasShownTutorial = false;
-
-  Future<void> showTutorialIfNoAccount() async {
-    if (_hasShownTutorial) return;
-    final accounts = await DatabaseHelper.instance.readAllAccounts();
-    if (accounts.isEmpty) {
-      _hasShownTutorial = true;
-      _showTutorial();
+  /// Creates the first account from the welcome card (FR-018).
+  Future<void> createFirstAccount() async {
+    final name = starterName.value.trim();
+    if (name.isEmpty) {
+      AppToast.warning('Nama rekening', 'Isi nama rekening dulu');
+      return;
     }
-  }
-
-  void _showTutorial() {
-    final context = keyBottomNavProfile.currentContext;
-    if (context == null) return;
-    List<TargetFocus> targets = [
-      TargetFocus(
-        identify: "TargetProfileTab",
-        keyTarget: keyBottomNavProfile,
-        alignSkip: Alignment.topRight,
-        contents: [
-          TargetContent(
-            align: ContentAlign.top,
-            builder: (context, controller) {
-              return TutorialCard(
-                controller: controller,
-                title: "Mulai Dari Sini!",
-                description:
-                    "Ketuk menu Saya untuk membuat dompet atau rekening pertama Anda agar bisa mulai mencatat.",
-                isLast: true,
-              );
-            },
-          )
-        ],
-      )
-    ];
-
-    void goToProfile() {
-      changePage(3);
-      Future.delayed(const Duration(milliseconds: 400), () {
-        Get.find<ProfileController>().showTutorialIfNoAccount();
+    final type = starterTypes[starterType.value]!;
+    isCreating.value = true;
+    try {
+      await DatabaseHelper.instance.insertAccount({
+        'name': name,
+        'type': type,
+        'balance': starterBalance.value,
+        'currency_code': 'IDR',
+        'icon_key': IconRegistry.accountTypeKey(type),
+        'color_val': categoryPaletteValues[7],
+        'is_excluded': 0,
       });
+      refreshAllGlobalData();
+      AppToast.success('Rekening dibuat', 'Sekarang kamu bisa mulai mencatat');
+    } catch (_) {
+      AppToast.error('Gagal', 'Rekening tidak dapat dibuat');
+    } finally {
+      isCreating.value = false;
     }
-
-    TutorialCoachMark(
-      targets: targets,
-      colorShadow: colorScrim,
-      hideSkip: true,
-      paddingFocus: 10,
-      opacityShadow: 0.8,
-      onFinish: goToProfile,
-      onClickTarget: (_) => goToProfile(),
-    ).show(context: context);
   }
 }

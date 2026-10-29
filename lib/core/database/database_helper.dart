@@ -1,6 +1,10 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:artavia/core/database/dummy_data.dart';
+import 'package:artavia/widgets/commons/common.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -15,17 +19,36 @@ class DatabaseHelper {
     return _database!;
   }
 
+  static const dbVersion = 12;
+
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
+    return openAt(join(dbPath, filePath));
+  }
 
-    return await openDatabase(
+  /// Opens (creating/upgrading) a database file at [path]. Tests use this with
+  /// an ffi factory and an explicit [version] to build older fixtures.
+  @visibleForTesting
+  Future<Database> openAt(String path, {int version = dbVersion}) {
+    return openDatabase(
       path,
-      version: 11,
+      version: version,
       onConfigure: _onConfigure,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
+      onOpen: _onOpen,
     );
+  }
+
+  /// Indexes for the hot queries (period ranges, per-account and per-import
+  /// lookups). Idempotent, so databases already on v12 get them too.
+  Future _onOpen(Database db) async {
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_account '
+        'ON transactions(account_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_transactions_batch '
+        'ON transactions(import_batch_id)');
   }
 
   Future _onConfigure(Database db) async {
@@ -66,11 +89,16 @@ CREATE TABLE transactions (
   date $textType,
   admin_fee INTEGER NOT NULL DEFAULT 0,
   admin_fee_type TEXT,
+  import_batch_id INTEGER,
+  updated_at TEXT,
   FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE RESTRICT,
   FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE RESTRICT,
-  FOREIGN KEY (destination_account_id) REFERENCES accounts (id) ON DELETE RESTRICT
+  FOREIGN KEY (destination_account_id) REFERENCES accounts (id) ON DELETE RESTRICT,
+  FOREIGN KEY (import_batch_id) REFERENCES import_batches (id) ON DELETE SET NULL
 )
 ''');
+
+    await db.execute(_importBatchesSql);
 
     await db.execute('''
 CREATE TABLE accounts (
@@ -82,7 +110,12 @@ CREATE TABLE accounts (
   icon_code INTEGER,
   icon_path TEXT,
   color_val INTEGER,
-  is_excluded INTEGER NOT NULL DEFAULT 0
+  is_excluded INTEGER NOT NULL DEFAULT 0,
+  icon_key TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_archived INTEGER NOT NULL DEFAULT 0,
+  credit_limit INTEGER,
+  due_day INTEGER
 )
 ''');
 
@@ -93,7 +126,10 @@ CREATE TABLE categories (
   type $textType,
   icon_code INTEGER,
   icon_path TEXT,
-  color_val INTEGER
+  color_val INTEGER,
+  icon_key TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_archived INTEGER NOT NULL DEFAULT 0
 )
 ''');
 
@@ -244,6 +280,7 @@ CREATE TABLE settings (
     if (useDummyData) {
       await DummyDataGenerator.generate(db);
     }
+    await _backfillV12(db);
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -347,6 +384,82 @@ CREATE TABLE IF NOT EXISTS settings (
     if (oldVersion < 11) {
       await db.execute(_recurringRulesSql);
     }
+    if (oldVersion < 12) {
+      await db.execute(_importBatchesSql);
+      const columns = {
+        'transactions': [
+          'import_batch_id INTEGER REFERENCES import_batches (id) ON DELETE SET NULL',
+          'updated_at TEXT',
+        ],
+        'categories': [
+          'icon_key TEXT',
+          'sort_order INTEGER NOT NULL DEFAULT 0',
+          'is_archived INTEGER NOT NULL DEFAULT 0',
+        ],
+        'accounts': [
+          'icon_key TEXT',
+          'sort_order INTEGER NOT NULL DEFAULT 0',
+          'is_archived INTEGER NOT NULL DEFAULT 0',
+          'credit_limit INTEGER',
+          'due_day INTEGER',
+        ],
+      };
+      for (final entry in columns.entries) {
+        for (final col in entry.value) {
+          try {
+            await db.execute('ALTER TABLE ${entry.key} ADD COLUMN $col');
+          } catch (_) {}
+        }
+      }
+      await _backfillV12(db);
+    }
+  }
+
+  static const _importBatchesSql = '''
+CREATE TABLE IF NOT EXISTS import_batches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  file_name TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  transaction_count INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  cancelled_at TEXT
+)
+''';
+
+  /// v12 data fill: Lucide `icon_key` from legacy icons, `sort_order` from id
+  /// order, legacy colors snapped to the Kobalt palette, `updated_at` = date.
+  /// Idempotent — only touches rows that still lack the new values.
+  Future<void> _backfillV12(Database db) async {
+    final batch = db.batch();
+    for (final table in ['categories', 'accounts']) {
+      final rows = await db.query(table, orderBy: 'id ASC');
+      for (var i = 0; i < rows.length; i++) {
+        final r = rows[i];
+        final hasKey = IconRegistry.contains(r['icon_key'] as String?);
+        final legacy = IconRegistry.legacyToKey(
+            iconPath: r['icon_path'] as String?,
+            iconCode: r['icon_code'] as int?);
+        final key = hasKey
+            ? r['icon_key']
+            : table == 'accounts' && legacy == IconRegistry.fallbackKey
+                ? IconRegistry.accountTypeKey(r['type'] as String? ?? '')
+                : legacy;
+        final color = r['color_val'] as int?;
+        batch.update(
+          table,
+          {
+            'icon_key': key,
+            if (!hasKey) 'sort_order': i,
+            if (color != null) 'color_val': nearestPaletteValue(color),
+          },
+          where: 'id = ?',
+          whereArgs: [r['id']],
+        );
+      }
+    }
+    batch.rawUpdate(
+        'UPDATE transactions SET updated_at = date WHERE updated_at IS NULL');
+    await batch.commit(noResult: true);
   }
 
   // ─── Transactions (read) ─────────────────────────────────────────────────
@@ -355,6 +468,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
   static const transactionSelect = '''
       SELECT t.*, c.name as categoryName, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal,
+             c.icon_key as categoryIconKey, c.is_archived as categoryIsArchived,
              a.name as accountName, da.name as destinationAccountName
       FROM transactions t
       LEFT JOIN categories c ON t.category_id = c.id
@@ -387,16 +501,72 @@ CREATE TABLE IF NOT EXISTS settings (
   Future<List<Map<String, dynamic>>> searchTransactions(String query) async {
     final db = await instance.database;
     return db.rawQuery(
-      '$transactionSelect WHERE t.note LIKE ? OR c.name LIKE ? ORDER BY t.date DESC',
-      ['%$query%', '%$query%'],
+      '$transactionSelect WHERE t.note LIKE ? OR c.name LIKE ? '
+      'OR a.name LIKE ? OR da.name LIKE ? ORDER BY t.date DESC',
+      List.filled(4, '%$query%'),
     );
+  }
+
+  /// How often each category was used for [type] (Catat grid ranking).
+  Future<Map<int, int>> categoryUsage(String type) async {
+    final db = await instance.database;
+    final rows = await db.rawQuery(
+      'SELECT category_id, COUNT(*) AS n FROM transactions '
+      'WHERE type = ? AND category_id IS NOT NULL GROUP BY category_id',
+      [type],
+    );
+    return {for (final r in rows) r['category_id'] as int: r['n'] as int};
+  }
+
+  /// Transactions that use an account (either side of a transfer).
+  Future<int> countAccountTransactions(int accountId) async {
+    final db = await instance.database;
+    final r = await db.rawQuery(
+        'SELECT COUNT(*) AS n FROM transactions '
+        'WHERE account_id = ? OR destination_account_id = ?',
+        [accountId, accountId]);
+    return r.first['n'] as int;
+  }
+
+  /// Transactions per category id (Kategori list subtitles, delete dialog).
+  Future<Map<int, int>> transactionCountByCategory() async {
+    final db = await instance.database;
+    final rows =
+        await db.rawQuery('SELECT category_id, COUNT(*) AS n FROM transactions '
+            'WHERE category_id IS NOT NULL GROUP BY category_id');
+    return {for (final r in rows) r['category_id'] as int: r['n'] as int};
+  }
+
+  /// Persists a manual order: `sort_order` = position in [ids].
+  Future<void> saveSortOrder(String table, List<int> ids) async {
+    final db = await instance.database;
+    final batch = db.batch();
+    for (var i = 0; i < ids.length; i++) {
+      batch.update(table, {'sort_order': i},
+          where: 'id = ?', whereArgs: [ids[i]]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Import history, newest first, with how many of each batch's rows are
+  /// still present and how many were edited after the import.
+  Future<List<Map<String, dynamic>>> readImportBatches() async {
+    final db = await instance.database;
+    return db.rawQuery('''
+      SELECT b.*,
+        (SELECT COUNT(*) FROM transactions t WHERE t.import_batch_id = b.id)
+          AS remaining,
+        (SELECT COUNT(*) FROM transactions t WHERE t.import_batch_id = b.id
+          AND t.updated_at > b.created_at) AS edited
+      FROM import_batches b ORDER BY b.created_at DESC
+    ''');
   }
 
   // ─── Accounts CRUD ───────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> readAllAccounts() async {
     final db = await instance.database;
-    return await db.query('accounts', orderBy: 'type ASC, name ASC');
+    return await db.query('accounts', orderBy: 'sort_order ASC, name ASC');
   }
 
   Future<int> insertAccount(Map<String, dynamic> account) async {
@@ -419,7 +589,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
   Future<List<Map<String, dynamic>>> readAllCategories() async {
     final db = await instance.database;
-    return await db.query('categories');
+    return await db.query('categories', orderBy: 'sort_order ASC, id ASC');
   }
 
   Future<int> insertCategory(Map<String, dynamic> category) async {
@@ -444,7 +614,7 @@ CREATE TABLE IF NOT EXISTS settings (
       int year, int month) async {
     final db = await instance.database;
     return await db.rawQuery('''
-      SELECT b.*, c.name as categoryName, c.type as categoryType, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal 
+      SELECT b.*, c.name as categoryName, c.type as categoryType, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal, c.icon_key as categoryIconKey
       FROM budgets b
       INNER JOIN categories c ON b.category_id = c.id
       WHERE b.year = ? AND b.month = ?
@@ -520,7 +690,7 @@ CREATE TABLE IF NOT EXISTS settings (
   Future<List<Map<String, dynamic>>> readRecurringRules() async {
     final db = await instance.database;
     return db.rawQuery('''
-      SELECT r.*, c.name as categoryName, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal,
+      SELECT r.*, c.name as categoryName, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal, c.icon_key as categoryIconKey,
              a.name as accountName
       FROM recurring_rules r
       LEFT JOIN categories c ON r.category_id = c.id
@@ -545,8 +715,21 @@ CREATE TABLE IF NOT EXISTS settings (
   }
 
   Future close() async {
-    final db = await instance.database;
-    db.close();
+    final db = _database;
+    _database = null;
+    await db?.close();
+  }
+
+  /// Absolute path of the live database file.
+  Future<String> databaseFilePath() async =>
+      join(await getDatabasesPath(), 'artavia.db');
+
+  /// Swaps the live database for [file] (already integrity-checked) and
+  /// reopens it, which runs `onUpgrade` for older backups.
+  Future<void> replaceDatabaseWith(File file) async {
+    await close();
+    await file.copy(await databaseFilePath());
+    await database;
   }
 
   Future<void> resetDatabase() async {

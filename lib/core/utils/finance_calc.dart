@@ -11,10 +11,29 @@ class NetWorth {
   int get net => asset - liability;
 }
 
+/// Excluded ("tidak dihitung") and archived accounts never count toward net
+/// worth, so every screen shows the same number.
 bool isExcludedAccount(Map<String, dynamic> account) {
   final value = account['is_excluded'] ?? account['exclude_from_total'];
-  return value == true || value == 1;
+  return value == true || value == 1 || account['is_archived'] == 1;
 }
+
+/// Rekening groups (board order) for an account type.
+const accountGroups = [
+  'Kas & bank',
+  'E-wallet',
+  'Investasi',
+  'Kartu kredit & utang',
+  'Lainnya',
+];
+
+String accountGroup(String? type) => switch (type) {
+      'Kas Tunai' || 'Bank' || 'Tabungan' || 'Kas Pribadi' => 'Kas & bank',
+      'Dompet Digital' => 'E-wallet',
+      'Investasi' || 'Investasi Aset' => 'Investasi',
+      'Kartu Kredit' || 'Pinjaman' => 'Kartu kredit & utang',
+      _ => 'Lainnya',
+    };
 
 NetWorth computeNetWorth(Iterable<Map<String, dynamic>> accounts) {
   var asset = 0;
@@ -148,4 +167,108 @@ BudgetSummary summarizeBudget(
     if (spent > limit) over++;
   }
   return BudgetSummary(total, used, over);
+}
+
+/// Catat category grid (FR-009): most-used first, then manual `sort_order`,
+/// then id. Archived categories are skipped. [usage] maps category id → count.
+List<Map<String, dynamic>> rankCategories(
+  Iterable<Map<String, dynamic>> categories,
+  Map<int, int> usage, {
+  int? limit,
+}) {
+  final list = categories.where((c) => (c['is_archived'] ?? 0) != 1).toList()
+    ..sort((a, b) {
+      final byUse = (usage[b['id']] ?? 0).compareTo(usage[a['id']] ?? 0);
+      if (byUse != 0) return byUse;
+      final byOrder = ((a['sort_order'] as int?) ?? 0)
+          .compareTo((b['sort_order'] as int?) ?? 0);
+      if (byOrder != 0) return byOrder;
+      return (a['id'] as int).compareTo(b['id'] as int);
+    });
+  return limit == null ? list : list.take(limit).toList();
+}
+
+// ─── Insight ──────────────────────────────────────────────────────────────────
+
+/// Expense this week (Mon → today) vs the same span last week (FR-014).
+class WeeklyInsight {
+  final int thisWeek;
+  final int lastWeek;
+
+  const WeeklyInsight(this.thisWeek, this.lastWeek);
+
+  /// Change in percent, or null when last week had nothing to compare with.
+  int? get percent =>
+      lastWeek == 0 ? null : ((thisWeek - lastWeek) * 100 / lastWeek).round();
+
+  bool get isLower => (percent ?? 0) < 0;
+
+  String get text {
+    final p = percent;
+    if (thisWeek == 0 && lastWeek == 0) {
+      return 'Belum ada pengeluaran minggu ini.';
+    }
+    if (p == null) return 'Belum ada pembanding dari minggu lalu.';
+    if (p == 0) return 'Pengeluaran minggu ini sama dengan minggu lalu.';
+    return p < 0
+        ? 'Pengeluaran minggu ini ${-p}% lebih hemat dari minggu lalu.'
+        : 'Pengeluaran minggu ini $p% lebih tinggi dari minggu lalu.';
+  }
+}
+
+WeeklyInsight weeklyInsight(
+    Iterable<Map<String, dynamic>> transactions, DateTime now) {
+  final start = startOfWeek(now);
+  final end = DateTime(now.year, now.month, now.day + 1);
+  final lastStart = start.subtract(const Duration(days: 7));
+  final lastEnd = end.subtract(const Duration(days: 7));
+  var thisWeek = 0, lastWeek = 0;
+  for (final t in transactions) {
+    if (t['type'] != 'pengeluaran') continue;
+    final d = DateTime.parse(t['date'] as String);
+    final amount = t['amount'] as int;
+    if (!d.isBefore(start) && d.isBefore(end)) thisWeek += amount;
+    if (!d.isBefore(lastStart) && d.isBefore(lastEnd)) lastWeek += amount;
+  }
+  return WeeklyInsight(thisWeek, lastWeek);
+}
+
+// ─── Budget status ────────────────────────────────────────────────────────────
+
+enum BudgetLevel { safe, near, over }
+
+/// >= 80 % = near ("Perlu perhatian", yellow); above the limit = over (red).
+BudgetLevel budgetStatus(int used, int limit) {
+  if (limit <= 0) return used > 0 ? BudgetLevel.over : BudgetLevel.safe;
+  if (used > limit) return BudgetLevel.over;
+  if (used * 10 >= limit * 8) return BudgetLevel.near;
+  return BudgetLevel.safe;
+}
+
+/// "Aman dibelanjakan ± Rp X per hari" — 0 when nothing is left.
+int safeDailySpend(int remaining, int daysLeft) =>
+    remaining <= 0 || daysLeft <= 0 ? 0 : remaining ~/ daysLeft;
+
+/// Suggested monthly limit per category: average monthly expense over the
+/// months that have data (max [months]), rounded up to 50.000.
+Map<int, int> budgetSuggestions(
+  Iterable<Map<String, dynamic>> transactions, {
+  int months = 3,
+}) {
+  final totals = <int, int>{};
+  final monthKeys = <String>{};
+  for (final t in transactions) {
+    final cat = t['category_id'] as int?;
+    if (t['type'] != 'pengeluaran' || cat == null) continue;
+    final d = DateTime.parse(t['date'] as String);
+    monthKeys.add('${d.year}-${d.month}');
+    totals[cat] = (totals[cat] ?? 0) + (t['amount'] as int);
+  }
+  if (monthKeys.isEmpty) return {};
+  final n = monthKeys.length.clamp(1, months);
+  const step = 50000;
+  return {
+    for (final e in totals.entries)
+      if (e.value > 0) e.key: ((e.value / n) / step).ceil() * step,
+  };
 }

@@ -67,6 +67,20 @@ class CalendarController extends GetxController {
     }
   }
 
+  int get monthIncome =>
+      dailyData.values.fold(0, (s, d) => s + (d['income'] ?? 0));
+  int get monthExpense =>
+      dailyData.values.fold(0, (s, d) => s + (d['expense'] ?? 0));
+
+  /// "Hari ini" chip: jump the grid and the list back to today.
+  void goToday() {
+    final now = DateTime.now();
+    final sameMonth = focusedDay.value.year == now.year &&
+        focusedDay.value.month == now.month;
+    onDaySelected(now, now);
+    if (!sameMonth) loadMonth(now);
+  }
+
   int get selectedDayExpense {
     final normalized = DateTime(
         selectedDay.value.year, selectedDay.value.month, selectedDay.value.day);

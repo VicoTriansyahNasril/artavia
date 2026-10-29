@@ -1,647 +1,199 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/page/account_management/account_management_controller.dart';
-import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/widgets/kobalt/kobalt.dart';
 
+/// Tambah / ubah rekening: live preview, name, type, balance, credit card
+/// fields, color, icon, "tidak dihitung", and archive/delete when editing.
 class AddAccountScreen extends GetView<AccountManagementController> {
   const AddAccountScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) {
-        controller.showAddAccountTutorialIfNoAccount(context);
-      }
-    });
-
-    return Scaffold(
-      backgroundColor: colorBackground,
-      appBar: AppBar(
-        backgroundColor: colorBackground,
-        title: Obx(() => Text(
-              controller.isEditMode ? 'Edit Rekening' : 'Tambah Rekening',
-            )),
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () {
-            controller.resetForm();
-            Get.back();
-          },
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: TextButton(
-              key: controller.keyAddAccountSave,
-              onPressed: controller.saveAccount,
-              style: TextButton.styleFrom(
-                backgroundColor: colorAccent,
-                foregroundColor: colorOnAccent,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Simpan',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ─── Live Preview Card ────────────────────────────────────────
-            _AccountPreviewCard(controller: controller),
-            const SizedBox(height: 24),
-
-            // ─── Tipe Rekening ────────────────────────────────────────────
-            const _SectionLabel('Tipe Rekening'),
-            const SizedBox(height: 10),
-            _TypeSelectorGrid(controller: controller),
-            const SizedBox(height: 24),
-
-            // ─── Informasi Rekening ───────────────────────────────────────
-            const _SectionLabel('Nama & Saldo'),
-            const SizedBox(height: 10),
-            Container(
-              key: controller.keyAddAccountForm,
-              child: _InfoCard(controller: controller),
-            ),
-            const SizedBox(height: 24),
-
-            // ─── Mata Uang ────────────────────────────────────────────────
-            const _SectionLabel('Mata Uang'),
-            const SizedBox(height: 10),
-            _CurrencyChips(controller: controller),
-            const SizedBox(height: 24),
-
-            // ─── Pilih Ikon ───────────────────────────────────────────────
-            const _SectionLabel('Ikon Rekening'),
-            const SizedBox(height: 10),
-            _IconPickerGrid(controller: controller),
-            const SizedBox(height: 24),
-
-            // ─── Warna ────────────────────────────────────────────────────
-            const _SectionLabel('Warna Ikon'),
-            const SizedBox(height: 10),
-            _ColorPicker(controller: controller),
-            const SizedBox(height: 24),
-
-            // ─── Toggle ───────────────────────────────────────────────────
-            _ExcludeToggle(controller: controller),
-            const SizedBox(height: 28),
-
-            // ─── Save Button ──────────────────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: controller.saveAccount,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorAccent,
-                  foregroundColor: colorOnAccent,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'Simpan Rekening',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Preview Card ─────────────────────────────────────────────────────────────
-
-class _AccountPreviewCard extends StatelessWidget {
-  final AccountManagementController controller;
-  const _AccountPreviewCard({required this.controller});
+  static final _digits = [
+    FilteringTextInputFormatter.digitsOnly,
+    LengthLimitingTextInputFormatter(12),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final color = Color(controller.selectedColorVal.value);
-      final iconCode = controller.selectedIconCode.value;
-      final iconPath = controller.selectedIconPath.value;
-      final name = controller.accountName.value.isEmpty
-          ? 'Nama Rekening'
-          : controller.accountName.value;
-      final balance = controller.balance.value;
-      final currency = controller.currencyCode.value;
-      final type = controller.typeValue.value;
-
-      return AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: colorCard,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
-        ),
-        child: Row(
-          children: [
-            // Icon container
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: CategoryIcon(
-                iconCode: iconCode,
-                iconPath: iconPath,
-                color: color,
-                size: 26,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: colorText,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    type,
-                    style: const TextStyle(color: colorGrey, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  currency,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _formatBalance(balance),
-                  style: TextStyle(
-                    color: balance < 0 ? colorExpense : colorText,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
-  String _formatBalance(int amount) {
-    final sign = amount < 0 ? '-' : '';
-    final abs = amount.abs();
-    final formatted = abs.toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (m) => '${m[1]}.',
-        );
-    return '$sign$formatted';
-  }
-}
-
-// ─── Type Selector ────────────────────────────────────────────────────────────
-
-class _TypeSelectorGrid extends StatelessWidget {
-  final AccountManagementController controller;
-  const _TypeSelectorGrid({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Obx(() => Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: AccountManagementController.accountTypes.map((type) {
-            final isSelected = controller.typeValue.value == type.label;
-            final color = Color(type.defaultColorVal);
-            return GestureDetector(
-              onTap: () => controller.onTypeSelected(type),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isSelected ? color.withValues(alpha: 0.15) : colorCard,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isSelected ? color : colorDivider,
-                    width: 1.5,
-                  ),
-                ),
-                child: Text(
-                  type.label,
-                  style: TextStyle(
-                    color: isSelected ? color : colorGrey,
-                    fontSize: 13,
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ));
-  }
-}
-
-// ─── Info Card (Name + Balance) ────────────────────────────────────────────────
-
-class _InfoCard extends StatelessWidget {
-  final AccountManagementController controller;
-  const _InfoCard({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: colorCard,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          // Name field
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 110,
-                  child: Text('Nama Rekening',
-                      style: TextStyle(color: colorGrey, fontSize: 14)),
-                ),
-                Expanded(
-                  child: TextField(
-                    autofocus: false,
-                    controller: controller.nameController,
-                    onChanged: (v) => controller.accountName.value = v,
-                    style: const TextStyle(color: colorText, fontSize: 15),
-                    decoration: const InputDecoration(
-                      hintText: 'cth: BCA, GoPay, Dompet',
-                      hintStyle: TextStyle(color: colorGrey, fontSize: 14),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      final c = controller;
+      final color = themedColor(c.colorVal.value);
+      final version = c.formVersion.value;
+      return AppScaffold(
+        leading: ScaffoldLeading.close,
+        title: c.isEditMode ? 'Ubah rekening' : 'Rekening baru',
+        bottom: GlassCard(
+          level: GlassLevel.regular,
+          borderRadius: BorderRadius.zero,
+          shadow: false,
+          padding: EdgeInsets.fromLTRB(
+              16, 12, 16, 12 + MediaQuery.paddingOf(context).bottom),
+          child: KButton(
+            label: 'Simpan rekening',
+            onPressed: c.isWorking.value ? null : c.saveAccount,
           ),
-          const Divider(color: colorDivider, height: 1, indent: 16),
-          // Balance field
-          Obx(() => Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 110,
-                      child: Text('Saldo Awal',
-                          style: TextStyle(color: colorGrey, fontSize: 14)),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: controller.balanceController,
-                        onChanged: (v) {
-                          controller.balance.value = int.tryParse(
-                                  v.replaceAll(RegExp(r'[^0-9\-]'), '')) ??
-                              0;
-                        },
-                        keyboardType:
-                            const TextInputType.numberWithOptions(signed: true),
-                        inputFormatters: [
-                          LengthLimitingTextInputFormatter(16),
-                          FilteringTextInputFormatter.allow(
-                              RegExp(r'^-?[0-9.,]*')),
-                          CurrencyInputFormatter(),
-                        ],
-                        style: const TextStyle(color: colorText, fontSize: 15),
-                        decoration: InputDecoration(
-                          hintText: '0',
-                          hintStyle:
-                              const TextStyle(color: colorGrey, fontSize: 14),
-                          border: InputBorder.none,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 14),
-                          prefixText: '${controller.currencyCode.value} ',
-                          prefixStyle:
-                              const TextStyle(color: colorGrey, fontSize: 14),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Currency Chips ───────────────────────────────────────────────────────────
-
-class _CurrencyChips extends StatelessWidget {
-  final AccountManagementController controller;
-  const _CurrencyChips({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Obx(() => SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: AccountManagementController.supportedCurrencies.map((c) {
-              final isSelected = controller.currencyCode.value == c['code'];
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () => controller.onCurrencySelected(c['code']!),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? colorAccent.withValues(alpha: 0.15)
-                          : colorCard,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isSelected ? colorAccent : colorDivider,
-                        width: 1.5,
-                      ),
-                    ),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          children: [
+            GlassCard(
+              child: Row(
+                children: [
+                  CategoryIcon.round(
+                      iconKey: c.iconKey.value, color: color, diameter: 48),
+                  const SizedBox(width: 14),
+                  Expanded(
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          c['symbol']!,
-                          style: TextStyle(
-                            color: isSelected ? colorAccent : colorText,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          c['code']!,
-                          style: TextStyle(
-                            color: isSelected ? colorAccent : colorGrey,
-                            fontSize: 10,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                          ),
-                        ),
+                            c.accountName.value.trim().isEmpty
+                                ? 'Nama rekening'
+                                : c.accountName.value.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.title3.copyWith(color: colorText)),
+                        Text(c.typeValue.value, style: AppText.caption.onGlass),
                       ],
                     ),
                   ),
-                ),
-              );
-            }).toList(),
-          ),
-        ));
-  }
-}
-
-// ─── Icon Picker Grid ─────────────────────────────────────────────────────────
-
-class _IconPickerGrid extends StatelessWidget {
-  final AccountManagementController controller;
-  const _IconPickerGrid({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Obx(() {
-      final selectedColor = Color(controller.selectedColorVal.value);
-
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: colorCard,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 6,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          children: [
-            ...AccountManagementController.accountTypes.map((type) {
-              final isSelected =
-                  controller.selectedIconCode.value == type.defaultIconCode;
-              return GestureDetector(
-                onTap: () {
-                  controller.selectedIconCode.value = type.defaultIconCode;
-                  controller.selectedIconPath.value = null;
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? selectedColor.withValues(alpha: 0.18)
-                        : colorSurface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected ? selectedColor : Colors.transparent,
-                      width: 1.5,
+                  Text(CurrencyService.to.money(c.balance.value),
+                      style: AppText.rowAmount.copyWith(color: colorText)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            KField(
+              key: ValueKey('name$version'),
+              label: 'Nama',
+              hint: 'Mis. BCA, GoPay, Dompet',
+              initialValue: c.accountName.value,
+              maxLength: 30,
+              onChanged: (v) => c.accountName.value = v,
+            ),
+            const SectionHeader(title: 'Jenis'),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final t in AccountManagementController.accountTypes)
+                  KChip(
+                    label: t,
+                    selected: c.typeValue.value == t,
+                    onTap: () => c.onTypeSelected(t),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            KField(
+              key: ValueKey('balance$version'),
+              label: c.isCreditCard ? 'Tagihan saat ini' : 'Saldo',
+              hint: '0',
+              initialValue:
+                  c.balance.value == 0 ? '' : '${c.balance.value.abs()}',
+              prefix: Text(c.balance.value < 0 ? '−Rp' : 'Rp',
+                  style: AppText.body.muted),
+              keyboardType: TextInputType.number,
+              inputFormatters: _digits,
+              helper: c.isCreditCard || c.typeValue.value == 'Pinjaman'
+                  ? 'Dicatat sebagai utang (saldo minus).'
+                  : null,
+              onChanged: (v) {
+                final n = int.tryParse(v) ?? 0;
+                final debt = c.isCreditCard || c.typeValue.value == 'Pinjaman';
+                c.balance.value = debt ? -n : n;
+              },
+            ),
+            if (c.isCreditCard) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: KField(
+                      key: ValueKey('limit$version'),
+                      label: 'Limit',
+                      hint: '0',
+                      initialValue: c.creditLimit.value == 0
+                          ? ''
+                          : '${c.creditLimit.value}',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: _digits,
+                      onChanged: (v) =>
+                          c.creditLimit.value = int.tryParse(v) ?? 0,
                     ),
                   ),
-                  child: Icon(
-                    type.icon,
-                    color: isSelected ? selectedColor : colorGrey,
-                  ),
-                ),
-              );
-            }),
-            ...AccountManagementController.keuanganIcons.map((iconPath) {
-              final isSelected = controller.selectedIconPath.value == iconPath;
-              return GestureDetector(
-                onTap: () => controller.onIconSelected(iconPath),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? selectedColor.withValues(alpha: 0.18)
-                        : colorSurface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected ? selectedColor : Colors.transparent,
-                      width: 1.5,
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 120,
+                    child: KField(
+                      key: ValueKey('due$version'),
+                      label: 'Jatuh tempo (tgl)',
+                      hint: '1–31',
+                      initialValue:
+                          c.dueDay.value == null ? '' : '${c.dueDay.value}',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(2),
+                      ],
+                      state: (c.dueDay.value ?? 1) > 31
+                          ? KFieldState.error
+                          : KFieldState.normal,
+                      onChanged: (v) {
+                        final n = int.tryParse(v);
+                        c.dueDay.value =
+                            n == null || n < 1 ? null : (n > 31 ? 31 : n);
+                      },
                     ),
                   ),
-                  padding: const EdgeInsets.all(8),
-                  child: Image.asset(
-                    iconPath,
-                    color: isSelected ? selectedColor : colorGrey,
+                ],
+              ),
+            ],
+            const SectionHeader(title: 'Warna'),
+            PaletteColorPicker(
+              value: c.colorVal.value,
+              onChanged: (v) => c.colorVal.value = v,
+            ),
+            const SectionHeader(title: 'Ikon'),
+            IconPicker(
+              selected: c.iconKey.value,
+              color: color,
+              onSelect: (k) => c.iconKey.value = k,
+            ),
+            const SizedBox(height: 8),
+            ListGroup(
+              children: [
+                NavRow(
+                  icon: LucideIcons.eyeOff,
+                  title: 'Jangan hitung di kekayaan bersih',
+                  subtitle: 'Mis. dana titipan atau rekening bersama',
+                  showChevron: false,
+                  trailing: KSwitch(
+                    value: c.excludeFromTotal.value,
+                    semanticLabel: 'Jangan hitung di kekayaan bersih',
+                    onChanged: (v) => c.excludeFromTotal.value = v,
                   ),
+                  onTap: () =>
+                      c.excludeFromTotal.value = !c.excludeFromTotal.value,
                 ),
-              );
-            }),
+              ],
+            ),
+            if (c.isEditMode) ...[
+              const SizedBox(height: 20),
+              KButton.danger(
+                label: 'Hapus rekening',
+                icon: LucideIcons.trash2,
+                onPressed: () => c.deleteAccount({
+                  'id': c.editingId.value,
+                  'name': c.accountName.value,
+                }),
+              ),
+            ],
           ],
         ),
       );
     });
-  }
-}
-
-// ─── Color Picker ─────────────────────────────────────────────────────────────
-
-class _ColorPicker extends StatelessWidget {
-  final AccountManagementController controller;
-  const _ColorPicker({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorCard,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Obx(() => Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: controller.presetColors.map((color) {
-              final isSelected =
-                  controller.selectedColorVal.value == color.toARGB32();
-              return GestureDetector(
-                onTap: () => controller.onColorSelected(color),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? colorText : Colors.transparent,
-                      width: 2.5,
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                                color: color.withValues(alpha: 0.5),
-                                blurRadius: 8,
-                                spreadRadius: 1)
-                          ]
-                        : null,
-                  ),
-                  child: isSelected
-                      ? const Icon(Icons.check_rounded,
-                          color: colorOnAccent, size: 18)
-                      : null,
-                ),
-              );
-            }).toList(),
-          )),
-    );
-  }
-}
-
-// ─── Exclude Toggle ───────────────────────────────────────────────────────────
-
-class _ExcludeToggle extends StatelessWidget {
-  final AccountManagementController controller;
-  const _ExcludeToggle({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: colorCard,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: colorSurface,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child:
-                const Icon(Icons.bar_chart_rounded, color: colorGrey, size: 20),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Kecualikan dari Total',
-                  style: TextStyle(
-                    color: colorText,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Saldo tidak dihitung dalam kekayaan bersih',
-                  style: TextStyle(color: colorGrey, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          Obx(() => Switch(
-                value: controller.excludeFromTotal.value,
-                onChanged: (val) => controller.excludeFromTotal.value = val,
-              )),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Section Label ────────────────────────────────────────────────────────────
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text.toUpperCase(),
-      style: const TextStyle(
-        color: colorGrey,
-        fontSize: 11,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 0.8,
-      ),
-    );
   }
 }

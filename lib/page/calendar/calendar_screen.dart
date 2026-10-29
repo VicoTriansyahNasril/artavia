@@ -1,213 +1,203 @@
 import 'package:flutter/material.dart';
-import 'package:artavia/core/utils/currency_format.dart';
 import 'package:get/get.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:intl/intl.dart';
+import 'package:artavia/core/utils/currency_format.dart';
+import 'package:artavia/core/utils/date_format.dart';
 import 'package:artavia/page/calendar/calendar_controller.dart';
-import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/widgets/kobalt/kobalt.dart';
 import 'package:artavia/widgets/transaction/transaction_item.dart';
-import 'package:artavia/model/transaction_model.dart';
 
+/// Kalender (board, FR-024): month summary, grid with grey (expense) and
+/// green (income) dots, and the selected day's transactions.
 class CalendarScreen extends GetView<CalendarController> {
   const CalendarScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: colorBackground,
-      appBar: AppBar(
-        backgroundColor: colorBackground,
-        title: const Text('Kalender',
-            style: TextStyle(color: colorText, fontSize: 18)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: colorText),
-          onPressed: () => Get.back(),
+    return AppScaffold(
+      leading: ScaffoldLeading.back,
+      title: 'Kalender',
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: KChip(label: 'Hari ini', onTap: controller.goToday),
         ),
-      ),
-      body: Column(
-        children: [
-          // Calendar (fixed)
-          Container(
-            color: colorCard,
-            child: Obx(() {
-              // Force Obx to rebuild when dailyData changes (e.g. after async load)
-              final _ = controller.dailyData.length;
-              return TableCalendar(
-                firstDay: DateTime.utc(2020, 1, 1),
-                lastDay: DateTime.utc(2030, 12, 31),
-                focusedDay: controller.focusedDay.value,
-                selectedDayPredicate: (day) =>
-                    isSameDay(controller.selectedDay.value, day),
-                onDaySelected: controller.onDaySelected,
-                onPageChanged: controller.onPageChanged,
-                calendarFormat: CalendarFormat.month,
-                headerStyle: const HeaderStyle(
-                  formatButtonVisible: false,
-                  titleCentered: true,
-                  titleTextStyle: TextStyle(
-                      color: colorText,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold),
-                  leftChevronIcon: Icon(Icons.chevron_left, color: colorText),
-                  rightChevronIcon: Icon(Icons.chevron_right, color: colorText),
-                ),
-                daysOfWeekStyle: const DaysOfWeekStyle(
-                  weekdayStyle: TextStyle(color: colorGrey, fontSize: 12),
-                  weekendStyle: TextStyle(color: colorExpense, fontSize: 12),
-                ),
-                calendarStyle: CalendarStyle(
-                  defaultTextStyle:
-                      const TextStyle(color: colorText, fontSize: 13),
-                  weekendTextStyle:
-                      const TextStyle(color: colorExpense, fontSize: 13),
-                  outsideTextStyle:
-                      const TextStyle(color: colorGrey, fontSize: 13),
-                  selectedDecoration: const BoxDecoration(
-                      color: colorAccent, shape: BoxShape.circle),
-                  selectedTextStyle: const TextStyle(
-                      color: colorOnAccent, fontWeight: FontWeight.bold),
-                  todayDecoration: BoxDecoration(
-                      border: Border.all(color: colorAccent, width: 1.5),
-                      shape: BoxShape.circle),
-                  todayTextStyle: const TextStyle(color: colorAccent),
-                  cellMargin: const EdgeInsets.all(4),
-                ),
-                calendarBuilders: CalendarBuilders(
-                  markerBuilder: (context, day, events) {
-                    final key = DateTime(day.year, day.month, day.day);
-                    final data = controller.dailyData[key];
-                    if (data == null) return null;
-                    final expense = data['expense'] ?? 0;
-                    final income = data['income'] ?? 0;
-                    if (expense == 0 && income == 0) return null;
-
-                    final net = income - expense;
-                    if (net == 0) return null;
-
-                    final isIncome = net > 0;
-                    final absNet = net.abs();
-                    final color = isIncome ? colorIncome : colorExpense;
-                    final prefix = isIncome ? '+' : '-';
-                    final text =
-                        NumberFormat.compact(locale: 'id_ID').format(absNet);
-
-                    return Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Center(
-                        child: Text(
-                          '$prefix$text',
-                          style: TextStyle(
-                            color: color,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 1,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              );
-            }),
-          ),
-
-          // Daily summary bar
-          Obx(() {
-            final exp = controller.selectedDayExpense;
-            final inc = controller.selectedDayIncome;
-            if (exp == 0 && inc == 0) return const SizedBox.shrink();
-            return Container(
-              color: colorBackground,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
+      ],
+      body: Obx(() {
+        final c = controller;
+        c.dailyData.length;
+        c.selectedDayTransactions.length;
+        final focused = c.focusedDay.value;
+        final selected = c.selectedDay.value;
+        final money = CurrencyService.to;
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          children: [
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Obx(() => Text(
-                        DateFormat('dd MMM', 'id_ID')
-                            .format(controller.selectedDay.value),
-                        style: const TextStyle(
-                            color: colorGrey,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600),
-                      )),
-                  const Spacer(),
-                  if (inc > 0) ...[
-                    const Icon(Icons.arrow_downward_rounded,
-                        color: colorIncome, size: 14),
-                    const SizedBox(width: 4),
-                    Text(CurrencyService.to.formatWithoutSymbol(inc),
-                        style: const TextStyle(
-                            color: colorIncome,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold)),
-                  ],
-                  if (inc > 0 && exp > 0) const SizedBox(width: 16),
-                  if (exp > 0) ...[
-                    const Icon(Icons.arrow_upward_rounded,
-                        color: colorExpense, size: 14),
-                    const SizedBox(width: 4),
-                    Text(CurrencyService.to.formatWithoutSymbol(exp),
-                        style: const TextStyle(
-                            color: colorExpense,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold)),
-                  ],
-                ],
-              ),
-            );
-          }),
-
-          // Transaction list for selected day
-          Expanded(
-            child: Obx(() {
-              if (controller.isLoadingDetail.value) {
-                return const Center(
-                    child: CircularProgressIndicator(color: colorAccent));
-              }
-              if (controller.selectedDayTransactions.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                  Text('${IdNames.monthLong(focused.month)} ${focused.year}',
+                      style: AppText.caption.onGlass),
+                  const SizedBox(height: 4),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                        money.money(c.monthIncome - c.monthExpense,
+                            signed: true),
+                        style: AppText.amountL.copyWith(color: colorText)),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
                     children: [
-                      Icon(Icons.event_note_rounded,
-                          size: 48, color: colorGrey.withValues(alpha: 0.3)),
-                      const SizedBox(height: 12),
-                      Obx(() => Text(
-                            'Tidak ada transaksi pada ${DateFormat('dd MMM', 'id_ID').format(controller.selectedDay.value)}',
-                            style:
-                                const TextStyle(color: colorGrey, fontSize: 13),
-                            textAlign: TextAlign.center,
-                          )),
+                      Expanded(
+                          child:
+                              _figure('Pemasukan', c.monthIncome, colorIncome)),
+                      Expanded(
+                          child: _figure(
+                              'Pengeluaran', c.monthExpense, colorDanger)),
                     ],
                   ),
-                );
-              }
-
-              return ListView(
-                children: controller.selectedDayTransactions
-                    .asMap()
-                    .entries
-                    .map((entry) {
-                  int i = entry.key;
-                  TransactionModel tx = entry.value;
-                  return Column(
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            KCard(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+              child: Column(
+                children: [
+                  TableCalendar(
+                    locale: 'id_ID',
+                    firstDay: DateTime.utc(2000, 1, 1),
+                    lastDay: DateTime.utc(2100, 12, 31),
+                    focusedDay: focused,
+                    startingDayOfWeek: StartingDayOfWeek.monday,
+                    selectedDayPredicate: (d) => isSameDay(selected, d),
+                    onDaySelected: c.onDaySelected,
+                    onPageChanged: c.onPageChanged,
+                    calendarFormat: CalendarFormat.month,
+                    availableGestures: AvailableGestures.horizontalSwipe,
+                    rowHeight: 46,
+                    headerStyle: HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                      titleTextStyle: AppText.title3.copyWith(color: colorText),
+                      leftChevronIcon: Icon(LucideIcons.chevronLeft,
+                          size: 20, color: colorText),
+                      rightChevronIcon: Icon(LucideIcons.chevronRight,
+                          size: 20, color: colorText),
+                    ),
+                    daysOfWeekStyle: DaysOfWeekStyle(
+                      weekdayStyle: AppText.caption.muted,
+                      weekendStyle: AppText.caption.muted,
+                    ),
+                    calendarStyle: CalendarStyle(
+                      outsideDaysVisible: false,
+                      defaultTextStyle:
+                          AppText.bodySmall.copyWith(color: colorText),
+                      weekendTextStyle:
+                          AppText.bodySmall.copyWith(color: colorText),
+                      todayDecoration: BoxDecoration(
+                          color: colorAccentDim, shape: BoxShape.circle),
+                      todayTextStyle: AppText.bodySmall.w600.accent,
+                      selectedDecoration: BoxDecoration(
+                          color: colorAccent, shape: BoxShape.circle),
+                      selectedTextStyle:
+                          AppText.bodySmall.w600.copyWith(color: colorOnAccent),
+                    ),
+                    calendarBuilders: CalendarBuilders(
+                      markerBuilder: (context, day, _) {
+                        final d =
+                            c.dailyData[DateTime(day.year, day.month, day.day)];
+                        if (d == null) return null;
+                        return Positioned(
+                          bottom: 4,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if ((d['expense'] ?? 0) > 0) _dot(colorGrey),
+                              if ((d['income'] ?? 0) > 0) _dot(colorIncome),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 16,
                     children: [
-                      if (i > 0)
-                        const Divider(
-                          color: colorBackground,
-                          height: 1,
-                          indent: 64,
-                        ),
-                      TransactionItem(tx: tx),
+                      _legend(colorGrey, 'Pengeluaran'),
+                      _legend(colorIncome, 'Pemasukan'),
                     ],
-                  );
-                }).toList(),
-              );
-            }),
-          ),
-        ],
-      ),
+                  ),
+                ],
+              ),
+            ),
+            if (c.selectedDayTransactions.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                    'Tidak ada transaksi pada ${IdNames.shortDate(selected)}',
+                    textAlign: TextAlign.center,
+                    style: AppText.bodySmall.muted),
+              )
+            else
+              ListGroup(
+                title:
+                    '${IdNames.dayLong(selected)}, ${IdNames.shortDate(selected)}',
+                titleAction: Text(
+                    money.money(c.selectedDayIncome - c.selectedDayExpense,
+                        signed: true),
+                    style: AppText.caption.w600.copyWith(color: colorGrey)),
+                children: [
+                  for (final t in c.selectedDayTransactions)
+                    TransactionItem(tx: t),
+                ],
+              ),
+          ],
+        );
+      }),
     );
   }
+
+  static Widget _legend(Color color, String label) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _dot(color),
+          const SizedBox(width: 4),
+          Text(label, style: AppText.caption.muted),
+        ],
+      );
+
+  static Widget _dot(Color color) => Container(
+        width: 6,
+        height: 6,
+        margin: const EdgeInsets.symmetric(horizontal: 1),
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
+
+  static Widget _figure(String label, int amount, Color color) => Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppText.caption.onGlass),
+                Text(CurrencyService.to.money(amount),
+                    style: AppText.rowAmount.copyWith(color: colorText)),
+              ],
+            ),
+          ),
+        ],
+      );
 }

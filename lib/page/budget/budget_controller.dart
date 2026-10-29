@@ -1,33 +1,86 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/services/period_service.dart';
-import 'package:artavia/core/utils/currency_format.dart';
-import 'package:artavia/core/utils/finance_calc.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
-import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/core/utils/finance_calc.dart';
 import 'package:artavia/widgets/components/app_feedback.dart';
 
+/// One budget row with its usage this period.
+class BudgetItem {
+  final int id;
+  final int categoryId;
+  final String name;
+  final int limit;
+  final int used;
+  final int? colorVal;
+  final String? iconKey;
+  final String? iconPath;
+  final int? iconCode;
+
+  const BudgetItem({
+    required this.id,
+    required this.categoryId,
+    required this.name,
+    required this.limit,
+    required this.used,
+    this.colorVal,
+    this.iconKey,
+    this.iconPath,
+    this.iconCode,
+  });
+
+  BudgetLevel get level => budgetStatus(used, limit);
+  int get left => limit - used;
+  double get ratio => limit == 0 ? 1 : used / limit;
+}
+
+/// Suggested limit for a category without a budget (board "Saran").
+class BudgetSuggestion {
+  final Map<String, dynamic> category;
+  final int amount;
+  const BudgetSuggestion(this.category, this.amount);
+}
+
+/// Anggaran (FR-022): hero with remaining + safe daily spend, "Perlu
+/// perhatian" (≥ 80 % / over) and "Aman" groups, and suggestions from the
+/// last 3 months when nothing is budgeted yet.
 class BudgetController extends GetxController {
   final isLoading = false.obs;
+  final isWorking = false.obs;
+  final items = <BudgetItem>[].obs;
+  final suggestions = <BudgetSuggestion>[].obs;
 
-  // Budget items: {id, category_id, category, budget_amount, used, color, icon_code, icon_path}
-  final budgetItems = <Map<String, dynamic>>[].obs;
-
-  int get totalBudget =>
-      budgetItems.fold(0, (s, i) => s + (i['budget_amount'] as int));
-  int get totalUsed => budgetItems.fold(0, (s, i) => s + (i['used'] as int));
-
-  /// Expense categories available for a new budget.
-  final availableCategories = <Map<String, dynamic>>[].obs;
-
-  final RxBool isWorking = false.obs;
+  /// Expense categories (non-archived) for the add sheet.
+  final categories = <Map<String, dynamic>>[].obs;
 
   PeriodService get _period => PeriodService.to;
+  Period get period => _period.active.value;
 
-  /// Shared with Riwayat and Grafik (FR-021).
-  String get monthLabel => _period.active.value.label;
+  int get totalLimit => items.fold(0, (s, i) => s + i.limit);
+  int get totalUsed => items.fold(0, (s, i) => s + i.used);
+  int get remaining => totalLimit - totalUsed;
+
+  List<BudgetItem> get attention =>
+      items.where((i) => i.level != BudgetLevel.safe).toList()
+        ..sort((a, b) => b.ratio.compareTo(a.ratio));
+  List<BudgetItem> get safe =>
+      items.where((i) => i.level == BudgetLevel.safe).toList();
+
+  /// Days left in the active period, counting today.
+  int get daysLeft {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final p = period;
+    if (!today.isBefore(p.end)) return 0;
+    final from = today.isBefore(p.start) ? p.start : today;
+    return p.end.difference(from).inDays;
+  }
+
+  int get safeDaily => safeDailySpend(remaining, daysLeft);
+
+  List<Map<String, dynamic>> get unbudgeted => categories
+      .where((c) => !items.any((i) => i.categoryId == c['id']))
+      .toList();
 
   @override
   void onInit() {
@@ -36,165 +89,94 @@ class BudgetController extends GetxController {
     loadData();
   }
 
-  void prevMonth() => _period.shift(-1);
-
-  void nextMonth() => _period.shift(1);
+  void shift(int months) => _period.shift(months);
 
   Future<void> loadData() async {
     isLoading.value = true;
     try {
-      final p = _period.active.value;
+      final p = period;
       final db = DatabaseHelper.instance;
       final budgets = await db.readBudgetsByMonth(p.year, p.month);
-      final transactions = await db.readTransactionsByRange(p.start, p.end);
+      final rows = await db.readTransactionsByRange(p.start, p.end);
       final cats = await db.readAllCategories();
-      availableCategories.value =
-          cats.where((c) => c['type'] == 'pengeluaran').toList();
+      categories.value = cats
+          .where((c) => c['type'] == 'pengeluaran' && c['is_archived'] != 1)
+          .toList();
 
-      final used = expenseByCategoryId(transactions);
-      budgetItems.value = [
-        for (var i = 0; i < budgets.length; i++)
-          {
-            'id': budgets[i]['id'],
-            'category_id': budgets[i]['category_id'] as int?,
-            'category': budgets[i]['categoryName'] as String? ?? '',
-            'budget_amount': budgets[i]['budget_amount'] as int,
-            'used': used[budgets[i]['category_id']] ?? 0,
-            'color': budgets[i]['categoryColorVal'] as int? ??
-                paletteColorAt(i).toARGB32(),
-            'icon_code': budgets[i]['categoryIconCode'] as int?,
-            'icon_path': budgets[i]['categoryIconPath'] as String?,
-          },
+      final used = expenseByCategoryId(rows);
+      items.value = [
+        for (final b in budgets)
+          BudgetItem(
+            id: b['id'] as int,
+            categoryId: b['category_id'] as int,
+            name: b['categoryName'] as String? ?? '',
+            limit: b['budget_amount'] as int,
+            used: used[b['category_id']] ?? 0,
+            colorVal: b['categoryColorVal'] as int?,
+            iconKey: b['categoryIconKey'] as String?,
+            iconPath: b['categoryIconPath'] as String?,
+            iconCode: b['categoryIconCode'] as int?,
+          ),
       ];
+
+      suggestions.clear();
+      if (items.isEmpty) {
+        final history =
+            await db.readTransactionsByRange(p.shift(-3).start, p.start);
+        final s = budgetSuggestions(history);
+        suggestions.value = [
+          for (final c in categories)
+            if (s[c['id']] != null) BudgetSuggestion(c, s[c['id']]!),
+        ]..sort((a, b) => b.amount.compareTo(a.amount));
+      }
     } finally {
       isLoading.value = false;
     }
   }
 
-  void showAddBudgetDialog(BuildContext context) {
-    final formKey = GlobalKey<FormState>();
-    int? categoryId;
-    final amountCtrl = TextEditingController();
-
-    _showBudgetDialog(
-      title: 'Tambah Anggaran',
-      formKey: formKey,
-      amountCtrl: amountCtrl,
-      categoryField: DropdownButtonFormField<int>(
-        dropdownColor: colorSurface,
-        decoration: const InputDecoration(labelText: 'Kategori'),
-        items: availableCategories
-            .map((c) => DropdownMenuItem<int>(
-                  value: c['id'] as int,
-                  child: Text(c['name'] as String),
-                ))
-            .toList(),
-        validator: (v) => v == null ? 'Pilih kategori' : null,
-        onChanged: (v) => categoryId = v,
-      ),
-      onSave: (amount) => _save(categoryId!, amount),
-    );
-  }
-
-  void showEditBudgetDialog(BuildContext context, Map<String, dynamic> item) {
-    final amountCtrl = TextEditingController(
-        text: CurrencyService.to
-            .formatWithoutSymbol(item['budget_amount'] as int));
-    _showBudgetDialog(
-      title: 'Anggaran ${item['category']}',
-      formKey: GlobalKey<FormState>(),
-      amountCtrl: amountCtrl,
-      onSave: (amount) => _save(item['category_id'] as int, amount),
-    );
-  }
-
-  void _showBudgetDialog({
-    required String title,
-    required GlobalKey<FormState> formKey,
-    required TextEditingController amountCtrl,
-    required Future<void> Function(int amount) onSave,
-    Widget? categoryField,
-  }) {
-    int parse() =>
-        int.tryParse(amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-
-    Get.dialog(
-      AlertDialog(
-        title: Text(title),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (categoryField != null) ...[
-                categoryField,
-                const SizedBox(height: 12)
-              ],
-              TextFormField(
-                controller: amountCtrl,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: colorText),
-                decoration: const InputDecoration(
-                    labelText: 'Batas per bulan', prefixText: 'Rp '),
-                inputFormatters: [
-                  LengthLimitingTextInputFormatter(16),
-                  FilteringTextInputFormatter.allow(RegExp(r'^[0-9.,]*')),
-                  CurrencyInputFormatter(),
-                ],
-                validator: (_) => parse() <= 0 ? 'Masukkan nominal' : null,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Batal', style: TextStyle(color: colorGrey)),
-          ),
-          FilledButton(
-            onPressed: () async {
-              if (isWorking.value || !formKey.currentState!.validate()) return;
-              await onSave(parse());
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _save(int categoryId, int amount) async {
+  Future<void> save(int categoryId, int amount, {bool close = true}) async {
+    if (amount <= 0 || isWorking.value) return;
     isWorking.value = true;
     try {
-      final p = _period.active.value;
+      final p = period;
       await DatabaseHelper.instance.upsertBudget(
-        categoryId: categoryId,
-        amount: amount,
-        month: p.month,
-        year: p.year,
-      );
-      Get.back();
+          categoryId: categoryId, amount: amount, month: p.month, year: p.year);
+      if (close) Get.back();
       refreshAllGlobalData();
-      AppToast.success('Berhasil', 'Anggaran disimpan');
+      AppToast.success('Anggaran disimpan', 'Berlaku untuk ${p.longLabel}');
     } finally {
       isWorking.value = false;
     }
   }
 
-  Future<void> deleteBudget(Map<String, dynamic> item) async {
+  /// "Pakai" on a suggestion.
+  Future<void> useSuggestion(BudgetSuggestion s) =>
+      save(s.category['id'] as int, s.amount, close: false);
+
+  Future<void> useAllSuggestions() async {
+    final p = period;
+    for (final s in suggestions) {
+      await DatabaseHelper.instance.upsertBudget(
+          categoryId: s.category['id'] as int,
+          amount: s.amount,
+          month: p.month,
+          year: p.year);
+    }
+    refreshAllGlobalData();
+    AppToast.success('Anggaran dibuat', '${suggestions.length} kategori');
+  }
+
+  Future<void> delete(BudgetItem item) async {
     final ok = await AppDialog.confirm(
-      title: 'Hapus Anggaran',
-      message: 'Hapus anggaran ${item['category']} untuk $monthLabel?',
-      confirmLabel: 'Hapus',
+      title: 'Hapus anggaran ${item.name}?',
+      message: 'Batas untuk ${period.longLabel} akan dihapus. '
+          'Transaksinya tidak berubah.',
+      confirmLabel: 'Hapus anggaran',
       destructive: true,
     );
-    if (!ok || isWorking.value) return;
-    isWorking.value = true;
-    try {
-      await DatabaseHelper.instance.deleteBudget(item['id'] as int);
-      refreshAllGlobalData();
-    } finally {
-      isWorking.value = false;
-    }
+    if (!ok) return;
+    await DatabaseHelper.instance.deleteBudget(item.id);
+    Get.back();
+    refreshAllGlobalData();
   }
 }
