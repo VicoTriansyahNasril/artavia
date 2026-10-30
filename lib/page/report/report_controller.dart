@@ -12,7 +12,13 @@ class CategoryShare {
   final int amount;
   final int count;
   final double percent;
-  final Color color;
+
+  /// Stored category color; resolved per theme in [color].
+  final int? colorVal;
+  final int fallbackIndex;
+
+  /// The "Lainnya" donut slice, drawn muted.
+  final bool isRest;
   final String? iconKey;
   final String? iconPath;
   final int? iconCode;
@@ -22,11 +28,17 @@ class CategoryShare {
     required this.amount,
     required this.count,
     required this.percent,
-    required this.color,
+    this.colorVal,
+    this.fallbackIndex = 11,
+    this.isRest = false,
     this.iconKey,
     this.iconPath,
     this.iconCode,
   });
+
+  /// Resolved at build time so a theme switch recolors the donut and legend.
+  Color get color =>
+      isRest ? colorGrey : themedColor(colorVal, fallbackIndex: fallbackIndex);
 }
 
 /// One bar of the trend chart.
@@ -259,8 +271,8 @@ class ReportController extends GetxController {
             amount: amount,
             count: list[i].value.length,
             percent: total == 0 ? 0 : amount * 100 / total,
-            color: themedColor(first['categoryColorVal'] as int?,
-                fallbackIndex: i),
+            colorVal: first['categoryColorVal'] as int?,
+            fallbackIndex: i,
             iconKey: first['categoryIconKey'] as String?,
             iconPath: first['categoryIconPath'] as String?,
             iconCode: first['categoryIconCode'] as int?,
@@ -280,7 +292,7 @@ class ReportController extends GetxController {
         amount: rest.fold(0, (s, c) => s + c.amount),
         count: rest.fold(0, (s, c) => s + c.count),
         percent: rest.fold(0.0, (s, c) => s + c.percent),
-        color: colorGrey,
+        isRest: true,
         iconKey: 'lainnya',
       ),
     ];

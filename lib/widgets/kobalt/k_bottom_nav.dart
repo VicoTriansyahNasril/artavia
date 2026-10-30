@@ -28,32 +28,53 @@ class KBottomNav extends StatelessWidget {
   });
 
   static const _items = [
-    _NavItem(LucideIcons.receiptText, 'Transaksi'),
+    _NavItem(LucideIcons.list, 'Transaksi'),
     _NavItem(LucideIcons.chartPie, 'Laporan'),
     _NavItem(LucideIcons.wallet, 'Rekening'),
-    _NavItem(LucideIcons.settings, 'Pengaturan'),
+    _NavItem(LucideIcons.user, 'Pengaturan'),
   ];
+
+  static const _barHeight = 84.0 - 20;
+
+  /// How far the Catat button sticks out above the bar.
+  static const _catatOverhang = 20.0;
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    return GlassCard(
-      level: GlassLevel.regular,
-      borderRadius: BorderRadius.zero,
-      padding: EdgeInsets.only(bottom: bottomInset),
-      shadow: false,
-      child: SizedBox(
-        height: 84 - 20,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _slot(0),
-            _slot(1),
-            Expanded(child: _CatatButton(onTap: onCatat)),
-            _slot(2),
-            _slot(3),
-          ],
-        ),
+    // The Catat button sits outside the glass card: GlassCard clips its
+    // child, which would cut off the raised part of the button. The overhang
+    // is part of this widget's height so the raised part stays tappable.
+    return SizedBox(
+      height: _catatOverhang + _barHeight + bottomInset,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            top: _catatOverhang,
+            child: GlassCard(
+              level: GlassLevel.regular,
+              borderRadius: BorderRadius.zero,
+              padding: EdgeInsets.only(bottom: bottomInset),
+              shadow: false,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _slot(0),
+                  _slot(1),
+                  const Spacer(),
+                  _slot(2),
+                  _slot(3),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Center(child: _CatatButton(onTap: onCatat)),
+          ),
+        ],
       ),
     );
   }
@@ -105,7 +126,7 @@ class KBottomNav extends StatelessWidget {
   }
 }
 
-/// Center "Catat" button: 52 px accent circle raised 12 px into the bar.
+/// Center "Catat" button: 52 px accent circle raised above the bar.
 class _CatatButton extends StatelessWidget {
   final VoidCallback onTap;
   const _CatatButton({required this.onTap});
@@ -116,27 +137,19 @@ class _CatatButton extends StatelessWidget {
       button: true,
       label: 'Catat transaksi',
       excludeSemantics: true,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Transform.translate(
-            offset: const Offset(0, -12),
-            child: Material(
-              color: colorAccent,
-              shape: const CircleBorder(),
-              elevation: 0,
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: onTap,
-                child: SizedBox(
-                  width: 52,
-                  height: 52,
-                  child: Icon(LucideIcons.plus, size: 26, color: colorOnAccent),
-                ),
-              ),
-            ),
+      child: Material(
+        color: colorAccent,
+        shape: const CircleBorder(),
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            width: 52,
+            height: 52,
+            child: Icon(LucideIcons.plus, size: 26, color: colorOnAccent),
           ),
-        ],
+        ),
       ),
     );
   }

@@ -32,7 +32,9 @@ class AppPalette {
   final Color switchOff;
   final Color switchThumbOff;
 
-  // Glass layers (fill) + edges
+  // Glass layers (fill) + edges. Ultra/thin/regular are lighter than the
+  // digest for an iOS-like look; thick stays opaque enough for unblurred
+  // dialogs and sheets.
   final Color glassUltra;
   final Color glassThin;
   final Color glassRegular;
@@ -106,9 +108,9 @@ class AppPalette {
     warning: Color(0xFFE0B25C),
     switchOff: Color(0xFF3A404B),
     switchThumbOff: Color(0xFFE7E9EE),
-    glassUltra: Color(0x66161A21),
-    glassThin: Color(0x8C161A21),
-    glassRegular: Color(0xB3181C24),
+    glassUltra: Color(0x40161A21),
+    glassThin: Color(0x5C161A21),
+    glassRegular: Color(0x80181C24),
     glassThick: Color(0xD11C2029),
     glassBorder: Color(0x0DFFFFFF),
     glassHighlight: Color(0x1FFFFFFF),
@@ -151,9 +153,9 @@ class AppPalette {
     warning: Color(0xFFA86E12),
     switchOff: Color(0xFFC9CED6),
     switchThumbOff: Color(0xFFFFFFFF),
-    glassUltra: Color(0x66FFFFFF),
-    glassThin: Color(0x8CFFFFFF),
-    glassRegular: Color(0xB3FFFFFF),
+    glassUltra: Color(0x4DFFFFFF),
+    glassThin: Color(0x6BFFFFFF),
+    glassRegular: Color(0x8CFFFFFF),
     glassThick: Color(0xE6FFFFFF),
     glassBorder: Color(0x0F0B0D12),
     glassHighlight: Color(0xB3FFFFFF),

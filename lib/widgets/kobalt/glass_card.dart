@@ -26,6 +26,24 @@ Color glassFill(GlassLevel level) {
   };
 }
 
+/// Saturation matrix (Rec. 709 luma) for the digest's "saturate 180 %".
+List<double> _saturation(double s) {
+  const r = 0.2126, g = 0.7152, b = 0.0722;
+  final i = 1 - s;
+  return [
+    r * i + s, g * i, b * i, 0, 0, //
+    r * i, g * i + s, b * i, 0, 0, //
+    r * i, g * i, b * i + s, 0, 0, //
+    0, 0, 0, 1, 0,
+  ];
+}
+
+/// iOS-style backdrop: boost what's behind the glass, then blur it.
+final ImageFilter _glassFilter = ImageFilter.compose(
+  outer: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+  inner: ColorFilter.matrix(_saturation(1.8)),
+);
+
 /// Frosted card: backdrop blur, 1 px border, inset top highlight, soft shadow.
 class GlassCard extends StatelessWidget {
   final GlassLevel level;
@@ -77,10 +95,7 @@ class GlassCard extends StatelessWidget {
         borderRadius: borderRadius,
         child: solid
             ? box
-            : BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                child: box,
-              ),
+            : BackdropFilter(filter: _glassFilter, child: box),
       ),
     );
   }
