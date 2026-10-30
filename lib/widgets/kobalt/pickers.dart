@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/widgets/kobalt/k_chip.dart';
 import 'package:artavia/widgets/kobalt/k_field.dart';
+import 'package:artavia/widgets/kobalt/sheet.dart';
 
 /// The 12 palette colors as round radios. [value] is a canonical (dark)
 /// palette value; the swatch shows the active theme's variant.
@@ -112,17 +113,20 @@ class IconGrid extends StatelessWidget {
   }
 }
 
-/// Inline picker: group chips + grid, with "Cari dari 107 ikon".
+/// Inline picker: group chips + grid, with "Cari dari 107 ikon". With
+/// [entries] it shows just that set as one grid (no groups, no search).
 class IconPicker extends StatefulWidget {
   final String? selected;
   final Color color;
   final ValueChanged<String> onSelect;
+  final List<IconEntry>? entries;
 
   const IconPicker({
     super.key,
     required this.selected,
     required this.color,
     required this.onSelect,
+    this.entries,
   });
 
   @override
@@ -136,6 +140,18 @@ class _IconPickerState extends State<IconPicker> {
 
   @override
   Widget build(BuildContext context) {
+    final entries = widget.entries;
+    if (entries != null) {
+      // Keep an earlier pick from the full set visible and selected.
+      final keep = IconRegistry.contains(widget.selected) &&
+          !entries.any((e) => e.key == widget.selected);
+      return IconGrid(
+        entries: [if (keep) IconRegistry.byKey(widget.selected), ...entries],
+        selected: widget.selected,
+        color: widget.color,
+        onSelect: widget.onSelect,
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -186,7 +202,7 @@ class _IconPickerState extends State<IconPicker> {
 /// Search sheet over all icons (Indonesian labels). Returns the chosen key.
 Future<String?> showIconSearch({String? selected, required Color color}) {
   final query = ''.obs;
-  return Get.bottomSheet<String>(
+  return showSheet<String>(
     SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(

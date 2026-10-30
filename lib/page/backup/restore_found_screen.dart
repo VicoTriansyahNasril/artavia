@@ -125,7 +125,7 @@ class RestoreFoundScreen extends GetView<BackupController> {
 
   void _pickOther(BackupController c) {
     final fmt = DateFormat('d MMM yyyy, HH.mm', 'id_ID');
-    Get.bottomSheet(
+    showSheet(
       SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

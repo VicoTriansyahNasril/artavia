@@ -49,6 +49,13 @@ void main() {
             home: const AddTransactionScreen(),
           ));
           await tester.pump();
+          // Pengeluaran/Pemasukan show the keypad once a category is picked.
+          expect(find.bySemanticsLabel('Simpan'),
+              tab == 'Transfer' ? findsOneWidget : findsNothing);
+          if (tab != 'Transfer') {
+            c.selectCategory(c.categories.first['id'] as int);
+            await tester.pumpAndSettle();
+          }
 
           for (final k in '6 0 0 000'.split(' ')) {
             c.onKey(k);

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
+import 'package:artavia/core/database/transaction_store.dart';
 import 'package:artavia/core/services/period_service.dart';
 import 'package:artavia/core/services/settings_service.dart';
 import 'package:artavia/core/utils/transfer_math.dart';
@@ -56,8 +57,9 @@ void main() {
     expect(c.amount.value, 57500);
     expect(c.expression.value, '45.000 + 12.500');
     c.selectAccount(gopay);
-    c.selectCategory(c.gridCategories.first['id'] as int);
-    expect(c.gridCategories.length, lessThanOrEqualTo(10));
+    expect(c.showKeypad, isFalse);
+    c.selectCategory(c.categories.first['id'] as int);
+    expect(c.showKeypad, isTrue);
 
     await c.save();
 
@@ -70,6 +72,33 @@ void main() {
     // FR-010: the next Catat opens on the last used account.
     final next = await _openCatat();
     expect(next.selectedAccountId.value, gopay);
+  });
+
+  test('Catat shows every category in the manual order, ignoring usage',
+      () async {
+    final c = await _openCatat();
+    final ids = [for (final cat in c.categories) cat['id'] as int];
+    expect(ids, hasLength(greaterThan(10)));
+
+    // Heavy use of the last category must not move it up...
+    await db.addTransaction({
+      'type': 'pengeluaran',
+      'amount': 1000,
+      'note': '',
+      'category_id': ids.last,
+      'account_id': bca,
+      'date': DateTime.now().toIso8601String(),
+    });
+    // ...only the manual order does.
+    final manual = [ids.last, ...ids.take(ids.length - 1)];
+    await db.saveSortOrder('categories', manual);
+    final next = await _openCatat();
+    expect([for (final cat in next.categories) cat['id']], manual);
+    expect(next.showKeypad, isFalse);
+
+    await next.save(); // no category, no amount → nothing saved
+    next.onTabChanged('Transfer');
+    expect(next.showKeypad, isTrue);
   });
 
   test('result ≤ 0 disables Simpan and shows the error', () async {

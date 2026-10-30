@@ -20,13 +20,7 @@ class ReportScreen extends GetView<ReportController> {
       color: colorAccent,
       child: Obx(() {
         final empty = controller.total.value == 0;
-        // Children are plain widgets: read what they show so this rebuilds.
-        PrivacyService.to.masked.value;
-        controller
-          ..previousTotal.value
-          ..bars.length
-          ..shares.length
-          ..breakdown.length;
+        final hasTrend = controller.bars.any((b) => b.amount > 0);
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
           children: [
@@ -75,8 +69,11 @@ class ReportScreen extends GetView<ReportController> {
                 ],
               ),
             ],
-            const SizedBox(height: 12),
-            const _TrendCard(),
+            // Nothing in the whole trend window: skip the empty chart.
+            if (hasTrend) ...[
+              const SizedBox(height: 12),
+              const _TrendCard(),
+            ],
             if (empty)
               EmptyState(
                 icon: LucideIcons.chartPie,
@@ -100,8 +97,11 @@ class ReportScreen extends GetView<ReportController> {
 class _TotalCard extends GetView<ReportController> {
   const _TotalCard();
 
+  // Const, so the parent's Obx never rebuilds it: observe here instead.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => _build(context));
+
+  Widget _build(BuildContext context) {
     final income = controller.isIncome.value;
     final change = controller.changePercent;
     // Spending less, or earning more, is the good direction.
@@ -174,8 +174,11 @@ class _TotalCard extends GetView<ReportController> {
 class _TrendCard extends GetView<ReportController> {
   const _TrendCard();
 
+  // Const, so the parent's Obx never rebuilds it: observe here instead.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => _build(context));
+
+  Widget _build(BuildContext context) {
     final bars = controller.bars;
     final max = bars.fold<int>(0, (m, b) => b.amount > m ? b.amount : m);
     final money = CurrencyService.to;
@@ -279,8 +282,11 @@ class _DashedBar extends CustomPainter {
 class _DonutCard extends GetView<ReportController> {
   const _DonutCard();
 
+  // Const, so the parent's Obx never rebuilds it: observe here instead.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => _build(context));
+
+  Widget _build(BuildContext context) {
     final shares = controller.shares;
     return KCard(
       padding: const EdgeInsets.all(16),
@@ -351,8 +357,11 @@ class _DonutCard extends GetView<ReportController> {
 class _Breakdown extends GetView<ReportController> {
   const _Breakdown();
 
+  // Const, so the parent's Obx never rebuilds it: observe here instead.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Obx(() => _build(context));
+
+  Widget _build(BuildContext context) {
     final items = controller.breakdown;
     final max = items.isEmpty ? 1 : items.first.amount;
     final money = CurrencyService.to;

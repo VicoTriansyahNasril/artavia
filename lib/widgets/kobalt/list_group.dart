@@ -108,62 +108,69 @@ class NavRow extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 52),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: [
-              leading ??
-                  (icon != null
-                      ? Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                              color: softFill(tint),
-                              borderRadius: BorderRadius.circular(12)),
-                          child: Icon(icon, size: 20, color: tint),
-                        )
-                      : const SizedBox.shrink()),
-              if (leading != null || icon != null) const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        style: AppText.body
-                            .copyWith(color: danger ? colorDanger : colorText)),
-                    if (subtitle != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(subtitle!, style: AppText.caption.muted),
-                      ),
-                  ],
-                ),
-              ),
-              // Trailing parts may shrink so large text never overflows.
-              if (trailingText != null)
-                Flexible(
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Text(trailingText!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.end,
-                        style: AppText.bodySmall
-                            .copyWith(color: trailingColor ?? colorGrey)),
+          child: LayoutBuilder(builder: (context, box) {
+            // Trailing parts hug the right edge but are capped, so the title
+            // keeps the rest and large text never overflows. (A Flexible here
+            // split the row 1:1 and parked them mid-row.)
+            final cap = BoxConstraints(maxWidth: box.maxWidth * .4);
+            return Row(
+              children: [
+                leading ??
+                    (icon != null
+                        ? Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                                color: softFill(tint),
+                                borderRadius: BorderRadius.circular(12)),
+                            child: Icon(icon, size: 20, color: tint),
+                          )
+                        : const SizedBox.shrink()),
+                if (leading != null || icon != null) const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: AppText.body.copyWith(
+                              color: danger ? colorDanger : colorText)),
+                      if (subtitle != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(subtitle!, style: AppText.caption.muted),
+                        ),
+                    ],
                   ),
                 ),
-              if (trailing != null)
-                Flexible(
-                  child: Padding(
+                if (trailingText != null)
+                  ConstrainedBox(
+                    constraints: cap,
+                    child: Padding(
                       padding: const EdgeInsets.only(left: 8),
-                      child: trailing!),
-                )
-              else if (showChevron && onTap != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Icon(LucideIcons.chevronRight,
-                      size: 18, color: colorGrey),
-                ),
-            ],
-          ),
+                      child: Text(trailingText!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                          style: AppText.bodySmall
+                              .copyWith(color: trailingColor ?? colorGrey)),
+                    ),
+                  ),
+                if (trailing != null)
+                  ConstrainedBox(
+                    constraints: cap,
+                    child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: trailing!),
+                  )
+                else if (showChevron && onTap != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Icon(LucideIcons.chevronRight,
+                        size: 18, color: colorGrey),
+                  ),
+              ],
+            );
+          }),
         ),
       ),
     );

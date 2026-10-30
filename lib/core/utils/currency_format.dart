@@ -67,30 +67,59 @@ class CurrencyService {
   }
 }
 
+/// Live thousands grouping for Rupiah inputs ("1250000" → "1.250.000"),
+/// following the separator setting. Digits only; keeps the cursor next to
+/// the same digit while regrouping.
 class CurrencyInputFormatter extends TextInputFormatter {
+  CurrencyInputFormatter({this.maxDigits = 12});
+
+  final int maxDigits;
+
+  static final _nonDigit = RegExp(r'[^0-9]');
+
+  /// "1.250.000" → 1250000 (0 when empty).
+  static int parse(String text) =>
+      int.tryParse(text.replaceAll(_nonDigit, '')) ?? 0;
+
+  /// 1250000 → "1.250.000"; 0 → "" so the field shows its hint.
+  static String initial(int value) =>
+      value == 0 ? '' : CurrencyService.to.formatWithoutSymbol(value.abs());
+
   @override
   TextEditingValue formatEditUpdate(
       TextEditingValue oldValue, TextEditingValue newValue) {
-    if (newValue.selection.baseOffset == 0) {
-      return newValue;
-    }
-    bool isNegative = newValue.text.startsWith('-');
-    String numStr = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (numStr.isEmpty) {
-      return newValue.copyWith(text: isNegative ? '-' : '');
+    final text = newValue.text;
+    final cursor = newValue.selection.end.clamp(0, text.length);
+    var before = text.substring(0, cursor).replaceAll(_nonDigit, '');
+    final after = text.substring(cursor).replaceAll(_nonDigit, '');
+
+    // Backspace over a separator removes the digit before it instead.
+    final deletedSeparator = text.length < oldValue.text.length &&
+        before.length + after.length ==
+            oldValue.text.replaceAll(_nonDigit, '').length;
+    if (deletedSeparator && before.isNotEmpty) {
+      before = before.substring(0, before.length - 1);
     }
 
-    final int value = int.parse(numStr);
+    final digits = (before + after).replaceFirst(RegExp(r'^0+(?=\d)'), '');
+    if (digits.isEmpty) return const TextEditingValue();
+    if (digits.length > maxDigits) return oldValue;
+
     final separator = CurrencyService.to.groupSeparator;
-    final formatted = value.toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (m) => '${m[1]}$separator',
-        );
-    final result = isNegative ? '-$formatted' : formatted;
+    final formatted = digits.replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+$)'),
+      (m) => '${m[1]}$separator',
+    );
 
-    return newValue.copyWith(
-      text: result,
-      selection: TextSelection.collapsed(offset: result.length),
+    var offset = formatted.length;
+    for (var seen = 0; offset > 0 && seen < after.length;) {
+      offset--;
+      if (formatted[offset] != separator) seen++;
+    }
+    if (offset > 0 && formatted[offset - 1] == separator) offset--;
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: offset),
     );
   }
 }

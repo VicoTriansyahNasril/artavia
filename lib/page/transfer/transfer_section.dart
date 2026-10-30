@@ -46,7 +46,15 @@ class TransferSection extends GetView<TransferController> {
         children: [
           _PairCard(controller: controller),
           const SizedBox(height: 16),
-          _label('Jumlah transfer'),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Expanded(child: _label('Jumlah transfer', bottom: 0)),
+                const CatatDateChip(),
+              ],
+            ),
+          ),
           _AmountField(controller: controller),
           const SizedBox(height: 16),
           _label('Biaya admin'),
@@ -72,8 +80,8 @@ class TransferSection extends GetView<TransferController> {
     });
   }
 
-  static Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(left: 4, bottom: 8),
+  static Widget _label(String text, {double bottom = 8}) => Padding(
+        padding: EdgeInsets.only(left: 4, bottom: bottom),
         child: Text(text, style: AppText.label.copyWith(color: colorGrey)),
       );
 }

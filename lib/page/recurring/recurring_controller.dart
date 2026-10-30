@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/models/recurring_rule.dart';
 import 'package:artavia/core/services/recurring_service.dart';
+import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
 import 'package:artavia/page/routes.dart';
 import 'package:artavia/widgets/components/app_feedback.dart';
@@ -69,8 +70,7 @@ class RecurringController extends GetxController {
     accountId.value = rule?.accountId ?? accounts.first['id'] as int;
     frequency.value = rule?.frequency ?? RecurringFrequency.monthly;
     startDate.value = rule?.startDate ?? DateTime.now();
-    amountController.text =
-        rule == null || rule.amount == 0 ? '' : '${rule.amount}';
+    amountController.text = CurrencyInputFormatter.initial(rule?.amount ?? 0);
     noteController.text = rule?.note ?? '';
   }
 
@@ -90,9 +90,7 @@ class RecurringController extends GetxController {
   }
 
   Future<void> save() async {
-    final amount =
-        int.tryParse(amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ??
-            0;
+    final amount = CurrencyInputFormatter.parse(amountController.text);
     if (amount <= 0) {
       AppToast.warning('Peringatan', 'Masukkan nominal yang valid');
       return;

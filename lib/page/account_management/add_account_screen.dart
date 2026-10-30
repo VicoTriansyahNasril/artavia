@@ -11,10 +11,7 @@ import 'package:artavia/widgets/kobalt/kobalt.dart';
 class AddAccountScreen extends GetView<AccountManagementController> {
   const AddAccountScreen({super.key});
 
-  static final _digits = [
-    FilteringTextInputFormatter.digitsOnly,
-    LengthLimitingTextInputFormatter(12),
-  ];
+  static final _amount = [CurrencyInputFormatter()];
 
   @override
   Widget build(BuildContext context) {
@@ -91,17 +88,16 @@ class AddAccountScreen extends GetView<AccountManagementController> {
               key: ValueKey('balance$version'),
               label: c.isCreditCard ? 'Tagihan saat ini' : 'Saldo',
               hint: '0',
-              initialValue:
-                  c.balance.value == 0 ? '' : '${c.balance.value.abs()}',
+              initialValue: CurrencyInputFormatter.initial(c.balance.value),
               prefix: Text(c.balance.value < 0 ? '−Rp' : 'Rp',
                   style: AppText.body.muted),
               keyboardType: TextInputType.number,
-              inputFormatters: _digits,
+              inputFormatters: _amount,
               helper: c.isCreditCard || c.typeValue.value == 'Pinjaman'
                   ? 'Dicatat sebagai utang (saldo minus).'
                   : null,
               onChanged: (v) {
-                final n = int.tryParse(v) ?? 0;
+                final n = CurrencyInputFormatter.parse(v);
                 final debt = c.isCreditCard || c.typeValue.value == 'Pinjaman';
                 c.balance.value = debt ? -n : n;
               },
@@ -115,13 +111,12 @@ class AddAccountScreen extends GetView<AccountManagementController> {
                       key: ValueKey('limit$version'),
                       label: 'Limit',
                       hint: '0',
-                      initialValue: c.creditLimit.value == 0
-                          ? ''
-                          : '${c.creditLimit.value}',
+                      initialValue:
+                          CurrencyInputFormatter.initial(c.creditLimit.value),
                       keyboardType: TextInputType.number,
-                      inputFormatters: _digits,
+                      inputFormatters: _amount,
                       onChanged: (v) =>
-                          c.creditLimit.value = int.tryParse(v) ?? 0,
+                          c.creditLimit.value = CurrencyInputFormatter.parse(v),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -158,6 +153,7 @@ class AddAccountScreen extends GetView<AccountManagementController> {
             ),
             const SectionHeader(title: 'Ikon'),
             IconPicker(
+              entries: IconRegistry.accountIcons,
               selected: c.iconKey.value,
               color: color,
               onSelect: (k) => c.iconKey.value = k,

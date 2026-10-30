@@ -45,4 +45,26 @@ void main() {
   test('search matches Indonesian labels', () {
     expect(IconRegistry.search('kopi').map((e) => e.key), contains('kopi'));
   });
+
+  test('account icons reuse registry glyphs and cover every account type', () {
+    final keys = IconRegistry.accountIcons.map((e) => e.key).toList();
+    expect(keys.toSet(), hasLength(keys.length));
+    for (final e in IconRegistry.accountIcons) {
+      expect(IconRegistry.contains(e.key), isTrue, reason: e.key);
+      expect(IconRegistry.byKey(e.key).icon, e.icon, reason: e.key);
+    }
+    for (final type in const [
+      'Kas Tunai',
+      'Bank',
+      'Kartu Kredit',
+      'Dompet Digital',
+      'Tabungan',
+      'Investasi',
+      'Pinjaman',
+      'Investasi Aset',
+      'Lainnya',
+    ]) {
+      expect(keys, contains(IconRegistry.accountTypeKey(type)), reason: type);
+    }
+  });
 }

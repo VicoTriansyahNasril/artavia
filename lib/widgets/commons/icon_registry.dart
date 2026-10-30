@@ -222,6 +222,31 @@ class IconRegistry {
         .toList();
   }
 
+  /// The account form's picker: only money, account and savings icons, in
+  /// one flat grid. Keys reuse registry entries (same glyph), with labels
+  /// worded for accounts.
+  static const List<IconEntry> accountIcons = [
+    IconEntry('uang_tunai', LucideIcons.banknote, 'Uang tunai', 'keuangan'),
+    IconEntry('biaya_bank', LucideIcons.landmark, 'Bank', 'keuangan'),
+    IconEntry('tabungan', LucideIcons.piggyBank, 'Tabungan', 'keuangan'),
+    IconEntry('cicilan', LucideIcons.creditCard, 'Kartu', 'keuangan'),
+    IconEntry('pulsa', LucideIcons.smartphone, 'Dompet digital', 'keuangan'),
+    IconEntry('bunga', LucideIcons.coins, 'Koin', 'keuangan'),
+    IconEntry('investasi', LucideIcons.trendingUp, 'Investasi', 'keuangan'),
+    IconEntry('utang', LucideIcons.receipt, 'Pinjaman', 'keuangan'),
+    IconEntry('perhiasan', LucideIcons.gem, 'Emas & perhiasan', 'keuangan'),
+    IconEntry('sewa', LucideIcons.house, 'Properti', 'keuangan'),
+    IconEntry('mobil', LucideIcons.car, 'Kendaraan', 'keuangan'),
+    IconEntry('usaha', LucideIcons.store, 'Usaha', 'keuangan'),
+    IconEntry('gaji', LucideIcons.briefcaseBusiness, 'Gaji', 'keuangan'),
+    IconEntry('asuransi', LucideIcons.shield, 'Asuransi', 'keuangan'),
+    IconEntry(
+        'sekolah', LucideIcons.graduationCap, 'Dana pendidikan', 'keuangan'),
+    IconEntry('keluarga', LucideIcons.users, 'Rekening bersama', 'keuangan'),
+    IconEntry('favorit', LucideIcons.star, 'Favorit', 'keuangan'),
+    IconEntry('lainnya', LucideIcons.ellipsis, 'Lainnya', 'keuangan'),
+  ];
+
   /// Account icons in the account form, by account type label.
   static String accountTypeKey(String type) =>
       _accountTypeKeys[type] ?? 'uang_tunai';

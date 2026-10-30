@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/utils/currency_format.dart';
@@ -94,7 +93,7 @@ class BudgetScreen extends GetView<BudgetController> {
     }
     final categoryId = RxnInt(item?.categoryId);
     final amount = (item?.limit ?? 0).obs;
-    Get.bottomSheet(
+    showSheet(
       SafeArea(
         child: Padding(
           padding: EdgeInsets.fromLTRB(
@@ -127,14 +126,14 @@ class BudgetScreen extends GetView<BudgetController> {
                     label: 'Batas per bulan',
                     hint: '0',
                     autofocus: item != null,
-                    initialValue: item == null ? '' : '${item.limit}',
+                    initialValue: item == null
+                        ? ''
+                        : CurrencyInputFormatter.initial(item.limit),
                     prefix: Text('Rp', style: AppText.body.muted),
                     keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(12),
-                    ],
-                    onChanged: (v) => amount.value = int.tryParse(v) ?? 0,
+                    inputFormatters: [CurrencyInputFormatter()],
+                    onChanged: (v) =>
+                        amount.value = CurrencyInputFormatter.parse(v),
                   ),
                   const SizedBox(height: 16),
                   KButton(

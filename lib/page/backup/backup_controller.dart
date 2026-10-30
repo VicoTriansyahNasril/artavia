@@ -73,6 +73,11 @@ class BackupController extends GetxController {
   }
 
   Future<void> connect() async {
+    if (!GoogleDriveService.isConfigured) {
+      AppToast.error('Backup Drive belum dikonfigurasi',
+          'Web client ID Google belum dipasang di aplikasi ini');
+      return;
+    }
     final ok = await drive.connect();
     if (ok) {
       await settings.set(SettingsService.keyBackupAuto, 'true');

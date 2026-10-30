@@ -106,7 +106,7 @@ class ImportMappingScreen extends GetView<ImportController> {
 
   static void _pick<T>(String title, List<T> options, String Function(T) label,
       T selected, ValueChanged<T> onSelected) {
-    Get.bottomSheet(
+    showSheet(
       SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -181,7 +181,7 @@ class _FieldRow extends StatelessWidget {
   }
 
   void _choose() {
-    Get.bottomSheet(
+    showSheet(
       SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

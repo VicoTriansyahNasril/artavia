@@ -17,6 +17,7 @@ export 'package:artavia/widgets/kobalt/k_segment.dart';
 export 'package:artavia/widgets/kobalt/keypad.dart';
 export 'package:artavia/widgets/kobalt/list_group.dart';
 export 'package:artavia/widgets/kobalt/pickers.dart';
+export 'package:artavia/widgets/kobalt/sheet.dart';
 export 'package:artavia/widgets/kobalt/stat_tiles.dart';
 export 'package:artavia/widgets/kobalt/step_header.dart';
 export 'package:artavia/widgets/kobalt/tx_row.dart';

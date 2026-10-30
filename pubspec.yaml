@@ -68,7 +68,6 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: any
   sqflite_common_ffi: any
-  flutter_launcher_icons: ^0.14.4
   flutter_native_splash: ^2.4.8
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -119,14 +118,23 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: "assets/logo/ARTAVIA_LOGO.png"
-  min_sdk_android: 21
+# App icons (android/app/src/main/res/mipmap-*, ios AppIcon.appiconset)
+# were copied as-is from the Artavia design pack, not generated:
+# flutter_launcher_icons would add a 16% inset on a foreground that is
+# already inside the safe zone, shrinking the glyph.
+# Splash: dart run flutter_native_splash:create
 
+# Follows the system theme like the app does by default ("Ikuti sistem"), so
+# the hand-off to the first screen has no color flash. Both colors equal the
+# app's own backgrounds (AppPalette.light / .dark).
 flutter_native_splash:
-  color: "#121212"
-  image: "assets/logo/ARTAVIA_LOGO.png"
+  color: "#F5F6F8"
+  color_dark: "#111318"
+  image: "assets/brand/splash-icon.png"
+  android_12:
+    color: "#F5F6F8"
+    color_dark: "#111318"
+    image: "assets/brand/splash-icon.png"
   android: true
   ios: true
+  web: false

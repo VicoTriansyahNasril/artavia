@@ -8,7 +8,6 @@ import 'package:artavia/core/services/settings_service.dart';
 import 'package:artavia/core/utils/calc_engine.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
-import 'package:artavia/core/utils/finance_calc.dart';
 import 'package:artavia/page/account_management/account_management_controller.dart';
 import 'package:artavia/page/transfer/transfer_controller.dart';
 import 'package:artavia/widgets/components/app_feedback.dart';
@@ -20,7 +19,6 @@ class AddTransactionController extends GetxController {
   AddTransactionController({this.initialTab});
 
   static const tabs = ['Pengeluaran', 'Pemasukan', 'Transfer'];
-  static const gridSize = 10;
 
   /// Set by the route (`/transfer` opens Catat on the Transfer segment).
   final String? initialTab;
@@ -43,10 +41,9 @@ class AddTransactionController extends GetxController {
   final selectedAccountId = RxnInt();
   final availableAccounts = <Map<String, dynamic>>[].obs;
 
-  /// Every non-archived category of the current type, ranked by use.
-  final rankedCategories = <Map<String, dynamic>>[].obs;
-  List<Map<String, dynamic>> get gridCategories =>
-      rankedCategories.take(gridSize).toList();
+  /// Every non-archived category of the current type, in the manual order
+  /// set in Kelola Kategori.
+  final categories = <Map<String, dynamic>>[].obs;
 
   final selectedCategoryId = RxnInt();
 
@@ -58,8 +55,12 @@ class AddTransactionController extends GetxController {
   Map<String, dynamic>? get selectedAccount => availableAccounts
       .firstWhereOrNull((a) => a['id'] == selectedAccountId.value);
 
-  Map<String, dynamic>? get selectedCategory => rankedCategories
+  Map<String, dynamic>? get selectedCategory => categories
       .firstWhereOrNull((c) => c['id'] == selectedCategoryId.value);
+
+  /// The keypad waits until a category is picked, so the whole grid is in
+  /// view first. Transfer has no category and always shows it.
+  bool get showKeypad => isTransfer || selectedCategoryId.value != null;
 
   /// FR-008: "Simpan" is enabled only for a positive result.
   bool get canSave => isTransfer ? transfer.canSave : amount.value > 0;
@@ -103,7 +104,7 @@ class AddTransactionController extends GetxController {
       _selectAccount(args['account_id'] as int?);
       final catId = args['category_id'] as int?;
       selectedCategoryId.value = catId ??
-          rankedCategories.firstWhereOrNull(
+          categories.firstWhereOrNull(
               (c) => c['name'] == args['category'])?['id'] as int?;
     }
     transfer.attach(
@@ -167,13 +168,14 @@ class AddTransactionController extends GetxController {
 
   Future<void> _loadCategories() async {
     final db = DatabaseHelper.instance;
+    // Already in sort_order, id order.
     final cats = await db.readAllCategories();
-    final usage = await db.categoryUsage(_dbType);
     final keep = selectedCategoryId.value;
-    rankedCategories.value =
-        rankCategories(cats.where((c) => c['type'] == _dbType), usage);
+    categories.value = cats
+        .where((c) => c['type'] == _dbType && (c['is_archived'] ?? 0) != 1)
+        .toList();
     selectedCategoryId.value =
-        rankedCategories.any((c) => c['id'] == keep) ? keep : null;
+        categories.any((c) => c['id'] == keep) ? keep : null;
   }
 
   /// Reloads categories (e.g. after adding one) and keeps the selection.

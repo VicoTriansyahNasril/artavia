@@ -144,7 +144,7 @@ Individu berbahasa Indonesia yang ingin mencatat keuangan harian secara offline,
 | `flutter_test` | Unit test |
 | `flutter_lints` | Aturan lint (`analysis_options.yaml` → `package:flutter_lints/flutter.yaml`) |
 | `sqflite_common_ffi` | SQLite di lingkungan test desktop |
-| `flutter_launcher_icons` | Ikon aplikasi dari `assets/logo/ARTAVIA_LOGO.png` (Android minSdk 21, iOS) |
+| Ikon aplikasi | Disalin dari paket desain Artavia (Android adaptive + monochrome, iOS terang/gelap/tinted) |
 | `flutter_native_splash` | Splash screen warna `#121212` + logo |
 
 ### 3.4 Aset
@@ -152,7 +152,7 @@ Individu berbahasa Indonesia yang ingin mencatat keuangan harian secara offline,
 | --- | --- |
 | `assets/belanja/`, `berpergian/`, `hiburan/`, `kehidupan/`, `kesehatan/`, `keuangan/`, `makanan/`, `olahraga/`, `pendidikan/`, `pribadi/`, `transportasi/` | Ikon PNG kategori/rekening (±117 ikon, didaftarkan di `AppIcons`) |
 | `assets/sounds/success.wav` | Bunyi sukses |
-| `assets/logo/ARTAVIA_LOGO.png` | Logo untuk launcher icon & splash |
+| `assets/brand/splash-icon.png` | Gambar splash (sumber untuk `flutter_native_splash`) |
 
 Ikon PNG digambar dengan `color` tint (monokrom) sesuai warna kategori/rekening.
 
@@ -1050,7 +1050,7 @@ Latar scrim hitam opasitas 0,8, tombol *skip* disembunyikan.
 ### 13.1 Android
 | Item | Nilai |
 | --- | --- |
-| `namespace` / `applicationId` | `com.example.artavia` |
+| `namespace` / `applicationId` | `id.artavia.app` |
 | Label | Artavia |
 | `compileSdk`/`minSdk`/`targetSdk` | Mengikuti default Flutter |
 | Java/Kotlin target | 17, *core library desugaring* aktif (`desugar_jdk_libs 2.1.4`), multidex |

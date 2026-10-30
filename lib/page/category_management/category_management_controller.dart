@@ -4,6 +4,7 @@ import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/database/transaction_store.dart';
 import 'package:artavia/core/services/period_service.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
+import 'package:artavia/core/utils/finance_calc.dart';
 import 'package:artavia/page/routes.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/widgets/components/app_feedback.dart';
@@ -77,6 +78,31 @@ class CategoryManagementController extends GetxController {
     await DatabaseHelper.instance
         .saveSortOrder('categories', [for (final c in list) c['id'] as int]);
     refreshAllGlobalData();
+  }
+
+  /// One-tap fill of the manual order from how often each category of the
+  /// visible type is used (ties keep their current order).
+  Future<void> sortByUsage() async {
+    final ok = await AppDialog.confirm(
+      icon: LucideIcons.arrowDownWideNarrow,
+      title: 'Urutkan menurut pemakaian?',
+      message: 'Kategori yang paling sering dipakai pindah ke atas, dan '
+          'urutan di Catat ikut berubah. Setelahnya kamu tetap bisa '
+          'menggeser manual.',
+      confirmLabel: 'Urutkan',
+    );
+    if (!ok) return;
+    final db = DatabaseHelper.instance;
+    final list =
+        rankCategories(visible, await db.categoryUsage(currentType.value));
+    if (currentType.value == 'pengeluaran') {
+      expense.value = list;
+    } else {
+      income.value = list;
+    }
+    await db.saveSortOrder('categories', [for (final c in list) c['id'] as int]);
+    refreshAllGlobalData();
+    AppToast.success('Diurutkan', 'Yang paling sering dipakai kini di atas');
   }
 
   Future<void> setArchived(Map<String, dynamic> cat, bool value) async {

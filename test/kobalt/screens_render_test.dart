@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/database/transaction_store.dart';
@@ -18,7 +20,11 @@ import 'package:artavia/page/home/home_binding.dart';
 import 'package:artavia/page/home/home_controller.dart';
 import 'package:artavia/page/home/home_screen.dart';
 import 'package:artavia/page/routes.dart';
-import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/core/utils/finance_calc.dart';
+import 'package:artavia/core/utils/currency_format.dart';
+import 'package:artavia/page/report/report_screen.dart';
+import 'package:artavia/page/report/report_controller.dart';
+import 'package:artavia/widgets/kobalt/kobalt.dart';
 
 import 'db_test_helper.dart';
 
@@ -125,6 +131,54 @@ void main() {
         }
       });
 
+      testWidgets('$tag: report cards follow the data after it loads',
+          (tester) async {
+        await boot(tester);
+        Get.put(ReportController()); // starts loading; screen shows first
+        await tester.pumpWidget(app(const Scaffold(body: ReportScreen())));
+        Future<void> settle() async {
+          for (var i = 0; i < 4; i++) {
+            await tester.runAsync(
+                () => Future<void>.delayed(const Duration(milliseconds: 150)));
+            await tester.pump(const Duration(milliseconds: 300));
+          }
+        }
+
+        await settle();
+        final c = Get.find<ReportController>();
+        expect(c.total.value, greaterThan(0));
+        expect(find.text(CurrencyService.to.digits(c.total.value)),
+            findsWidgets);
+        expect(find.text('Tren'), findsOneWidget);
+
+        c.changeMode(TrendMode.week);
+        await settle();
+        expect(find.textContaining('minggu lalu'), findsOneWidget);
+        expect(find.textContaining('bulan lalu'), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('$tag: greeting in the hero card is not cut off',
+          (tester) async {
+        await boot(tester);
+        HomeBinding().dependencies();
+        await tester.pumpWidget(app(const HomeScreen()));
+        await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 150)));
+        await tester.pump();
+        final greeting = Get.find<HomeController>().greeting;
+        final text = tester.renderObject<RenderParagraph>(find.text(greeting));
+        expect(text.didExceedMaxLines, isFalse, reason: greeting);
+        expect(find.byIcon(LucideIcons.chevronLeft), findsOneWidget);
+        // Let the remaining home loads (sqflite) finish before teardown.
+        for (var i = 0; i < 4; i++) {
+          await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 150)));
+          await tester.pump(const Duration(milliseconds: 300));
+        }
+        expect(tester.takeException(), isNull);
+      });
+
       testWidgets('$tag: secondary screens render', (tester) async {
         await boot(tester);
         await tester.pumpWidget(GetMaterialApp(
@@ -203,6 +257,50 @@ void main() {
           expect(tester.takeException(), isNull);
         });
       }
+
+      testWidgets('$tag: inline note swaps the keypad for the keyboard',
+          (tester) async {
+        await boot(tester);
+        late AddTransactionController c;
+        await tester.runAsync(() async {
+          c = Get.put(AddTransactionController());
+          while (c.isLoading.value) {
+            await Future<void>.delayed(const Duration(milliseconds: 5));
+          }
+        });
+        await tester.pumpWidget(app(const AddTransactionScreen()));
+        expect(find.byType(Keypad), findsNothing);
+        expect(
+            find.text('Pilih kategori untuk mengisi jumlah'), findsOneWidget);
+        c.selectCategory(c.categories.first['id'] as int);
+        await tester.pumpAndSettle();
+        expect(find.byType(Keypad), findsOneWidget);
+        expect(
+            find.bySemanticsLabel(RegExp('^Pilih tanggal:')), findsOneWidget);
+        expect(
+            find.bySemanticsLabel(RegExp('^Pilih rekening:')), findsOneWidget);
+
+        await tester.enterText(find.byType(TextField), 'Makan siang ');
+        await tester.pump();
+        expect(c.note.value, 'Makan siang');
+        expect(find.byType(Keypad), findsNothing);
+
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        expect(find.byType(Keypad), findsOneWidget);
+        expect(find.text('Makan siang '), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('$tag: sheets paint the themed card background',
+          (tester) async {
+        await boot(tester);
+        await tester.pumpWidget(app(const Scaffold()));
+        showSheet(const Text('Isi sheet'));
+        await tester.pumpAndSettle();
+        final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
+        expect(sheet.backgroundColor, colorCard);
+      });
     }
   }
 }

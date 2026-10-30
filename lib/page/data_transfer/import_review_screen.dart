@@ -162,7 +162,7 @@ class _Resolution extends StatelessWidget {
   }
 
   void _choose() {
-    Get.bottomSheet(
+    showSheet(
       SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

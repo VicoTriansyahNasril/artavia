@@ -6,7 +6,8 @@ import 'package:artavia/page/category_management/category_management_controller.
 import 'package:artavia/widgets/kobalt/kobalt.dart';
 
 /// Kategori (board): type segment with counts, "Tambah kategori", drag
-/// handles to reorder, archived link.
+/// handles to reorder (the order Catat shows), "Urutkan otomatis",
+/// archived link.
 class CategoryManagementScreen extends GetView<CategoryManagementController> {
   const CategoryManagementScreen({super.key});
 
@@ -50,8 +51,22 @@ class CategoryManagementScreen extends GetView<CategoryManagementController> {
                 buildDefaultDragHandles: false,
                 header: Padding(
                   padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                  child: Text('Tahan ⠿ lalu geser untuk mengubah urutan',
-                      style: AppText.caption.muted),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                          'Urutan ini dipakai di Catat. Tahan ⠿ lalu geser '
+                          'untuk memindah.',
+                          style: AppText.caption.muted),
+                      KButton.text(
+                        label: 'Urutkan otomatis',
+                        icon: LucideIcons.arrowDownWideNarrow,
+                        compact: true,
+                        expand: false,
+                        onPressed: list.length < 2 ? null : c.sortByUsage,
+                      ),
+                    ],
+                  ),
                 ),
                 itemCount: list.length,
                 onReorderItem: c.reorder,
@@ -91,7 +106,7 @@ class CategoryManagementScreen extends GetView<CategoryManagementController> {
 
   void _showArchived() {
     final c = controller;
-    Get.bottomSheet(
+    showSheet(
       SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

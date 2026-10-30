@@ -227,7 +227,7 @@ class SettingsView extends GetView<SettingsController> {
 
   void _pickStartDay() {
     final current = controller.settings.monthStartDay;
-    Get.bottomSheet(
+    showSheet(
       SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -285,7 +285,7 @@ class SettingsView extends GetView<SettingsController> {
     required T selected,
     required ValueChanged<T> onSelected,
   }) {
-    Get.bottomSheet(
+    showSheet(
       SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

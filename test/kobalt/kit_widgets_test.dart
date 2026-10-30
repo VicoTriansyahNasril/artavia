@@ -15,6 +15,22 @@ void main() {
       setUp(() => AppPalette.current = palette);
       tearDown(() => AppPalette.current = AppPalette.dark);
 
+      testWidgets('NavRow trailing hugs the right edge', (tester) async {
+        const handle = Key('handle');
+        await tester.pumpWidget(_host(const SizedBox(
+          width: 360,
+          child: NavRow(
+            title: 'Makan',
+            subtitle: '3 transaksi',
+            showChevron: false,
+            trailing: SizedBox(key: handle, width: 44, height: 44),
+          ),
+        )));
+        final row = tester.getRect(find.byType(NavRow));
+        final right = tester.getRect(find.byKey(handle)).right;
+        expect(right, moreOrLessEquals(row.right - 14)); // row padding
+      });
+
       testWidgets('Keypad emits keys and Simpan respects saveEnabled',
           (tester) async {
         final keys = <String>[];

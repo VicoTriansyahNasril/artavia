@@ -110,7 +110,7 @@ class AccountListView extends GetView<AccountManagementController> {
   }
 
   void _showArchived() {
-    Get.bottomSheet(
+    showSheet(
       SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

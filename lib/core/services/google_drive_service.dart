@@ -25,6 +25,15 @@ class GoogleAuthClient extends http.BaseClient {
 class GoogleDriveService extends GetxService {
   static GoogleDriveService get to => Get.find();
 
+  /// OAuth "Web application" client ID from Google Cloud Console (same
+  /// project as the Android client for `id.artavia.app` + the signing
+  /// SHA-1s). Android needs nothing else. See docs/google-drive-android.md.
+  static const webClientId =
+      '591973850664-773205kiaqtdd2hr44lfbhnq5gm8pl37.apps.googleusercontent.com';
+
+  /// False until [webClientId] is filled in; sign-in cannot work before.
+  static bool get isConfigured => !webClientId.startsWith('GANTI_');
+
   static const scopes = [
     drive.DriveApi.driveAppdataScope,
     drive.DriveApi.driveFileScope,
@@ -44,10 +53,10 @@ class GoogleDriveService extends GetxService {
   }
 
   Future<void> _init() async {
+    if (!isConfigured) return;
     try {
       await sign_in.GoogleSignIn.instance.initialize(
-        serverClientId:
-            'GANTI_DENGAN_WEB_CLIENT_ID_ANDA.apps.googleusercontent.com',
+        serverClientId: webClientId,
       );
       sign_in.GoogleSignIn.instance.authenticationEvents.listen((event) {
         if (event is sign_in.GoogleSignInAuthenticationEventSignIn) {

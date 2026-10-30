@@ -261,7 +261,7 @@ class _Connected extends StatelessWidget {
     var password = '', confirm = '', hint = '';
     final valid = false.obs;
     void check() => valid.value = password.length >= 8 && password == confirm;
-    Get.bottomSheet(
+    showSheet(
       SafeArea(
         child: Padding(
           padding: EdgeInsets.fromLTRB(
@@ -327,7 +327,7 @@ class _Connected extends StatelessWidget {
 void passwordPrompt(BackupController c, BackupEntry e) {
   c.passwordError.value = false;
   c.password = '';
-  Get.bottomSheet(
+  showSheet(
     SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(

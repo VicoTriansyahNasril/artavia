@@ -68,7 +68,7 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
-	<key>NSFaceIDUsageDescription</key>
-	<string>Buka Artavia dengan Face ID.</string>
-</dict>
+		<key>NSFaceIDUsageDescription</key>
+		<string>Buka Artavia dengan Face ID.</string>
+	</dict>
 </plist>

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/services/period_service.dart';
@@ -226,39 +225,83 @@ class _HistoryHeader extends GetView<HomeController> {
   }
 }
 
-/// Greeting and ‹ Oktober 2026 › inside the hero card.
+/// Greeting and ‹ Oktober 2026 › inside the hero card. Both share one
+/// line when the greeting fits in full; otherwise the period moves to a
+/// second line so the greeting is never cut off.
 class _PeriodRow extends StatelessWidget {
   final String greeting;
   const _PeriodRow({required this.greeting});
 
+  static const _arrows = 44.0 * 2 + 8; // two KIconButtons + gap
+
   @override
   Widget build(BuildContext context) {
+    final greetStyle = AppText.bodySmall.w600.copyWith(color: colorText);
+    final labelStyle = AppText.label.copyWith(color: colorText);
+    final greet = Text(greeting,
+        maxLines: 1, overflow: TextOverflow.ellipsis, style: greetStyle);
+    return Obx(() {
+      final label = PeriodService.to.active.value.longLabel;
+      return LayoutBuilder(builder: (context, box) {
+        final scaler = MediaQuery.textScalerOf(context);
+        final need = _textWidth(greeting, greetStyle, scaler) +
+            _textWidth(label, labelStyle, scaler) +
+            _arrows;
+        if (need <= box.maxWidth) {
+          return Row(
+            children: [
+              Expanded(child: greet),
+              _nav(label, labelStyle, shrink: false),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            greet,
+            Align(
+              alignment: Alignment.centerRight,
+              child: _nav(label, labelStyle, shrink: true),
+            ),
+          ],
+        );
+      });
+    });
+  }
+
+  static double _textWidth(String text, TextStyle style, TextScaler scaler) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    return width;
+  }
+
+  /// ‹ label ›. With [shrink] the label scales down to the line width
+  /// (only possible when the row has a bounded width).
+  Widget _nav(String label, TextStyle style, {required bool shrink}) {
     final service = PeriodService.to;
+    Widget text = GestureDetector(
+      onTap: showPeriodPicker,
+      child: Text(label, maxLines: 1, style: style),
+    );
+    if (shrink) {
+      text = Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: text));
+    }
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: Text(greeting,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppText.bodySmall.w600.copyWith(color: colorText)),
-        ),
         KIconButton(
           icon: LucideIcons.chevronLeft,
           size: 18,
           semanticLabel: 'Periode sebelumnya',
           onPressed: () => service.shift(-1),
         ),
-        Flexible(
-          flex: 2,
-          child: GestureDetector(
-            onTap: showPeriodPicker,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Obx(() => Text(service.active.value.longLabel,
-                  style: AppText.label.copyWith(color: colorText))),
-            ),
-          ),
-        ),
+        text,
         KIconButton(
           icon: LucideIcons.chevronRight,
           size: 18,
@@ -411,12 +454,9 @@ class _WelcomeCard extends GetView<HomeController> {
                 hint: '0',
                 prefix: Text('Rp', style: AppText.body.muted),
                 keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(12),
-                ],
-                onChanged: (v) =>
-                    controller.starterBalance.value = int.tryParse(v) ?? 0,
+                inputFormatters: [CurrencyInputFormatter()],
+                onChanged: (v) => controller.starterBalance.value =
+                    CurrencyInputFormatter.parse(v),
               ),
               const SizedBox(height: 18),
               KButton(
@@ -436,7 +476,7 @@ class _WelcomeCard extends GetView<HomeController> {
 void showPeriodPicker() {
   final service = PeriodService.to;
   final year = service.active.value.year.obs;
-  Get.bottomSheet(
+  showSheet(
     SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
