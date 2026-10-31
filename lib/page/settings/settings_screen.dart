@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -42,6 +41,7 @@ class SettingsView extends GetView<SettingsController> {
         // Reactive reads for the plain rows below.
         s.get(SettingsService.keyHaptics);
         s.get(SettingsService.keyLastBackupAt);
+        s.get(SettingsService.keyBackupNudgeHidden);
         t.pref.value;
         t.textScale.value;
         t.reduceTransparency.value;
@@ -166,13 +166,6 @@ class SettingsView extends GetView<SettingsController> {
                   trailingText: 'Versi 1.0.0',
                   onTap: _about,
                 ),
-                if (kDebugMode)
-                  NavRow(
-                    icon: LucideIcons.bug,
-                    title: 'Buat data dummy',
-                    subtitle: 'Hanya di mode debug',
-                    onTap: c.generateDummyData,
-                  ),
               ],
             ),
             const SizedBox(height: 20),
@@ -322,7 +315,7 @@ class SettingsView extends GetView<SettingsController> {
       icon: LucideIcons.wallet,
       title: 'Artavia',
       message: 'Pencatat keuangan pribadi yang menyimpan data di HP-mu. '
-          'Versi 1.0.0.\n\nIkon: Lucide (ISC). Huruf: Plus Jakarta Sans (OFL).',
+          'Versi 1.0.0.',
     );
   }
 }
@@ -335,49 +328,81 @@ class _DataStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final last = SettingsService.to.lastBackupAt;
     final drive = Get.find<GoogleDriveService>();
+    final connected = drive.isConnected.value;
+    // "Hubungkan nanti" hides the nudge until Drive is connected (the
+    // Cadangan Google Drive row below stays available).
+    if (!connected && SettingsService.to.backupNudgeHidden) {
+      return const SizedBox.shrink();
+    }
     final tone = last == null ? colorWarning : colorIncome;
+    final status = Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration:
+              BoxDecoration(color: softFill(tone), shape: BoxShape.circle),
+          child: Icon(
+              last == null ? LucideIcons.cloudAlert : LucideIcons.cloudCheck,
+              size: 22,
+              color: tone),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                  last == null
+                      ? 'Data hanya ada di HP ini'
+                      : 'Data dicadangkan di Google Drive',
+                  style: AppText.bodySmall.w600.copyWith(color: colorText)),
+              Text(
+                  last == null
+                      ? 'Belum pernah dicadangkan'
+                      : 'Terakhir ${DateFormat('d MMM, HH.mm', 'id_ID').format(last)}',
+                  style: AppText.caption.onGlass),
+            ],
+          ),
+        ),
+        if (connected)
+          KButton.tonal(
+            label: 'Cadangkan',
+            onPressed: () =>
+                Get.toNamed(backupRoute, arguments: {'backupNow': true}),
+          ),
+      ],
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: GlassCard(
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration:
-                  BoxDecoration(color: softFill(tone), shape: BoxShape.circle),
-              child: Icon(
-                  last == null
-                      ? LucideIcons.cloudAlert
-                      : LucideIcons.cloudCheck,
-                  size: 22,
-                  color: tone),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: connected
+            ? status
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                      last == null
-                          ? 'Data hanya ada di HP ini'
-                          : 'Data dicadangkan di Google Drive',
-                      style: AppText.bodySmall.w600.copyWith(color: colorText)),
-                  Text(
-                      last == null
-                          ? 'Belum pernah dicadangkan'
-                          : 'Terakhir ${DateFormat('d MMM, HH.mm', 'id_ID').format(last)}',
-                      style: AppText.caption.onGlass),
+                  status,
+                  const SizedBox(height: 12),
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      KButton.text(
+                        label: 'Hubungkan nanti',
+                        compact: true,
+                        expand: false,
+                        onPressed: () => SettingsService.to
+                            .set(SettingsService.keyBackupNudgeHidden, 'true'),
+                      ),
+                      KButton.tonal(
+                        label: 'Hubungkan',
+                        onPressed: () => Get.toNamed(backupRoute),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-            ),
-            KButton.tonal(
-              label: drive.isConnected.value ? 'Cadangkan' : 'Atur',
-              onPressed: () => Get.toNamed(backupRoute,
-                  arguments: {'backupNow': drive.isConnected.value}),
-            ),
-          ],
-        ),
       ),
     );
   }

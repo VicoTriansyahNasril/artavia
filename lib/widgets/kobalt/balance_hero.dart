@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/widgets/kobalt/glass_card.dart';
+import 'package:artavia/core/services/privacy_service.dart';
 
 /// One column in the hero's 2-col breakdown (e.g. Pemasukan / Pengeluaran).
 class HeroFigure {
@@ -43,6 +44,7 @@ class BalanceHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    PrivacyService.watch(context);
     final cs = CurrencyService.to;
     final negative = amount < 0;
     return GestureDetector(
@@ -113,6 +115,7 @@ class _Figure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    PrivacyService.watch(context);
     final color = figure.color ?? colorText;
     return Row(
       children: [

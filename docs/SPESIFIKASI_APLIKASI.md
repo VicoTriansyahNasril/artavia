@@ -168,7 +168,6 @@ lib/
 │   ├── database/
 │   │   ├── database_helper.dart    # Singleton SQLite: skema, migrasi, CRUD baca
 │   │   ├── transaction_store.dart  # Extension: semua mutasi transaksi + efek saldo (atomik)
-│   │   └── dummy_data.dart         # Generator data contoh (debug)
 │   ├── models/
 │   │   ├── account_model.dart      # AccountModel
 │   │   └── recurring_rule.dart     # RecurringRule + RecurringFrequency

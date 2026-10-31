@@ -26,6 +26,8 @@ class SettingsService extends GetxService {
   static const keyLastBackupAt = 'last_backup_at';
   static const keyLastBackupBytes = 'last_backup_bytes';
   static const keyLastBackupTx = 'last_backup_tx';
+  static const keyBackupNudgeHidden = 'backup_nudge_hidden';
+  static const keyBudgetStep = 'onboarding_budget_step';
 
   final _values = <String, String>{}.obs;
 
@@ -72,6 +74,12 @@ class SettingsService extends GetxService {
   int get lastBackupBytes =>
       int.tryParse(_values[keyLastBackupBytes] ?? '') ?? 0;
   int get lastBackupTx => int.tryParse(_values[keyLastBackupTx] ?? '') ?? 0;
+
+  /// "Hubungkan nanti" on the Status data card.
+  bool get backupNudgeHidden => _bool(keyBackupNudgeHidden);
+
+  /// Optional budget step after the first account (onboarding).
+  bool get budgetStepPending => _bool(keyBudgetStep);
 
   /// Most recent search queries, newest first (max 5), stored '|'-separated.
   List<String> get recentSearches {

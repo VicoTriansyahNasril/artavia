@@ -125,6 +125,40 @@ class _Disconnected extends StatelessWidget {
   }
 }
 
+/// Google profile photo; the name's initial on an accent circle when there
+/// is no photo or it fails to load (offline).
+class _Avatar extends StatelessWidget {
+  final String? photoUrl;
+  final String? name;
+  const _Avatar({this.photoUrl, this.name});
+
+  static const _size = 40.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = Container(
+      width: _size,
+      height: _size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: colorAccentDim, shape: BoxShape.circle),
+      child: name == null || name!.trim().isEmpty
+          ? Icon(LucideIcons.circleUser, size: 22, color: colorAccent)
+          : Text(name!.trim()[0].toUpperCase(),
+              style: AppText.title3.copyWith(color: colorAccent)),
+    );
+    if (photoUrl == null) return initial;
+    return ClipOval(
+      child: Image.network(
+        photoUrl!,
+        width: _size,
+        height: _size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => initial,
+      ),
+    );
+  }
+}
+
 class _Connected extends StatelessWidget {
   final BackupController c;
   const _Connected({required this.c});
@@ -141,9 +175,16 @@ class _Connected extends StatelessWidget {
         ListGroup(
           children: [
             NavRow(
-              icon: LucideIcons.circleUser,
-              title: c.drive.email.value ?? 'Akun Google',
-              subtitle: 'Terhubung',
+              leading: _Avatar(
+                photoUrl: c.drive.photoUrl.value,
+                name: c.drive.displayName.value ?? c.drive.email.value,
+              ),
+              title: c.drive.displayName.value ??
+                  c.drive.email.value ??
+                  'Akun Google',
+              subtitle: c.drive.displayName.value == null
+                  ? 'Terhubung'
+                  : '${c.drive.email.value ?? ''} · Terhubung',
               showChevron: false,
               trailing:
                   KButton.tonal(label: 'Ganti', onPressed: c.switchAccount),

@@ -102,6 +102,7 @@ class _TotalCard extends GetView<ReportController> {
   Widget build(BuildContext context) => Obx(() => _build(context));
 
   Widget _build(BuildContext context) {
+    PrivacyService.watch(context);
     final income = controller.isIncome.value;
     final change = controller.changePercent;
     // Spending less, or earning more, is the good direction.
@@ -179,6 +180,7 @@ class _TrendCard extends GetView<ReportController> {
   Widget build(BuildContext context) => Obx(() => _build(context));
 
   Widget _build(BuildContext context) {
+    PrivacyService.watch(context);
     final bars = controller.bars;
     final max = bars.fold<int>(0, (m, b) => b.amount > m ? b.amount : m);
     final money = CurrencyService.to;
@@ -287,6 +289,7 @@ class _DonutCard extends GetView<ReportController> {
   Widget build(BuildContext context) => Obx(() => _build(context));
 
   Widget _build(BuildContext context) {
+    PrivacyService.watch(context);
     final shares = controller.shares;
     return KCard(
       padding: const EdgeInsets.all(16),
@@ -362,6 +365,7 @@ class _Breakdown extends GetView<ReportController> {
   Widget build(BuildContext context) => Obx(() => _build(context));
 
   Widget _build(BuildContext context) {
+    PrivacyService.watch(context);
     final items = controller.breakdown;
     final max = items.isEmpty ? 1 : items.first.amount;
     final money = CurrencyService.to;

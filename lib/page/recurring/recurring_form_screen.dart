@@ -4,7 +4,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/models/recurring_rule.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/core/utils/date_format.dart';
-import 'package:artavia/page/add_transaction/add_transaction_screen.dart';
 import 'package:artavia/page/recurring/recurring_controller.dart';
 import 'package:artavia/widgets/kobalt/kobalt.dart';
 
@@ -46,13 +45,11 @@ class RecurringFormScreen extends GetView<RecurringController> {
               onChanged: c.setType,
             ),
             const SizedBox(height: 16),
-            KField(
-              controller: c.amountController,
+            KAmountField(
               label: 'Nominal',
-              hint: '0',
-              prefix: Text('Rp', style: AppText.body.muted),
-              keyboardType: TextInputType.number,
-              inputFormatters: [CurrencyInputFormatter()],
+              value: CurrencyInputFormatter.parse(c.amountController.text),
+              onChanged: (n) =>
+                  c.amountController.text = CurrencyInputFormatter.initial(n),
             ),
             const SectionHeader(title: 'Kategori'),
             Wrap(

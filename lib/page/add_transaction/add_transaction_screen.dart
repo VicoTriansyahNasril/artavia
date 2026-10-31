@@ -440,9 +440,8 @@ class _KeypadSheetState extends State<_KeypadSheet> {
                           maxWidth: MediaQuery.sizeOf(context).width * .42),
                       child: _MetaChip(
                         icon: LucideIcons.wallet,
-                        label:
-                            controller.selectedAccount?['name'] as String? ??
-                                'Pilih rekening',
+                        label: controller.selectedAccount?['name'] as String? ??
+                            'Pilih rekening',
                         semantic: 'Pilih rekening',
                         onTap: _pickAccount,
                       ),
@@ -608,69 +607,4 @@ class _MetaChip extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Bottom sheet listing accounts with balances (shared by Catat/Transfer).
-void showAccountPicker({
-  required List<Map<String, dynamic>> accounts,
-  required int? selectedId,
-  required ValueChanged<int> onSelect,
-  VoidCallback? onCreate,
-  String title = 'Pilih rekening',
-}) {
-  showSheet(
-    SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(title, style: AppText.title3.copyWith(color: colorText)),
-            const SizedBox(height: 12),
-            Flexible(
-              child: SingleChildScrollView(
-                child: ListGroup(
-                  children: [
-                    for (var i = 0; i < accounts.length; i++)
-                      NavRow(
-                        leading: CategoryIcon.round(
-                          iconKey: accounts[i]['icon_key'] as String? ??
-                              IconRegistry.accountTypeKey(
-                                  accounts[i]['type'] as String? ?? ''),
-                          color: themedColor(accounts[i]['color_val'] as int?,
-                              fallbackIndex: i),
-                        ),
-                        title: accounts[i]['name'] as String,
-                        subtitle: CurrencyService.to
-                            .money(accounts[i]['balance'] as int? ?? 0),
-                        showChevron: false,
-                        trailing:
-                            KRadio(selected: accounts[i]['id'] == selectedId),
-                        onTap: () {
-                          onSelect(accounts[i]['id'] as int);
-                          Get.back();
-                        },
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            if (onCreate != null) ...[
-              const SizedBox(height: 12),
-              KButton.text(
-                label: 'Tambah rekening',
-                icon: LucideIcons.plus,
-                onPressed: () {
-                  Get.back();
-                  onCreate();
-                },
-              ),
-            ],
-          ],
-        ),
-      ),
-    ),
-    isScrollControlled: true,
-  );
 }

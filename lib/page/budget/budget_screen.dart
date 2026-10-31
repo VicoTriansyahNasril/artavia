@@ -122,18 +122,10 @@ class BudgetScreen extends GetView<BudgetController> {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  KField(
+                  KAmountField(
                     label: 'Batas per bulan',
-                    hint: '0',
-                    autofocus: item != null,
-                    initialValue: item == null
-                        ? ''
-                        : CurrencyInputFormatter.initial(item.limit),
-                    prefix: Text('Rp', style: AppText.body.muted),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [CurrencyInputFormatter()],
-                    onChanged: (v) =>
-                        amount.value = CurrencyInputFormatter.parse(v),
+                    value: amount.value,
+                    onChanged: (n) => amount.value = n,
                   ),
                   const SizedBox(height: 16),
                   KButton(

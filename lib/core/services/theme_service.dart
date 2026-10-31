@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/services/settings_service.dart';
 import 'package:artavia/widgets/commons/common.dart';
@@ -43,7 +45,21 @@ class ThemeService extends GetxService with WidgetsBindingObserver {
     reduceTransparency.value = s.get(keyReduceTransparency) == 'true';
     AppPalette.current = palette;
     WidgetsBinding.instance.addObserver(this);
+    _syncNativeNightMode();
     return this;
+  }
+
+  static const _native = MethodChannel('artavia/theme');
+
+  /// Android 12+: hands the choice to the system so its launch splash uses
+  /// the app's theme instead of the phone's. No-op elsewhere.
+  Future<void> _syncNativeNightMode() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    try {
+      await _native.invokeMethod('setNightMode', pref.value.name);
+    } on MissingPluginException {
+      // Tests / hosts without the channel.
+    } on PlatformException catch (_) {}
   }
 
   @override
@@ -85,6 +101,9 @@ class ThemeService extends GetxService with WidgetsBindingObserver {
   Future<void> setTheme(ThemePref p) async {
     pref.value = p;
     await SettingsService.to.set(keyThemeMode, p.name);
+    // Native first: back on "system" the reported brightness flips back to
+    // the phone's; didChangePlatformBrightness re-applies when it lands.
+    await _syncNativeNightMode();
     _apply();
   }
 

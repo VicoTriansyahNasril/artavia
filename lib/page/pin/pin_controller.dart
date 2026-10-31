@@ -43,7 +43,7 @@ class PinController extends GetxController {
     }
     final wait = PinLockService.to.secondsBlocked;
     _error(wait > 0
-        ? 'Coba lagi dalam $wait detik'
+        ? 'Coba lagi dalam ${PinLockService.waitLabel(wait)}'
         : 'PIN salah. Sisa ${PinLockService.to.remainingAttempts} percobaan.');
   }
 

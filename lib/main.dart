@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:artavia/page/routes.dart';
 import 'package:artavia/page/pin/lock_overlay.dart';
+import 'package:artavia/page/splash/splash_screen.dart';
 import 'package:artavia/widgets/commons/common.dart';
 import 'package:artavia/core/services/backup_service.dart';
 import 'package:artavia/core/services/google_drive_service.dart';
@@ -19,11 +21,18 @@ import 'package:artavia/core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Settings + theme first (one small table read), so the animated splash
+  // already uses the theme the user picked, not the phone's.
+  await Get.putAsync(() => SettingsService().init(), permanent: true);
+  Get.put(ThemeService().init(), permanent: true);
+  final ready = ValueNotifier(false);
+  runApp(_Root(ready: ready));
+  // One full bar pass, so the splash never just flickers.
+  final minSplash = Future.delayed(const Duration(milliseconds: 900));
+
   await initializeDateFormatting('id_ID', null);
 
   Get.put(GoogleDriveService(), permanent: true);
-  await Get.putAsync(() => SettingsService().init(), permanent: true);
-  Get.put(ThemeService().init(), permanent: true);
   Get.put(PrivacyService().init(), permanent: true);
   Get.put(HapticsService(), permanent: true);
   Get.put(PeriodService(), permanent: true);
@@ -35,7 +44,30 @@ void main() async {
   await RecurringService.to.runDue();
   await Get.putAsync(() => NotificationService().init(), permanent: true);
 
-  runApp(const MyApp());
+  await minSplash;
+  ready.value = true;
+}
+
+/// Splash until services are up, then a crossfade into [MyApp] (a second
+/// `runApp` would cut over without any transition).
+class _Root extends StatelessWidget {
+  final ValueListenable<bool> ready;
+  const _Root({required this.ready});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: ready,
+      builder: (context, isReady, _) => AnimatedSwitcher(
+        duration: const Duration(milliseconds: 400),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: isReady
+            ? const MyApp(key: ValueKey('app'))
+            : const SplashApp(key: ValueKey('splash')),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -58,7 +90,11 @@ class MyApp extends StatelessWidget {
       builder: (context, child) {
         _syncSystemBars();
         final scaler = theme.textScaler;
-        final app = LockOverlay(child: child ?? const SizedBox());
+        // Only PrivacyService.watch() callers rebuild when the mask flips.
+        final app = Obx(() => PrivacyScope(
+              masked: PrivacyService.to.masked.value,
+              child: LockOverlay(child: child ?? const SizedBox()),
+            ));
         if (scaler == null) return app;
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: scaler),

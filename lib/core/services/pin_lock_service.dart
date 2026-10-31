@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:local_auth/local_auth.dart';
@@ -40,9 +41,17 @@ class PinLockService extends GetxService with WidgetsBindingObserver {
 
   static const _grace = Duration(seconds: 10);
   static const maxAttempts = 5;
+
+  /// First cooldown; doubles on every further lockout up to [maxCooldown].
   static const cooldown = Duration(seconds: 30);
+  static const maxCooldown = Duration(minutes: 15);
 
   static const keyPinLength = 'pin_length';
+
+  // Wrong-PIN state lives in settings, so killing the app doesn't reset it.
+  static const keyPinFailed = 'pin_failed';
+  static const keyPinLockouts = 'pin_lockouts';
+  static const keyPinBlockedUntil = 'pin_blocked_until';
 
   /// New PINs are 6 digits (board); PINs made before v12 keep 4.
   static const newPinLength = 6;
@@ -53,8 +62,12 @@ class PinLockService extends GetxService with WidgetsBindingObserver {
   final canUseBiometrics = false.obs;
   final _auth = LocalAuthentication();
   DateTime? _pausedAt;
-  int _failed = 0;
-  DateTime? _blockedUntil;
+
+  SettingsService get _s => SettingsService.to;
+  int get _failed => int.tryParse(_s.get(keyPinFailed) ?? '') ?? 0;
+  int get _lockouts => int.tryParse(_s.get(keyPinLockouts) ?? '') ?? 0;
+  DateTime? get _blockedUntil =>
+      DateTime.tryParse(_s.get(keyPinBlockedUntil) ?? '');
 
   bool get enabled =>
       SettingsService.to.appLock &&
@@ -65,7 +78,24 @@ class PinLockService extends GetxService with WidgetsBindingObserver {
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
     isLocked.value = enabled;
+    _secureScreen(enabled);
     _checkBiometrics();
+  }
+
+  static const _secure = MethodChannel('artavia/secure_screen');
+
+  /// Re-applies FLAG_SECURE after settings were replaced (reset/restore).
+  Future<void> syncSecureScreen() => _secureScreen(enabled);
+
+  /// Android FLAG_SECURE while the lock is on: no content in Recents, no
+  /// screenshots. No-op elsewhere.
+  Future<void> _secureScreen(bool on) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    try {
+      await _secure.invokeMethod('set', on);
+    } on MissingPluginException {
+      // Tests / hosts without the channel.
+    } on PlatformException catch (_) {}
   }
 
   Future<void> _checkBiometrics() async {
@@ -95,8 +125,7 @@ class PinLockService extends GetxService with WidgetsBindingObserver {
         persistAcrossBackgrounding: true,
       );
       if (ok) {
-        _failed = 0;
-        _blockedUntil = null;
+        await _resetAttempts();
         unlock();
       }
       return ok;
@@ -142,17 +171,34 @@ class PinLockService extends GetxService with WidgetsBindingObserver {
     final hash =
         await compute(_hashInIsolate, {'pin': pin, 'salt': base64Decode(salt)});
     if (hashesEqual(hash, stored)) {
-      _failed = 0;
-      _blockedUntil = null;
+      await _resetAttempts();
       return true;
     }
-    _failed++;
-    if (_failed >= maxAttempts) {
-      _failed = 0;
-      _blockedUntil = DateTime.now().add(cooldown);
+    final failed = _failed + 1;
+    if (failed < maxAttempts) {
+      await _s.set(keyPinFailed, '$failed');
+      return false;
     }
+    final wait = cooldown * (1 << _lockouts.clamp(0, 10));
+    await _s.set(keyPinFailed, '0');
+    await _s.set(keyPinLockouts, '${_lockouts + 1}');
+    await _s.set(
+        keyPinBlockedUntil,
+        DateTime.now()
+            .add(wait > maxCooldown ? maxCooldown : wait)
+            .toIso8601String());
     return false;
   }
+
+  Future<void> _resetAttempts() async {
+    await _s.remove(keyPinFailed);
+    await _s.remove(keyPinLockouts);
+    await _s.remove(keyPinBlockedUntil);
+  }
+
+  /// "30 detik" / "4 menit" for the lockout message.
+  static String waitLabel(int seconds) =>
+      seconds < 60 ? '$seconds detik' : '${(seconds / 60).ceil()} menit';
 
   Future<void> enable(String pin) async {
     final salt = newPinSalt();
@@ -162,6 +208,7 @@ class PinLockService extends GetxService with WidgetsBindingObserver {
     await settings.set(SettingsService.keyPinHash, hash);
     await settings.set(keyPinLength, '${pin.length}');
     await settings.set(SettingsService.keyAppLock, 'true');
+    await _secureScreen(true);
   }
 
   Future<void> disable() async {
@@ -170,6 +217,8 @@ class PinLockService extends GetxService with WidgetsBindingObserver {
     await settings.remove(SettingsService.keyPinSalt);
     await settings.remove(SettingsService.keyPinHash);
     await settings.remove(keyPinLength);
+    await _resetAttempts();
+    await _secureScreen(false);
     isLocked.value = false;
   }
 

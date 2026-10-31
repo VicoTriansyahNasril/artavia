@@ -19,6 +19,12 @@ class HomeScreen extends GetView<HomeController> {
   const HomeScreen({super.key});
 
   static const _titles = ['Transaksi', 'Laporan', 'Rekening', 'Pengaturan'];
+  static const _tabs = [
+    HistoryView(),
+    ReportScreen(),
+    AccountListView(),
+    SettingsView(),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -32,17 +38,22 @@ class HomeScreen extends GetView<HomeController> {
             bottom: false,
             child: Column(
               children: [
-                Obx(() => _TabHeader(index: controller.currentIndex.value)),
+                Obx(() => _TabHeader(
+                      index: controller.currentIndex.value,
+                      // Nothing to hide before the first account exists.
+                      showEye: controller.hasAccounts.value == true,
+                    )),
                 Expanded(
-                  child: Obx(() => IndexedStack(
-                        index: controller.currentIndex.value,
-                        children: const [
-                          HistoryView(),
-                          ReportScreen(),
-                          AccountListView(),
-                          SettingsView(),
-                        ],
-                      )),
+                  child: Obx(() {
+                    final index = controller.currentIndex.value;
+                    return IndexedStack(
+                      index: index,
+                      children: [
+                        for (final (i, tab) in _tabs.indexed)
+                          _TabFade(active: i == index, child: tab),
+                      ],
+                    );
+                  }),
                 ),
               ],
             ),
@@ -69,14 +80,64 @@ class HomeScreen extends GetView<HomeController> {
   }
 }
 
+/// Fades a tab in (and lifts it 8 px) each time it becomes the active one,
+/// so switching tabs doesn't jump. IndexedStack keeps every tab's state.
+class _TabFade extends StatefulWidget {
+  final bool active;
+  final Widget child;
+  const _TabFade({required this.active, required this.child});
+
+  @override
+  State<_TabFade> createState() => _TabFadeState();
+}
+
+class _TabFadeState extends State<_TabFade>
+    with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 220), value: 1);
+  late final _curve = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+  late final _slide =
+      Tween(begin: const Offset(0, 8), end: Offset.zero).animate(_curve);
+
+  @override
+  void didUpdateWidget(_TabFade old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) {
+      final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+      still ? _c.value = 1 : _c.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _curve.dispose();
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (context, child) => Opacity(
+        opacity: _curve.value,
+        child: Transform.translate(offset: _slide.value, child: child),
+      ),
+    );
+  }
+}
+
 /// Per-tab title row; money tabs get the privacy eye, Transaksi also gets
 /// Cari and Kalender.
 class _TabHeader extends StatelessWidget {
   final int index;
-  const _TabHeader({required this.index});
+  final bool showEye;
+  const _TabHeader({required this.index, required this.showEye});
 
   @override
   Widget build(BuildContext context) {
+    PrivacyService.watch(context);
     final masked = PrivacyService.to.masked.value;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
@@ -88,7 +149,7 @@ class _TabHeader extends StatelessWidget {
               child: Text(HomeScreen._titles[index],
                   style: AppText.title2.copyWith(color: colorText)),
             ),
-            if (index < 3)
+            if (index < 3 && showEye)
               DecoratedBox(
                 decoration: BoxDecoration(
                   color: masked ? colorAccentDim : Colors.transparent,
@@ -165,6 +226,10 @@ class _HistoryHeader extends GetView<HomeController> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (controller.budgetStep.value) ...[
+            const _BudgetStepCard(),
+            const SizedBox(height: 12),
+          ],
           BalanceHero(
             header: _PeriodRow(greeting: controller.greeting),
             label: 'Sisa periode ini',
@@ -319,6 +384,7 @@ class _BudgetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    PrivacyService.watch(context);
     final s = budget.summary;
     final level = budgetStatus(s.used, s.total);
     final tone = switch (level) {
@@ -382,6 +448,7 @@ class _DaySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    PrivacyService.watch(context);
     final net = group.income - group.expense;
     return ListGroup(
       title: group.label,
@@ -449,14 +516,10 @@ class _WelcomeCard extends GetView<HomeController> {
                 ],
               ),
               const SizedBox(height: 10),
-              KField(
+              KAmountField(
                 label: 'Saldo awal',
-                hint: '0',
-                prefix: Text('Rp', style: AppText.body.muted),
-                keyboardType: TextInputType.number,
-                inputFormatters: [CurrencyInputFormatter()],
-                onChanged: (v) => controller.starterBalance.value =
-                    CurrencyInputFormatter.parse(v),
+                value: controller.starterBalance.value,
+                onChanged: (n) => controller.starterBalance.value = n,
               ),
               const SizedBox(height: 18),
               KButton(
@@ -468,6 +531,74 @@ class _WelcomeCard extends GetView<HomeController> {
               ),
             ],
           )),
+    );
+  }
+}
+
+/// Onboarding step 2 (optional): monthly limits for a few expense
+/// categories right after the first account. Skippable; full budgets live
+/// in Pengaturan › Anggaran.
+class _BudgetStepCard extends GetView<HomeController> {
+  const _BudgetStepCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.all(20),
+      child: Obx(() {
+        final c = controller;
+        final any = c.starterBudgets.values.any((v) => v > 0);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                      color: colorAccentDim, shape: BoxShape.circle),
+                  child: Icon(LucideIcons.target, color: colorAccent),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Opsional', style: AppText.caption.muted),
+                ),
+                // Up top so small screens see it without scrolling.
+                KButton.text(
+                  label: 'Lewati',
+                  compact: true,
+                  expand: false,
+                  onPressed: c.skipBudgetStep,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text('Atur anggaran bulanan',
+                style: AppText.title1.copyWith(color: colorText)),
+            const SizedBox(height: 6),
+            Text(
+                'Batasi pengeluaran untuk kategori yang paling sering '
+                'dipakai. Bisa diubah kapan saja di Pengaturan › Anggaran.',
+                style: AppText.bodySmall.onGlass),
+            const SizedBox(height: 18),
+            for (final cat in c.starterCategories) ...[
+              KAmountField(
+                label: cat['name'] as String,
+                value: c.starterBudgets[cat['id']] ?? 0,
+                onChanged: (n) => c.starterBudgets[cat['id'] as int] = n,
+              ),
+              const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 6),
+            KButton(
+              label: 'Simpan anggaran',
+              onPressed:
+                  !any || c.isCreating.value ? null : c.saveStarterBudgets,
+            ),
+          ],
+        );
+      }),
     );
   }
 }

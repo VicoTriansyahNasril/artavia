@@ -46,6 +46,10 @@ class GoogleDriveService extends GetxService {
   final isConnected = false.obs;
   final email = RxnString();
 
+  /// Google profile shown on the Cadangan screen once connected.
+  final displayName = RxnString();
+  final photoUrl = RxnString();
+
   @override
   void onInit() {
     super.onInit();
@@ -76,6 +80,8 @@ class GoogleDriveService extends GetxService {
     if (user == null) _api = null;
     isConnected.value = user != null;
     email.value = user?.email;
+    displayName.value = user?.displayName;
+    photoUrl.value = user?.photoUrl;
   }
 
   /// Interactive sign-in with the backup scopes.

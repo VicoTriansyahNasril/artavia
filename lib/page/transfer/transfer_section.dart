@@ -7,6 +7,7 @@ import 'package:artavia/page/add_transaction/add_transaction_controller.dart';
 import 'package:artavia/page/add_transaction/add_transaction_screen.dart';
 import 'package:artavia/page/transfer/transfer_controller.dart';
 import 'package:artavia/widgets/kobalt/kobalt.dart';
+import 'package:artavia/core/services/privacy_service.dart';
 
 /// Transfer segment of Catat (board "Transfer"): Dari/Ke with balances and
 /// swap, amount field, remembered admin fee chips, who pays it, and a live
@@ -92,6 +93,7 @@ class _PairCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    PrivacyService.watch(context);
     final c = controller;
     return KCard(
       child: Stack(

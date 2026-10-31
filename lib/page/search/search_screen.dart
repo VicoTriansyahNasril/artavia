@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/core/utils/date_format.dart';
-import 'package:artavia/page/add_transaction/add_transaction_screen.dart';
 import 'package:artavia/page/search/search_controller.dart' as app;
 import 'package:artavia/widgets/kobalt/kobalt.dart';
 import 'package:artavia/widgets/transaction/transaction_item.dart';

@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:artavia/model/transaction_model.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/services/period_service.dart';
+import 'package:artavia/core/services/settings_service.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
 import 'package:artavia/core/utils/date_format.dart';
 import 'package:artavia/core/utils/finance_calc.dart';
@@ -67,6 +68,12 @@ class HomeController extends GetxController {
   final starterBalance = 0.obs;
   final isCreating = false.obs;
 
+  // Optional budget step after the first account: a few expense categories
+  // with a monthly limit each (id → amount).
+  final budgetStep = false.obs;
+  final starterCategories = <Map<String, dynamic>>[].obs;
+  final starterBudgets = <int, int>{}.obs;
+
   Period get period => PeriodService.to.active.value;
 
   String get greeting {
@@ -99,6 +106,9 @@ class HomeController extends GetxController {
       final db = DatabaseHelper.instance;
       final accounts = await db.readAllAccounts();
       hasAccounts.value = accounts.isNotEmpty;
+      if (accounts.isNotEmpty && SettingsService.to.budgetStepPending) {
+        await _loadBudgetStep();
+      }
 
       final p = period;
       final rows = await db.readTransactionsByRange(p.start, p.end);
@@ -191,6 +201,7 @@ class HomeController extends GetxController {
         'color_val': categoryPaletteValues[7],
         'is_excluded': 0,
       });
+      await SettingsService.to.set(SettingsService.keyBudgetStep, 'true');
       refreshAllGlobalData();
       AppToast.success('Rekening dibuat', 'Sekarang kamu bisa mulai mencatat');
     } catch (_) {
@@ -198,5 +209,41 @@ class HomeController extends GetxController {
     } finally {
       isCreating.value = false;
     }
+  }
+
+  /// Top expense categories (sort order) offered on the budget step.
+  Future<void> _loadBudgetStep() async {
+    final cats = await DatabaseHelper.instance.readAllCategories();
+    starterCategories.value = cats
+        .where((c) => c['type'] == 'pengeluaran' && c['is_archived'] != 1)
+        .take(4)
+        .toList();
+    budgetStep.value = starterCategories.isNotEmpty;
+  }
+
+  /// Saves every filled limit for the active period, then ends the step.
+  Future<void> saveStarterBudgets() async {
+    final p = period;
+    isCreating.value = true;
+    try {
+      for (final e in starterBudgets.entries) {
+        if (e.value <= 0) continue;
+        await DatabaseHelper.instance.upsertBudget(
+            categoryId: e.key, amount: e.value, month: p.month, year: p.year);
+      }
+      await skipBudgetStep();
+      AppToast.success('Anggaran disimpan', 'Berlaku untuk ${p.longLabel}');
+    } catch (_) {
+      AppToast.error('Gagal', 'Anggaran tidak dapat disimpan');
+    } finally {
+      isCreating.value = false;
+    }
+  }
+
+  Future<void> skipBudgetStep() async {
+    budgetStep.value = false;
+    starterBudgets.clear();
+    await SettingsService.to.remove(SettingsService.keyBudgetStep);
+    refreshAllGlobalData();
   }
 }

@@ -15,6 +15,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/services/backup_codec.dart';
 import 'package:artavia/core/services/google_drive_service.dart';
+import 'package:artavia/core/services/pin_lock_service.dart';
 import 'package:artavia/core/services/period_service.dart';
 import 'package:artavia/core/services/settings_service.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
@@ -381,6 +382,7 @@ class BackupService extends GetxService with WidgetsBindingObserver {
       }
     }
     PeriodService.to.resetToToday();
+    await PinLockService.to.syncSecureScreen();
     refreshAllGlobalData();
   }
 

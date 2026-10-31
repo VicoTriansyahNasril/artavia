@@ -170,6 +170,7 @@ class _GroupSection extends GetView<AccountManagementController> {
 
   @override
   Widget build(BuildContext context) {
+    PrivacyService.watch(context);
     final collapsed = controller.collapsed.contains(group.name);
     final money = CurrencyService.to;
     return Column(
@@ -224,6 +225,7 @@ class _AccountRow extends GetView<AccountManagementController> {
 
   @override
   Widget build(BuildContext context) {
+    PrivacyService.watch(context);
     final balance = account['balance'] as int? ?? 0;
     final excluded = account['is_excluded'] == 1;
     final limit = account['credit_limit'] as int?;

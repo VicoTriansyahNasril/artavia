@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:artavia/core/database/dummy_data.dart';
 import 'package:artavia/widgets/commons/common.dart';
 
 class DatabaseHelper {
@@ -277,9 +276,6 @@ CREATE TABLE settings (
     }
     await batch.commit(noResult: true);
 
-    if (useDummyData) {
-      await DummyDataGenerator.generate(db);
-    }
     await _backfillV12(db);
   }
 

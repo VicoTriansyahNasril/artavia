@@ -11,8 +11,6 @@ import 'package:artavia/widgets/kobalt/kobalt.dart';
 class AddAccountScreen extends GetView<AccountManagementController> {
   const AddAccountScreen({super.key});
 
-  static final _amount = [CurrencyInputFormatter()];
-
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -84,20 +82,15 @@ class AddAccountScreen extends GetView<AccountManagementController> {
               ],
             ),
             const SizedBox(height: 12),
-            KField(
+            KAmountField(
               key: ValueKey('balance$version'),
               label: c.isCreditCard ? 'Tagihan saat ini' : 'Saldo',
-              hint: '0',
-              initialValue: CurrencyInputFormatter.initial(c.balance.value),
-              prefix: Text(c.balance.value < 0 ? '−Rp' : 'Rp',
-                  style: AppText.body.muted),
-              keyboardType: TextInputType.number,
-              inputFormatters: _amount,
+              value: c.balance.value,
+              prefix: c.balance.value < 0 ? '−Rp' : 'Rp',
               helper: c.isCreditCard || c.typeValue.value == 'Pinjaman'
                   ? 'Dicatat sebagai utang (saldo minus).'
                   : null,
-              onChanged: (v) {
-                final n = CurrencyInputFormatter.parse(v);
+              onChanged: (n) {
                 final debt = c.isCreditCard || c.typeValue.value == 'Pinjaman';
                 c.balance.value = debt ? -n : n;
               },
@@ -107,16 +100,11 @@ class AddAccountScreen extends GetView<AccountManagementController> {
               Row(
                 children: [
                   Expanded(
-                    child: KField(
+                    child: KAmountField(
                       key: ValueKey('limit$version'),
                       label: 'Limit',
-                      hint: '0',
-                      initialValue:
-                          CurrencyInputFormatter.initial(c.creditLimit.value),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: _amount,
-                      onChanged: (v) =>
-                          c.creditLimit.value = CurrencyInputFormatter.parse(v),
+                      value: c.creditLimit.value,
+                      onChanged: (n) => c.creditLimit.value = n,
                     ),
                   ),
                   const SizedBox(width: 12),

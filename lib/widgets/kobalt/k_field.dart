@@ -70,14 +70,85 @@ class _KFieldState extends State<KField> {
 
   @override
   Widget build(BuildContext context) {
-    final tone = switch (widget.state) {
+    return KFieldFrame(
+      label: widget.label,
+      helper: widget.helper,
+      state: widget.state,
+      focused: _focus.hasFocus,
+      child: Row(
+        children: [
+          if (widget.prefix != null) ...[
+            widget.prefix!,
+            const SizedBox(width: 10),
+          ],
+          Expanded(
+            child: TextFormField(
+              controller: widget.controller,
+              initialValue:
+                  widget.controller == null ? widget.initialValue : null,
+              focusNode: _focus,
+              onChanged: widget.onChanged,
+              onFieldSubmitted: widget.onSubmitted,
+              keyboardType: widget.keyboardType,
+              inputFormatters: widget.inputFormatters,
+              maxLength: widget.maxLength,
+              autofocus: widget.autofocus,
+              obscureText: widget.obscureText,
+              textInputAction: widget.textInputAction,
+              style: AppText.body.copyWith(color: colorText),
+              cursorColor: colorAccent,
+              decoration: InputDecoration(
+                hintText: widget.hint,
+                hintStyle: AppText.body.muted,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                counterText: '',
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ),
+          if (widget.suffix != null) ...[
+            const SizedBox(width: 8),
+            widget.suffix!,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Shared chrome of [KField] and `KAmountField`: label, the 56 h card box
+/// (r14) with its ring — 1 px divider → 1.5 px accent when [focused],
+/// 1.5 px danger/warning for [state] — and the helper line.
+class KFieldFrame extends StatelessWidget {
+  final String? label;
+  final String? helper;
+  final KFieldState state;
+  final bool focused;
+  final Widget child;
+
+  const KFieldFrame({
+    super.key,
+    this.label,
+    this.helper,
+    this.state = KFieldState.normal,
+    this.focused = false,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = switch (state) {
       KFieldState.error => colorDanger,
       KFieldState.warning => colorWarning,
       KFieldState.normal => null,
     };
     final ring = tone != null
         ? BorderSide(color: tone, width: 1.5)
-        : _focus.hasFocus
+        : focused
             ? BorderSide(color: colorAccent, width: 1.5)
             : BorderSide(color: colorDivider);
 
@@ -85,10 +156,10 @@ class _KFieldState extends State<KField> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.label != null)
+        if (label != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 6, left: 4),
-            child: Text(widget.label!, style: AppText.caption.muted),
+            child: Text(label!, style: AppText.caption.muted),
           ),
         AnimatedContainer(
           duration: const Duration(milliseconds: 150),
@@ -99,53 +170,13 @@ class _KFieldState extends State<KField> {
             borderRadius: BorderRadius.circular(14),
             border: Border.fromBorderSide(ring),
           ),
-          child: Row(
-            children: [
-              if (widget.prefix != null) ...[
-                widget.prefix!,
-                const SizedBox(width: 10),
-              ],
-              Expanded(
-                child: TextFormField(
-                  controller: widget.controller,
-                  initialValue:
-                      widget.controller == null ? widget.initialValue : null,
-                  focusNode: _focus,
-                  onChanged: widget.onChanged,
-                  onFieldSubmitted: widget.onSubmitted,
-                  keyboardType: widget.keyboardType,
-                  inputFormatters: widget.inputFormatters,
-                  maxLength: widget.maxLength,
-                  autofocus: widget.autofocus,
-                  obscureText: widget.obscureText,
-                  textInputAction: widget.textInputAction,
-                  style: AppText.body.copyWith(color: colorText),
-                  cursorColor: colorAccent,
-                  decoration: InputDecoration(
-                    hintText: widget.hint,
-                    hintStyle: AppText.body.muted,
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    counterText: '',
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-              ),
-              if (widget.suffix != null) ...[
-                const SizedBox(width: 8),
-                widget.suffix!,
-              ],
-            ],
-          ),
+          child: child,
         ),
-        if (widget.helper != null)
+        if (helper != null)
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 4),
             child: Text(
-              widget.helper!,
+              helper!,
               style: AppText.caption.copyWith(color: tone ?? colorGrey),
             ),
           ),

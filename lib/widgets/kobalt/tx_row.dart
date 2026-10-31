@@ -4,6 +4,7 @@ import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/core/utils/date_format.dart';
 import 'package:artavia/model/transaction_model.dart';
 import 'package:artavia/widgets/commons/common.dart';
+import 'package:artavia/core/services/privacy_service.dart';
 
 /// Transaction row (64 h): round category icon, title (wraps at large text
 /// sizes), "Kategori · Rekening · jam", signed amount on the right.
@@ -48,6 +49,7 @@ class TxRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    PrivacyService.watch(context);
     final amount = (tx.amount ?? 0).abs();
     final color = _isTransfer
         ? colorAccent

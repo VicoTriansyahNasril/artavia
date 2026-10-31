@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:artavia/core/database/database_helper.dart';
-import 'package:artavia/core/database/dummy_data.dart';
 import 'package:artavia/core/services/notification_service.dart';
 import 'package:artavia/core/services/period_service.dart';
 import 'package:artavia/core/services/pin_lock_service.dart';
@@ -134,25 +133,12 @@ class SettingsController extends GetxController {
       await DatabaseHelper.instance.resetDatabase();
       await settings.reload();
       PinLockService.to.unlock();
+      await PinLockService.to.syncSecureScreen();
       PeriodService.to.resetToToday();
       refreshAllGlobalData();
       AppToast.success('Reset selesai', 'Semua data berhasil dihapus');
     } finally {
       isWorking.value = false;
-    }
-  }
-
-  /// Debug only (constitution V): the menu row is behind `kDebugMode`.
-  Future<void> generateDummyData() async {
-    try {
-      AppDialog.showProgress();
-      await DummyDataGenerator.generate(await DatabaseHelper.instance.database);
-      AppDialog.hideProgress();
-      refreshAllGlobalData();
-      AppToast.success('Berhasil', 'Data dummy berhasil ditambahkan');
-    } catch (e) {
-      AppDialog.hideProgress();
-      AppToast.error('Gagal', '$e');
     }
   }
 }

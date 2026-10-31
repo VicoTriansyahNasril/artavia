@@ -52,8 +52,8 @@ class _UnlockScreenState extends State<_UnlockScreen> {
 
   Future<void> _check(String pin) async {
     if (_service.secondsBlocked > 0) {
-      setState(
-          () => _message = 'Coba lagi dalam ${_service.secondsBlocked} detik');
+      setState(() => _message = 'Coba lagi dalam '
+          '${PinLockService.waitLabel(_service.secondsBlocked)}');
       return;
     }
     setState(() => _busy = true);
@@ -68,7 +68,8 @@ class _UnlockScreenState extends State<_UnlockScreen> {
     setState(() {
       _busy = false;
       _message = wait > 0
-          ? 'Terlalu banyak percobaan. Coba lagi dalam $wait detik'
+          ? 'Terlalu banyak percobaan. Coba lagi dalam '
+              '${PinLockService.waitLabel(wait)}'
           : 'PIN salah. Sisa $left percobaan.';
     });
   }
@@ -84,6 +85,7 @@ class _UnlockScreenState extends State<_UnlockScreen> {
     await SettingsService.to.reload();
     PeriodService.to.resetToToday();
     _service.unlock();
+    await _service.syncSecureScreen();
     refreshAllGlobalData();
     Get.toNamed(backupRoute);
   }

@@ -219,6 +219,13 @@ const List<int> categoryPaletteValues = [
   0xFF8D94A3,
 ];
 
+/// App icon (konsep A): blue tile gradient, white "A", gold crossbar.
+/// Fixed across themes, like the launcher icon itself.
+const Color brandTileTop = Color(0xFF3D72F2);
+const Color brandTileBottom = Color(0xFF2252CC);
+const Color brandMark = Color(0xFFFFFFFF);
+const Color brandGold = Color(0xFFF5C26B);
+
 AppPalette get _p => AppPalette.current;
 
 // ─── Background Layers ────────────────────────────────────────────────────────
