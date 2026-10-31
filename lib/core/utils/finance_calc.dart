@@ -151,7 +151,21 @@ class BudgetSummary {
   double get ratio => total == 0 ? 0 : used / total;
 }
 
-/// Totals for budget rows (`category_id`, `budget_amount`) given usage.
+/// Spending of a budget row (`category_ids`) — the sum over its categories.
+int budgetUsed(Map<String, dynamic> budget, Map<int, int> usedByCategory) =>
+    (budget['category_ids'] as List? ?? const [])
+        .fold(0, (s, id) => s + (usedByCategory[id] ?? 0));
+
+/// Budget row of [budgets] that holds [categoryId], if any.
+Map<String, dynamic>? budgetOfCategory(
+        Iterable<Map<String, dynamic>> budgets, int? categoryId) =>
+    categoryId == null
+        ? null
+        : budgets
+            .where((b) => (b['category_ids'] as List).contains(categoryId))
+            .firstOrNull;
+
+/// Totals for budget rows (`category_ids`, `budget_amount`) given usage.
 BudgetSummary summarizeBudget(
   Iterable<Map<String, dynamic>> budgets,
   Map<int, int> usedByCategory,
@@ -161,7 +175,7 @@ BudgetSummary summarizeBudget(
   var over = 0;
   for (final b in budgets) {
     final limit = b['budget_amount'] as int;
-    final spent = usedByCategory[b['category_id'] as int?] ?? 0;
+    final spent = budgetUsed(b, usedByCategory);
     total += limit;
     used += spent;
     if (spent > limit) over++;

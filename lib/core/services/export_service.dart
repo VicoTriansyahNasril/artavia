@@ -113,12 +113,21 @@ abstract final class ExportService {
     }
     if (parts.contains(ExportPart.budgets)) {
       sheets[ExportPart.budgets.sheet] = [
-        ['Bulan', 'Kategori', 'Batas'],
+        ['Bulan', 'Nama', 'Kategori', 'Batas', 'Ikon', 'Warna'],
         for (final b in budgets)
           [
             '${(b['month'] as int).toString().padLeft(2, '0')}/${b['year']}',
-            b['categoryName'] ?? '',
+            b['name'] ?? '',
+            [
+              for (final c in b['categories'] as List? ?? const []) c['name'],
+            ].join(', '),
             b['budget_amount'] as int,
+            b['icon_key'] ?? '',
+            if (b['color_val'] case final int v)
+              categoryPaletteNames[
+                  categoryPaletteValues.indexOf(nearestPaletteValue(v))]
+            else
+              '',
           ],
       ];
     }
@@ -145,13 +154,8 @@ abstract final class ExportService {
     return rows;
   }
 
-  static Future<List<Map<String, dynamic>>> _budgets() async {
-    final db = await DatabaseHelper.instance.database;
-    return db.rawQuery('''
-      SELECT b.*, c.name AS categoryName FROM budgets b
-      LEFT JOIN categories c ON b.category_id = c.id
-      ORDER BY b.year, b.month, c.name''');
-  }
+  static Future<List<Map<String, dynamic>>> _budgets() =>
+      DatabaseHelper.instance.readAllBudgets();
 
   static Future<Map<ExportPart, int>> counts(ExportRange range) async {
     final db = DatabaseHelper.instance;

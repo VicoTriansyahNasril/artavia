@@ -60,6 +60,11 @@ Future<void> _writeV11Fixture(String path) async {
     'account_id': 1,
     'date': '2026-10-01T12:00:00.000',
   });
+  await db.insert('budgets',
+      {'category_id': 1, 'budget_amount': 500000, 'month': 10, 'year': 2026});
+  // Category gone: dropped by v13.
+  await db.insert('budgets',
+      {'category_id': 99, 'budget_amount': 1, 'month': 10, 'year': 2026});
   await db.setVersion(11);
   await db.close();
 }
@@ -119,6 +124,17 @@ void main() {
 
     final joined = await db.rawQuery(DatabaseHelper.transactionSelect);
     expect(joined.single['categoryIconKey'], cat['icon_key']);
+
+    // v13: the budget is named after its category and linked to it.
+    final budget = (await db.query('budgets')).single;
+    expect(budget['name'], 'Makanan');
+    expect(budget['category_id'], isNull);
+    // v14: own icon/color columns, empty = follow the categories.
+    expect(budget['icon_key'], isNull);
+    expect(budget['color_val'], isNull);
+    expect(await db.query('budget_categories'), [
+      {'budget_id': budget['id'], 'category_id': 1},
+    ]);
     await db.close();
   });
 

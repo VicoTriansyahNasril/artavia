@@ -141,12 +141,12 @@ class HomeController extends GetxController {
     var worst = -1.0;
     for (final b in budgets) {
       final limit = b['budget_amount'] as int;
-      final used = usedByCategory[b['category_id']] ?? 0;
+      final used = budgetUsed(b, usedByCategory);
       final ratio = limit == 0 ? 0.0 : used / limit;
       final l = budgetStatus(used, limit);
       if (l != BudgetLevel.safe && ratio > worst) {
         worst = ratio;
-        name = b['categoryName'] as String?;
+        name = b['name'] as String?;
         level = l;
       }
     }

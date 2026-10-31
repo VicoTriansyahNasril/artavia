@@ -8,6 +8,7 @@ import 'package:artavia/core/services/settings_service.dart';
 import 'package:artavia/core/utils/calc_engine.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
+import 'package:artavia/core/utils/finance_calc.dart';
 import 'package:artavia/page/account_management/account_management_controller.dart';
 import 'package:artavia/page/transfer/transfer_controller.dart';
 import 'package:artavia/widgets/components/app_feedback.dart';
@@ -283,25 +284,20 @@ class AddTransactionController extends GetxController {
     }
   }
 
-  /// Warning when the saved expense pushed its category over budget.
+  /// Warning when the saved expense pushed its category's budget over.
   Future<String?> _overBudgetMessage() async {
     final period =
         Period.containing(selectedDate.value, PeriodService.to.startDay);
     final db = DatabaseHelper.instance;
     final budgets = await db.readBudgetsByMonth(period.year, period.month);
-    final budget = budgets
-        .firstWhereOrNull((b) => b['category_id'] == selectedCategoryId.value);
+    final budget = budgetOfCategory(budgets, selectedCategoryId.value);
     if (budget == null) return null;
     final rows = await db.readTransactionsByRange(period.start, period.end);
-    final used = rows
-        .where((t) =>
-            t['type'] == 'pengeluaran' &&
-            t['category_id'] == selectedCategoryId.value)
-        .fold<int>(0, (s, t) => s + (t['amount'] as int));
+    final used = budgetUsed(budget, expenseByCategoryId(rows));
     final limit = budget['budget_amount'] as int;
     if (used <= limit) return null;
     final money = CurrencyService.to;
-    return '${selectedCategory?['name'] ?? 'Kategori'}: '
+    return '${budget['name']}: '
         '${money.money(used, maskable: false)} dari '
         '${money.money(limit, maskable: false)}';
   }

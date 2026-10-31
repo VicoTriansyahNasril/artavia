@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/page/category_management/category_management_controller.dart';
 import 'package:artavia/widgets/kobalt/kobalt.dart';
 
@@ -168,7 +167,7 @@ class _CategoryRow extends GetView<CategoryManagementController> {
     final budget = controller.budgets[id];
     final subtitle = [
       '$count transaksi',
-      if (budget != null) 'Anggaran ${CurrencyService.to.short(budget)}',
+      if (budget != null) 'Anggaran $budget',
     ].join(' · ');
     final radius = BorderRadius.vertical(
       top: Radius.circular(first ? 16 : 0),

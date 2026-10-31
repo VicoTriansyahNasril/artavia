@@ -114,7 +114,6 @@ class TransactionDetailScreen extends StatelessWidget {
           if (type == 'pengeluaran' && arg['category_id'] != null)
             _CategoryBudget(
               categoryId: arg['category_id'] as int,
-              categoryName: category,
               date: date,
             ),
           const SizedBox(height: 8),
@@ -194,38 +193,37 @@ class TransactionDetailScreen extends StatelessWidget {
   }
 }
 
-/// "Anggaran <kategori>" card for the period the transaction falls in.
+/// "Anggaran <nama>" card: the budget holding this category in the period
+/// the transaction falls in.
 class _CategoryBudget extends StatelessWidget {
   final int categoryId;
-  final String categoryName;
   final DateTime date;
 
-  const _CategoryBudget({
-    required this.categoryId,
-    required this.categoryName,
-    required this.date,
-  });
+  const _CategoryBudget({required this.categoryId, required this.date});
 
-  Future<(int, int)?> _load() async {
+  Future<(String, int, int)?> _load() async {
     final db = DatabaseHelper.instance;
     final period = Period.containing(date, PeriodService.to.startDay);
     final budgets = await db.readBudgetsByMonth(period.year, period.month);
-    final budget =
-        budgets.firstWhereOrNull((b) => b['category_id'] == categoryId);
+    final budget = budgetOfCategory(budgets, categoryId);
     if (budget == null) return null;
     final rows = await db.readTransactionsByRange(period.start, period.end);
-    final used = expenseByCategoryId(rows)[categoryId] ?? 0;
-    return (used, budget['budget_amount'] as int);
+    final used = budgetUsed(budget, expenseByCategoryId(rows));
+    return (
+      budget['name'] as String,
+      used,
+      budget['budget_amount'] as int,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<(int, int)?>(
+    return FutureBuilder<(String, int, int)?>(
       future: _load(),
       builder: (context, snap) {
         final data = snap.data;
         if (data == null) return const SizedBox.shrink();
-        final (used, limit) = data;
+        final (name, used, limit) = data;
         final level = budgetStatus(used, limit);
         final tone = switch (level) {
           BudgetLevel.over => KTone.danger,
@@ -237,7 +235,7 @@ class _CategoryBudget extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SectionHeader(title: 'Anggaran $categoryName'),
+            SectionHeader(title: 'Anggaran $name'),
             KCard(
               padding: const EdgeInsets.all(16),
               child: Column(

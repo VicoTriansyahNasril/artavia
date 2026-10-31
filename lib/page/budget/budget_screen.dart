@@ -4,7 +4,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/core/utils/finance_calc.dart';
 import 'package:artavia/page/budget/budget_controller.dart';
-import 'package:artavia/widgets/components/app_feedback.dart';
 import 'package:artavia/widgets/kobalt/kobalt.dart';
 
 /// Anggaran (board): hero, Perlu perhatian / Aman, empty state with
@@ -18,6 +17,11 @@ class BudgetScreen extends GetView<BudgetController> {
       leading: ScaffoldLeading.back,
       title: 'Anggaran',
       actions: [
+        KIconButton(
+          icon: LucideIcons.fileDown,
+          semanticLabel: 'Impor anggaran',
+          onPressed: controller.importFile,
+        ),
         KIconButton(
           icon: LucideIcons.plus,
           semanticLabel: 'Tambah anggaran',
@@ -75,6 +79,12 @@ class BudgetScreen extends GetView<BudgetController> {
                         _BudgetRow(item: i, onTap: () => _editSheet(i)),
                     ],
                   ),
+                const SizedBox(height: 8),
+                KButton.text(
+                  label: 'Salin ke ${c.period.shift(1).longLabel}',
+                  icon: LucideIcons.copy,
+                  onPressed: c.isWorking.value ? null : c.copyToNext,
+                ),
               ],
             ],
           ),
@@ -83,69 +93,212 @@ class BudgetScreen extends GetView<BudgetController> {
     );
   }
 
-  /// Add (no [item]) or edit a budget in a bottom sheet.
+  /// Add (no [item]) or edit a budget in a bottom sheet: name, one or more
+  /// expense categories (or a new one), and the monthly limit.
   void _editSheet([BudgetItem? item]) {
     final c = controller;
-    if (item == null && c.unbudgeted.isEmpty) {
-      AppToast.info('Semua kategori sudah dianggarkan',
-          'Ketuk salah satu anggaran untuk mengubahnya.');
-      return;
-    }
-    final categoryId = RxnInt(item?.categoryId);
+    final selected = <int>{...?item?.categoryIds}.obs;
+    final name = (item?.name ?? '').obs;
+    final iconKey = RxnString(item?.ownIconKey);
+    final colorVal = RxnInt(item?.ownColorVal);
     final amount = (item?.limit ?? 0).obs;
+    final addingCategory = false.obs;
+
+    Future<void> addCategory() async {
+      if (addingCategory.value) return;
+      addingCategory.value = true;
+      try {
+        selected.addAll(await c.addCategory());
+      } finally {
+        addingCategory.value = false;
+      }
+    }
+
     showSheet(
       SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
               16, 0, 16, 16 + MediaQuery.viewInsetsOf(Get.context!).bottom),
-          child: Obx(() => Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(item == null ? 'Anggaran baru' : 'Anggaran ${item.name}',
-                      style: AppText.title3.copyWith(color: colorText)),
-                  const SizedBox(height: 4),
-                  Text('Batas untuk ${c.period.longLabel}',
-                      style: AppText.caption.muted),
-                  if (item == null) ...[
-                    const SectionHeader(title: 'Kategori'),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final cat in c.unbudgeted)
-                          KChip(
-                            label: cat['name'] as String,
-                            selected: categoryId.value == cat['id'],
-                            onTap: () => categoryId.value = cat['id'] as int,
+          child: Obx(() {
+            final options = c.availableFor(item);
+            final taken = c.nameTaken(name.value, exceptId: item?.id);
+            final hint = selected.isEmpty
+                ? 'Mis. Makan & jajan'
+                : c.defaultName(selected);
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(item == null ? 'Anggaran baru' : 'Ubah anggaran',
+                    style: AppText.title3.copyWith(color: colorText)),
+                const SizedBox(height: 4),
+                Text('Batas untuk ${c.period.longLabel}',
+                    style: AppText.caption.muted),
+                const SizedBox(height: 12),
+                KField(
+                  label: 'Nama anggaran',
+                  hint: hint,
+                  initialValue: name.value,
+                  maxLength: BudgetController.maxName,
+                  textInputAction: TextInputAction.done,
+                  state: taken ? KFieldState.error : KFieldState.normal,
+                  helper: taken
+                      ? 'Nama ini sudah dipakai'
+                      : 'Kosongkan untuk memakai nama kategori',
+                  onChanged: (v) => name.value = v,
+                ),
+                const SectionHeader(title: 'Kategori'),
+                Text('Pilih satu atau lebih. Pengeluarannya dijumlahkan.',
+                    style: AppText.caption.muted),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final cat in options)
+                      KChip(
+                        label: cat['name'] as String,
+                        showCheck: true,
+                        selected: selected.contains(cat['id']),
+                        onTap: () {
+                          final id = cat['id'] as int;
+                          if (!selected.remove(id)) selected.add(id);
+                        },
+                      ),
+                    KChip(
+                      label: 'Kategori baru',
+                      icon: LucideIcons.plus,
+                      onTap: addingCategory.value ? null : addCategory,
+                    ),
+                  ],
+                ),
+                const SectionHeader(title: 'Ikon & warna'),
+                _Appearance(
+                  iconKey: iconKey.value ?? _autoIcon(selected),
+                  colorVal: colorVal.value ?? _autoColor(selected),
+                  custom: iconKey.value != null || colorVal.value != null,
+                  onIcon: (k) => iconKey.value = k,
+                  onColor: (v) => colorVal.value = v,
+                  onReset: () {
+                    iconKey.value = null;
+                    colorVal.value = null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                KAmountField(
+                  label: 'Batas per bulan',
+                  value: amount.value,
+                  onChanged: (n) => amount.value = n,
+                ),
+                const SizedBox(height: 16),
+                KButton(
+                  label: 'Simpan anggaran',
+                  onPressed: selected.isEmpty ||
+                          amount.value <= 0 ||
+                          taken ||
+                          c.isWorking.value
+                      ? null
+                      : () => c.save(
+                            item: item,
+                            name: name.value,
+                            categoryIds: {...selected},
+                            amount: amount.value,
+                            iconKey: iconKey.value,
+                            colorVal: colorVal.value,
                           ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  KAmountField(
-                    label: 'Batas per bulan',
-                    value: amount.value,
-                    onChanged: (n) => amount.value = n,
+                ),
+                if (item != null) ...[
+                  const SizedBox(height: 8),
+                  KButton.text(
+                    label: 'Hapus anggaran',
+                    onPressed: () => c.delete(item),
                   ),
-                  const SizedBox(height: 16),
-                  KButton(
-                    label: 'Simpan anggaran',
-                    onPressed: categoryId.value == null || amount.value <= 0
-                        ? null
-                        : () => c.save(categoryId.value!, amount.value),
-                  ),
-                  if (item != null) ...[
-                    const SizedBox(height: 8),
-                    KButton.text(
-                      label: 'Hapus anggaran',
-                      onPressed: () => c.delete(item),
-                    ),
-                  ],
                 ],
-              )),
+              ],
+            );
+          }),
         ),
       ),
       isScrollControlled: true,
+    );
+  }
+
+  /// Icon shown when none is chosen: the only category's, else a tag.
+  String _autoIcon(Set<int> ids) {
+    final cat = ids.length == 1 ? controller.categoryById(ids.single) : null;
+    return IconRegistry.contains(cat?['icon_key'] as String?)
+        ? cat!['icon_key'] as String
+        : ids.length == 1
+            ? IconRegistry.legacyToKey(
+                iconPath: cat?['icon_path'] as String?,
+                iconCode: cat?['icon_code'] as int?)
+            : 'label';
+  }
+
+  int? _autoColor(Set<int> ids) => ids.isEmpty
+      ? null
+      : controller.categoryById(ids.first)?['color_val'] as int?;
+}
+
+/// Budget icon + color: preview, "Ganti ikon" (search sheet), palette and
+/// "Ikuti kategori" to go back to the automatic look.
+class _Appearance extends StatelessWidget {
+  final String iconKey;
+  final int? colorVal;
+  final bool custom;
+  final ValueChanged<String> onIcon;
+  final ValueChanged<int> onColor;
+  final VoidCallback onReset;
+
+  const _Appearance({
+    required this.iconKey,
+    required this.colorVal,
+    required this.custom,
+    required this.onIcon,
+    required this.onColor,
+    required this.onReset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = themedColor(colorVal);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            CategoryIcon.round(iconKey: iconKey, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(custom ? 'Pilihan sendiri' : 'Mengikuti kategori',
+                  style: AppText.caption.muted),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            KChip(
+              label: 'Ganti ikon',
+              icon: LucideIcons.search,
+              onTap: () async {
+                final k = await showIconSearch(selected: iconKey, color: color);
+                if (k != null) onIcon(k);
+              },
+            ),
+            if (custom)
+              KChip(
+                label: 'Ikuti kategori',
+                icon: LucideIcons.rotateCcw,
+                onTap: onReset,
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        PaletteColorPicker(value: colorVal ?? -1, onChanged: onColor),
+      ],
     );
   }
 }
@@ -249,16 +402,32 @@ class _BudgetRow extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
+                        flex: 3,
                         child: Text(item.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppText.body.copyWith(color: colorText)),
                       ),
-                      Text(
-                          '${money.money(item.used)} / ${money.short(item.limit)}',
-                          style: AppText.caption.muted),
+                      const SizedBox(width: 8),
+                      // Shrinks on narrow screens / large text instead of
+                      // overflowing the row.
+                      Flexible(
+                        flex: 2,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                              '${money.money(item.used)} / ${money.short(item.limit)}',
+                              style: AppText.caption.muted),
+                        ),
+                      ),
                     ],
                   ),
+                  if (item.categoryLabel case final cats?)
+                    Text(cats,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.caption.muted),
                   const SizedBox(height: 6),
                   KProgress(value: item.ratio, tone: tone, height: 5),
                   const SizedBox(height: 4),
@@ -295,6 +464,20 @@ class _Empty extends StatelessWidget {
             icon: LucideIcons.plus,
             onPressed: onCreate,
           ),
+        ),
+        if (c.previousCount.value > 0) ...[
+          KButton.text(
+            label: 'Salin ${c.previousCount.value} anggaran dari '
+                '${c.period.shift(-1).longLabel}',
+            icon: LucideIcons.copy,
+            onPressed: c.isWorking.value ? null : c.copyFromPrevious,
+          ),
+          const SizedBox(height: 8),
+        ],
+        KButton.text(
+          label: 'Impor dari file',
+          icon: LucideIcons.fileDown,
+          onPressed: c.isWorking.value ? null : c.importFile,
         ),
         if (c.suggestions.isNotEmpty)
           ListGroup(

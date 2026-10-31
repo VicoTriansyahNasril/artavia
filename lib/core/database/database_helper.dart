@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:artavia/core/models/budget_import_row.dart';
 import 'package:artavia/widgets/commons/common.dart';
 
 class DatabaseHelper {
@@ -18,7 +19,7 @@ class DatabaseHelper {
     return _database!;
   }
 
-  static const dbVersion = 12;
+  static const dbVersion = 14;
 
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
@@ -136,12 +137,16 @@ CREATE TABLE categories (
 CREATE TABLE budgets (
   id $idType,
   category_id INTEGER,
+  name TEXT,
+  icon_key TEXT,
+  color_val INTEGER,
   budget_amount $intType,
   month $intType,
   year $intType,
   FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
 )
 ''');
+    await db.execute(_budgetCategoriesSql);
 
     await db.execute('''
 CREATE TABLE settings (
@@ -409,7 +414,61 @@ CREATE TABLE IF NOT EXISTS settings (
       }
       await _backfillV12(db);
     }
+    if (oldVersion < 13) {
+      await _migrateBudgetsV13(db);
+    }
+    if (oldVersion < 14) {
+      // Own icon/color per budget; NULL = follow its categories.
+      for (final col in ['icon_key TEXT', 'color_val INTEGER']) {
+        try {
+          await db.execute('ALTER TABLE budgets ADD COLUMN $col');
+        } catch (_) {}
+      }
+    }
   }
+
+  /// Budget ↔ category links (v13): one named budget covers 1..n expense
+  /// categories; a category belongs to at most one budget per period.
+  static const _budgetCategoriesSql = '''
+CREATE TABLE IF NOT EXISTS budget_categories (
+  budget_id INTEGER NOT NULL REFERENCES budgets (id) ON DELETE CASCADE,
+  category_id INTEGER NOT NULL REFERENCES categories (id) ON DELETE CASCADE,
+  PRIMARY KEY (budget_id, category_id)
+)
+''';
+
+  /// v13: budgets get a free `name` and move their single `category_id`
+  /// into `budget_categories`. Old rows are named after their category;
+  /// rows whose category is gone are dropped. `budgets.category_id` stays
+  /// (NULL) so a category delete never cascades a multi-category budget.
+  Future<void> _migrateBudgetsV13(Database db) async {
+    final cols = (await db.rawQuery('PRAGMA table_info(budgets)'))
+        .map((r) => r['name'] as String)
+        .toSet();
+    // Budgets created by the v4 upgrade lack these columns.
+    if (!cols.contains('category_id')) {
+      await db.execute('ALTER TABLE budgets ADD COLUMN category_id INTEGER');
+    }
+    if (!cols.contains('name')) {
+      await db.execute('ALTER TABLE budgets ADD COLUMN name TEXT');
+    }
+    await db.execute(_budgetCategoriesSql);
+    await db.execute('''
+INSERT OR IGNORE INTO budget_categories (budget_id, category_id)
+SELECT b.id, b.category_id FROM budgets b
+INNER JOIN categories c ON c.id = b.category_id''');
+    await db.execute('''
+UPDATE budgets SET name =
+  (SELECT c.name FROM categories c WHERE c.id = budgets.category_id)
+WHERE IFNULL(LENGTH(TRIM(name)), 0) = 0''');
+    await db.execute('UPDATE budgets SET category_id = NULL');
+    await pruneEmptyBudgets(db);
+  }
+
+  /// Drops budgets left without any category (after a category delete).
+  static Future<void> pruneEmptyBudgets(DatabaseExecutor db) =>
+      db.execute('DELETE FROM budgets WHERE id NOT IN '
+          '(SELECT budget_id FROM budget_categories)');
 
   static const _importBatchesSql = '''
 CREATE TABLE IF NOT EXISTS import_batches (
@@ -601,48 +660,250 @@ CREATE TABLE IF NOT EXISTS import_batches (
 
   Future<int> deleteCategory(int id) async {
     final db = await instance.database;
-    return await db.delete('categories', where: 'id = ?', whereArgs: [id]);
+    final n = await db.delete('categories', where: 'id = ?', whereArgs: [id]);
+    await pruneEmptyBudgets(db);
+    return n;
   }
 
   // ─── Budgets CRUD ────────────────────────────────────────────────────────
 
-  Future<List<Map<String, dynamic>>> readBudgetsByMonth(
-      int year, int month) async {
+  /// Budgets of one period, oldest first. Each row has `id`, `name`,
+  /// `budget_amount`, `month`, `year`, `category_ids` (List<int>) and
+  /// `categories` (category rows in manual order). Budgets without any
+  /// category are left out.
+  Future<List<Map<String, dynamic>>> readBudgetsByMonth(int year, int month) =>
+      _readBudgets('WHERE b.year = ? AND b.month = ?', [year, month]);
+
+  /// Every budget (export), by period.
+  Future<List<Map<String, dynamic>>> readAllBudgets() => _readBudgets('', []);
+
+  Future<List<Map<String, dynamic>>> _readBudgets(
+      String where, List<Object?> args) async {
     final db = await instance.database;
-    return await db.rawQuery('''
-      SELECT b.*, c.name as categoryName, c.type as categoryType, c.icon_code as categoryIconCode, c.icon_path as categoryIconPath, c.color_val as categoryColorVal, c.icon_key as categoryIconKey
-      FROM budgets b
-      INNER JOIN categories c ON b.category_id = c.id
-      WHERE b.year = ? AND b.month = ?
-    ''', [year, month]);
+    final budgets = await db.rawQuery(
+        'SELECT b.id, b.name, b.icon_key, b.color_val, b.budget_amount, '
+        'b.month, b.year FROM budgets b '
+        '$where ORDER BY b.year, b.month, b.id',
+        args);
+    if (budgets.isEmpty) return [];
+    final links = await db.rawQuery(
+        'SELECT bc.budget_id, c.* FROM budget_categories bc '
+        'INNER JOIN budgets b ON b.id = bc.budget_id '
+        'INNER JOIN categories c ON c.id = bc.category_id '
+        '$where ORDER BY c.sort_order, c.id',
+        args);
+    final byBudget = <int, List<Map<String, dynamic>>>{};
+    for (final l in links) {
+      final cat = Map<String, dynamic>.of(l)..remove('budget_id');
+      byBudget.putIfAbsent(l['budget_id'] as int, () => []).add(cat);
+    }
+    return [
+      for (final b in budgets)
+        if (byBudget[b['id']] case final cats?)
+          {
+            ...b,
+            'name': (b['name'] as String?)?.trim().isNotEmpty == true
+                ? b['name']
+                : cats.map((c) => c['name']).join(', '),
+            'category_ids': [for (final c in cats) c['id'] as int],
+            'categories': cats,
+          },
+    ];
   }
 
+  /// Creates ([id] null) or updates a named budget covering [categoryIds]
+  /// for one period. Those categories leave any other budget of the same
+  /// period (a category counts toward one budget only); budgets emptied by
+  /// that are removed. [iconKey]/[colorVal] null = follow the categories.
+  /// Returns the budget id.
+  Future<int> saveBudget({
+    int? id,
+    required String name,
+    required int amount,
+    required Set<int> categoryIds,
+    required int month,
+    required int year,
+    String? iconKey,
+    int? colorVal,
+  }) async {
+    final db = await instance.database;
+    return db.transaction((txn) => _saveBudget(txn,
+        id: id,
+        name: name,
+        amount: amount,
+        categoryIds: categoryIds,
+        month: month,
+        year: year,
+        iconKey: iconKey,
+        colorVal: colorVal));
+  }
+
+  static Future<int> _saveBudget(
+    Transaction txn, {
+    int? id,
+    required String name,
+    required int amount,
+    required Set<int> categoryIds,
+    required int month,
+    required int year,
+    String? iconKey,
+    int? colorVal,
+  }) async {
+    assert(categoryIds.isNotEmpty);
+    final row = {
+      'name': name.trim(),
+      'budget_amount': amount,
+      'month': month,
+      'year': year,
+      'icon_key': iconKey,
+      'color_val': colorVal,
+    };
+    final budgetId = id ?? await txn.insert('budgets', row);
+    if (id != null) {
+      await txn.update('budgets', row, where: 'id = ?', whereArgs: [id]);
+    }
+    final marks = List.filled(categoryIds.length, '?').join(', ');
+    await txn.rawDelete(
+        'DELETE FROM budget_categories WHERE budget_id = ? OR '
+        '(category_id IN ($marks) AND budget_id IN '
+        '(SELECT id FROM budgets WHERE month = ? AND year = ?))',
+        [budgetId, ...categoryIds, month, year]);
+    for (final c in categoryIds) {
+      await txn.insert(
+          'budget_categories', {'budget_id': budgetId, 'category_id': c});
+    }
+    await pruneEmptyBudgets(txn);
+    return budgetId;
+  }
+
+  /// Copies the budgets of one period into another. A budget is skipped
+  /// when the target already has its name; categories already budgeted in
+  /// the target are left out (and a budget with none left is skipped).
+  /// Returns how many budgets were created.
+  Future<int> copyBudgets({
+    required int fromYear,
+    required int fromMonth,
+    required int toYear,
+    required int toMonth,
+  }) async {
+    final source = await readBudgetsByMonth(fromYear, fromMonth);
+    final target = await readBudgetsByMonth(toYear, toMonth);
+    final names = {
+      for (final b in target) (b['name'] as String).toLowerCase(),
+    };
+    final taken = {
+      for (final b in target) ...(b['category_ids'] as List<int>),
+    };
+    final db = await instance.database;
+    return db.transaction((txn) async {
+      var copied = 0;
+      for (final b in source) {
+        final ids = {
+          for (final id in b['category_ids'] as List<int>)
+            if (!taken.contains(id)) id,
+        };
+        if (ids.isEmpty || names.contains((b['name'] as String).toLowerCase())) {
+          continue;
+        }
+        await _saveBudget(txn,
+            name: b['name'] as String,
+            amount: b['budget_amount'] as int,
+            categoryIds: ids,
+            month: toMonth,
+            year: toYear,
+            iconKey: b['icon_key'] as String?,
+            colorVal: b['color_val'] as int?);
+        taken.addAll(ids);
+        copied++;
+      }
+      return copied;
+    });
+  }
+
+  /// Writes imported budgets in one DB transaction. Categories are matched
+  /// by name (expense, any case, archived too); missing ones are created.
+  /// A budget with the same name in its period is updated, else created.
+  Future<BudgetImportResult> importBudgets(
+      List<BudgetImportRow> rows) async {
+    final db = await instance.database;
+    return db.transaction((txn) async {
+      final cats = await txn.query('categories',
+          where: 'type = ?', whereArgs: ['pengeluaran']);
+      final byName = {
+        for (final c in cats)
+          (c['name'] as String).toLowerCase(): c['id'] as int,
+      };
+      var sortOrder = cats.length;
+      var created = 0, updated = 0, newCategories = 0;
+      for (final r in rows) {
+        final ids = <int>{};
+        for (final name in r.categories) {
+          final key = name.toLowerCase();
+          var id = byName[key];
+          if (id == null) {
+            id = await txn.insert('categories', {
+              'name': name,
+              'type': 'pengeluaran',
+              'icon_key': IconRegistry.fallbackKey,
+              'color_val': categoryPaletteValues[
+                  sortOrder % categoryPaletteValues.length],
+              'sort_order': sortOrder++,
+            });
+            byName[key] = id;
+            newCategories++;
+          }
+          ids.add(id);
+        }
+        final existing = await txn.query('budgets',
+            columns: ['id'],
+            where: 'year = ? AND month = ? AND LOWER(name) = ?',
+            whereArgs: [r.year, r.month, r.name.toLowerCase()]);
+        final id = existing.isEmpty ? null : existing.first['id'] as int;
+        await _saveBudget(txn,
+            id: id,
+            name: r.name,
+            amount: r.amount,
+            categoryIds: ids,
+            month: r.month,
+            year: r.year,
+            iconKey: r.iconKey,
+            colorVal: r.colorVal);
+        id == null ? created++ : updated++;
+      }
+      return BudgetImportResult(created, updated, newCategories);
+    });
+  }
+
+  /// Sets the limit of the budget holding [categoryId] in that period, or
+  /// creates a one-category budget named after it (suggestions, onboarding).
   Future<int> upsertBudget(
       {required int categoryId,
       required int amount,
       required int month,
       required int year}) async {
-    final db = await instance.database;
-    final existing = await db.query(
-      'budgets',
-      where: 'category_id = ? AND month = ? AND year = ?',
-      whereArgs: [categoryId, month, year],
-    );
+    final existing = (await readBudgetsByMonth(year, month)).firstWhere(
+        (b) => (b['category_ids'] as List).contains(categoryId),
+        orElse: () => const {});
     if (existing.isNotEmpty) {
-      return await db.update(
-        'budgets',
-        {'budget_amount': amount},
-        where: 'category_id = ? AND month = ? AND year = ?',
-        whereArgs: [categoryId, month, year],
-      );
-    } else {
-      return await db.insert('budgets', {
-        'category_id': categoryId,
-        'budget_amount': amount,
-        'month': month,
-        'year': year,
-      });
+      return saveBudget(
+          id: existing['id'] as int,
+          name: existing['name'] as String,
+          amount: amount,
+          categoryIds: {...(existing['category_ids'] as List).cast<int>()},
+          month: month,
+          year: year,
+          iconKey: existing['icon_key'] as String?,
+          colorVal: existing['color_val'] as int?);
     }
+    final db = await instance.database;
+    final cat = await db.query('categories',
+        columns: ['name'], where: 'id = ?', whereArgs: [categoryId]);
+    return saveBudget(
+        name: cat.isEmpty ? '' : cat.first['name'] as String,
+        amount: amount,
+        categoryIds: {categoryId},
+        month: month,
+        year: year);
   }
 
   Future<int> deleteBudget(int id) async {

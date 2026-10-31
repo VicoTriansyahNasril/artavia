@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/database/database_helper.dart';
 import 'package:artavia/core/database/transaction_store.dart';
 import 'package:artavia/core/services/period_service.dart';
+import 'package:artavia/core/utils/currency_format.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
 import 'package:artavia/core/utils/finance_calc.dart';
 import 'package:artavia/page/routes.dart';
@@ -22,7 +23,9 @@ class CategoryManagementController extends GetxController {
   final income = <Map<String, dynamic>>[].obs;
   final archived = <Map<String, dynamic>>[].obs;
   final counts = <int, int>{}.obs;
-  final budgets = <int, int>{}.obs;
+
+  /// Category id → subtitle label of the budget holding it this period.
+  final budgets = <int, String>{}.obs;
   final isWorking = false.obs;
 
   // ─── Form ────────────────────────────────────────────────────────────────
@@ -55,7 +58,10 @@ class CategoryManagementController extends GetxController {
     final p = PeriodService.to.active.value;
     budgets.value = {
       for (final b in await db.readBudgetsByMonth(p.year, p.month))
-        b['category_id'] as int: b['budget_amount'] as int,
+        for (final id in b['category_ids'] as List<int>)
+          id: (b['category_ids'] as List).length == 1
+              ? CurrencyService.to.short(b['budget_amount'] as int)
+              : b['name'] as String,
     };
     final active = cats.where((c) => c['is_archived'] != 1);
     expense.value = active.where((c) => c['type'] == 'pengeluaran').toList();
@@ -227,11 +233,14 @@ class CategoryManagementController extends GetxController {
         final list = formType.value == 'pengeluaran' ? expense : income;
         await db.insertCategory({...data, 'sort_order': list.length});
       }
+      // Refresh before closing: when the form was opened on its own (from
+      // Catat or Anggaran) this controller is deleted once the pop finishes,
+      // and a reload landing after that threw — skipping the global refresh.
+      await loadCategories();
+      refreshAllGlobalData();
       Get.back();
       AppToast.success(editing ? 'Kategori diperbarui' : 'Kategori dibuat',
           '${data['name']} siap dipakai');
-      await loadCategories();
-      refreshAllGlobalData();
     } catch (_) {
       AppToast.error('Gagal', 'Kategori tidak dapat disimpan');
     } finally {

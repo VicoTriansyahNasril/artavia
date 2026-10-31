@@ -81,11 +81,33 @@ void main() {
       tx('pemasukan', 5000, DateTime(2026), cat: 1),
     ]);
     final summary = summarizeBudget([
-      {'category_id': 1, 'budget_amount': 500},
-      {'category_id': 2, 'budget_amount': 500},
+      {
+        'category_ids': [1],
+        'budget_amount': 500
+      },
+      {
+        'category_ids': [2],
+        'budget_amount': 500
+      },
     ], used);
     expect(summary.total, 1000);
     expect(summary.used, 800);
+    expect(summary.overCount, 1);
+  });
+
+  test('summarizeBudget sums every category of a multi-category budget', () {
+    final used = expenseByCategoryId([
+      tx('pengeluaran', 300, DateTime(2026), cat: 1),
+      tx('pengeluaran', 300, DateTime(2026), cat: 2),
+      tx('pengeluaran', 999, DateTime(2026), cat: 3),
+    ]);
+    final summary = summarizeBudget([
+      {
+        'category_ids': [1, 2],
+        'budget_amount': 500
+      },
+    ], used);
+    expect(summary.used, 600);
     expect(summary.overCount, 1);
   });
 

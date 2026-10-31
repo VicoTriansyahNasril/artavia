@@ -1,33 +1,57 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:artavia/core/database/database_helper.dart';
+import 'package:artavia/core/services/budget_import.dart';
+import 'package:artavia/core/services/import_service.dart';
 import 'package:artavia/core/services/period_service.dart';
 import 'package:artavia/core/utils/data_refresh.dart';
 import 'package:artavia/core/utils/finance_calc.dart';
+import 'package:artavia/page/routes.dart';
 import 'package:artavia/widgets/components/app_feedback.dart';
 
-/// One budget row with its usage this period.
+/// One named budget with its categories and usage this period.
 class BudgetItem {
   final int id;
-  final int categoryId;
   final String name;
   final int limit;
   final int used;
-  final int? colorVal;
-  final String? iconKey;
-  final String? iconPath;
-  final int? iconCode;
+
+  /// Category rows covered by this budget (at least one).
+  final List<Map<String, dynamic>> categories;
+
+  /// Icon/color chosen for the budget itself; null = follow categories.
+  final String? ownIconKey;
+  final int? ownColorVal;
 
   const BudgetItem({
     required this.id,
-    required this.categoryId,
     required this.name,
     required this.limit,
     required this.used,
-    this.colorVal,
-    this.iconKey,
-    this.iconPath,
-    this.iconCode,
+    required this.categories,
+    this.ownIconKey,
+    this.ownColorVal,
   });
+
+  Set<int> get categoryIds => {for (final c in categories) c['id'] as int};
+
+  /// Own icon, else the only category's, else a tag (multi-category).
+  Map<String, dynamic> get _first => categories.first;
+  bool get isSingle => categories.length == 1;
+  bool get _catIcon => ownIconKey == null && isSingle;
+  String? get iconKey =>
+      ownIconKey ?? (isSingle ? _first['icon_key'] as String? : 'label');
+  String? get iconPath => _catIcon ? _first['icon_path'] as String? : null;
+  int? get iconCode => _catIcon ? _first['icon_code'] as int? : null;
+  int? get colorVal => ownColorVal ?? _first['color_val'] as int?;
+
+  /// Category names under the title, unless the name already says it.
+  String? get categoryLabel {
+    final names = [for (final c in categories) c['name'] as String];
+    if (isSingle && names.single == name) return null;
+    return names.join(', ');
+  }
 
   BudgetLevel get level => budgetStatus(used, limit);
   int get left => limit - used;
@@ -43,12 +67,20 @@ class BudgetSuggestion {
 
 /// Anggaran (FR-022): hero with remaining + safe daily spend, "Perlu
 /// perhatian" (≥ 80 % / over) and "Aman" groups, and suggestions from the
-/// last 3 months when nothing is budgeted yet.
+/// last 3 months when nothing is budgeted yet. A budget has its own name
+/// and covers one or more expense categories; a category counts toward at
+/// most one budget per period.
 class BudgetController extends GetxController {
+  static const maxName = 30;
+
   final isLoading = false.obs;
   final isWorking = false.obs;
   final items = <BudgetItem>[].obs;
   final suggestions = <BudgetSuggestion>[].obs;
+
+  /// Budgets in the previous period (offered for copying when this one is
+  /// empty).
+  final previousCount = 0.obs;
 
   /// Expense categories (non-archived) for the add sheet.
   final categories = <Map<String, dynamic>>[].obs;
@@ -78,9 +110,40 @@ class BudgetController extends GetxController {
 
   int get safeDaily => safeDailySpend(remaining, daysLeft);
 
-  List<Map<String, dynamic>> get unbudgeted => categories
-      .where((c) => !items.any((i) => i.categoryId == c['id']))
-      .toList();
+  /// Expense categories free for [item] (all when null = new budget):
+  /// not held by another budget, plus [item]'s own (even if archived).
+  List<Map<String, dynamic>> availableFor(BudgetItem? item) {
+    final taken = {
+      for (final i in items)
+        if (i.id != item?.id) ...i.categoryIds,
+    };
+    final own = item?.categories ?? const [];
+    return [
+      ...own.where((c) => !categories.any((x) => x['id'] == c['id'])),
+      ...categories.where((c) => !taken.contains(c['id'])),
+    ];
+  }
+
+  List<Map<String, dynamic>> get unbudgeted => availableFor(null);
+
+  /// Budget names are unique (case-insensitive) within a period.
+  bool nameTaken(String name, {int? exceptId}) {
+    final n = name.trim().toLowerCase();
+    return n.isNotEmpty &&
+        items.any((i) => i.id != exceptId && i.name.toLowerCase() == n);
+  }
+
+  /// Category row by id (active categories and those held by budgets).
+  Map<String, dynamic>? categoryById(int id) => [
+        ...categories,
+        for (final i in items) ...i.categories,
+      ].where((c) => c['id'] == id).firstOrNull;
+
+  /// Name saved when the field is left empty: the category names.
+  String defaultName(Iterable<int> categoryIds) => <String>{
+        for (final c in [...categories, for (final i in items) ...i.categories])
+          if (categoryIds.contains(c['id'])) c['name'] as String,
+      }.join(', ');
 
   @override
   void onInit() {
@@ -108,16 +171,18 @@ class BudgetController extends GetxController {
         for (final b in budgets)
           BudgetItem(
             id: b['id'] as int,
-            categoryId: b['category_id'] as int,
-            name: b['categoryName'] as String? ?? '',
+            name: b['name'] as String,
             limit: b['budget_amount'] as int,
-            used: used[b['category_id']] ?? 0,
-            colorVal: b['categoryColorVal'] as int?,
-            iconKey: b['categoryIconKey'] as String?,
-            iconPath: b['categoryIconPath'] as String?,
-            iconCode: b['categoryIconCode'] as int?,
+            used: budgetUsed(b, used),
+            categories: (b['categories'] as List).cast(),
+            ownIconKey: b['icon_key'] as String?,
+            ownColorVal: b['color_val'] as int?,
           ),
       ];
+      final prev = p.shift(-1);
+      previousCount.value = items.isEmpty
+          ? (await db.readBudgetsByMonth(prev.year, prev.month)).length
+          : 0;
 
       suggestions.clear();
       if (items.isEmpty) {
@@ -134,24 +199,143 @@ class BudgetController extends GetxController {
     }
   }
 
-  Future<void> save(int categoryId, int amount, {bool close = true}) async {
-    if (amount <= 0 || isWorking.value) return;
+  /// Saves a new ([item] null) or edited budget from the sheet.
+  Future<void> save({
+    BudgetItem? item,
+    required String name,
+    required Set<int> categoryIds,
+    required int amount,
+    String? iconKey,
+    int? colorVal,
+  }) async {
+    if (amount <= 0 || categoryIds.isEmpty || isWorking.value) return;
+    if (nameTaken(name, exceptId: item?.id)) return;
     isWorking.value = true;
     try {
       final p = period;
-      await DatabaseHelper.instance.upsertBudget(
-          categoryId: categoryId, amount: amount, month: p.month, year: p.year);
-      if (close) Get.back();
+      final label =
+          name.trim().isEmpty ? defaultName(categoryIds) : name.trim();
+      await DatabaseHelper.instance.saveBudget(
+          id: item?.id,
+          name: label,
+          amount: amount,
+          categoryIds: categoryIds,
+          month: p.month,
+          year: p.year,
+          iconKey: iconKey,
+          colorVal: colorVal);
       refreshAllGlobalData();
-      AppToast.success('Anggaran disimpan', 'Berlaku untuk ${p.longLabel}');
+      Get.back();
+      AppToast.success('Anggaran disimpan', '$label · ${p.longLabel}');
+    } catch (_) {
+      AppToast.error('Gagal', 'Anggaran tidak dapat disimpan');
     } finally {
       isWorking.value = false;
     }
   }
 
-  /// "Pakai" on a suggestion.
-  Future<void> useSuggestion(BudgetSuggestion s) =>
-      save(s.category['id'] as int, s.amount, close: false);
+  /// Opens "Kategori baru" (expense) over the sheet and returns the ids of
+  /// the categories created there, already loaded into [categories].
+  Future<Set<int>> addCategory() async {
+    final before = {for (final c in categories) c['id'] as int};
+    await Get.toNamed(addCategoryRoute, arguments: {'type': 'pengeluaran'});
+    await loadData();
+    return {
+      for (final c in categories)
+        if (!before.contains(c['id'])) c['id'] as int,
+    };
+  }
+
+  /// "Pakai" on a suggestion: a one-category budget named after it.
+  Future<void> useSuggestion(BudgetSuggestion s) async {
+    final p = period;
+    await DatabaseHelper.instance.upsertBudget(
+        categoryId: s.category['id'] as int,
+        amount: s.amount,
+        month: p.month,
+        year: p.year);
+    refreshAllGlobalData();
+    AppToast.success('Anggaran disimpan', 'Berlaku untuk ${p.longLabel}');
+  }
+
+  /// Copies the previous period's budgets into the active one.
+  Future<void> copyFromPrevious() => _copy(from: period.shift(-1), to: period);
+
+  /// Copies the active period's budgets into the next one.
+  Future<void> copyToNext() => _copy(from: period, to: period.shift(1));
+
+  Future<void> _copy({required Period from, required Period to}) async {
+    if (isWorking.value) return;
+    isWorking.value = true;
+    try {
+      final n = await DatabaseHelper.instance.copyBudgets(
+          fromYear: from.year,
+          fromMonth: from.month,
+          toYear: to.year,
+          toMonth: to.month);
+      refreshAllGlobalData();
+      if (n == 0) {
+        AppToast.info('Tidak ada yang disalin',
+            'Anggaran ${from.longLabel} sudah ada di ${to.longLabel}');
+      } else {
+        AppToast.success(
+            '$n anggaran disalin', 'Dari ${from.longLabel} ke ${to.longLabel}');
+      }
+    } catch (_) {
+      AppToast.error('Gagal', 'Anggaran tidak dapat disalin');
+    } finally {
+      isWorking.value = false;
+    }
+  }
+
+  /// Impor anggaran from the "Anggaran" sheet of an Ekspor file (or a CSV
+  /// with the same headers), after a confirmation with the counts.
+  Future<void> importFile() async {
+    if (isWorking.value) return;
+    final picked = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const ['xlsx', 'csv'],
+      dialogTitle: 'Pilih file anggaran',
+    );
+    if (picked == null) return;
+    isWorking.value = true;
+    try {
+      final sheet =
+          BudgetImport.parseFile(picked.name, await picked.readAsBytes());
+      if (sheet.rows.isEmpty) {
+        AppToast.error('Tidak ada anggaran yang bisa diimpor',
+            sheet.problems.isEmpty ? 'File kosong' : sheet.problems.first);
+        return;
+      }
+      final months = {for (final r in sheet.rows) '${r.month}/${r.year}'};
+      final ok = await AppDialog.confirm(
+        icon: LucideIcons.fileDown,
+        title: 'Impor ${sheet.rows.length} anggaran?',
+        message: 'Untuk ${months.length} bulan. Anggaran dengan nama yang '
+            'sama di bulan itu diperbarui; kategori yang belum ada dibuat.',
+        info: sheet.problems.isEmpty
+            ? null
+            : DialogInfo(
+                '${sheet.problems.length} baris dilewati — '
+                '${sheet.problems.take(3).join('; ')}',
+                warning: true),
+        confirmLabel: 'Impor',
+      );
+      if (!ok) return;
+      final r = await DatabaseHelper.instance.importBudgets(sheet.rows);
+      refreshAllGlobalData();
+      AppToast.success(
+          'Anggaran diimpor',
+          '${r.created} baru · ${r.updated} diperbarui'
+              '${r.newCategories > 0 ? ' · ${r.newCategories} kategori baru' : ''}');
+    } on ImportFileError catch (e) {
+      AppToast.error('File tidak bisa dibaca', e.message);
+    } catch (_) {
+      AppToast.error('Impor gagal', 'Tidak ada anggaran yang diubah');
+    } finally {
+      isWorking.value = false;
+    }
+  }
 
   Future<void> useAllSuggestions() async {
     final p = period;

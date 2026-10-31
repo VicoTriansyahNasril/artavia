@@ -292,6 +292,49 @@ void main() {
         expect(tester.takeException(), isNull);
       });
 
+      testWidgets('$tag: budget sheet renders for new and edit', (tester) async {
+        await boot(tester);
+        await tester.pumpWidget(GetMaterialApp(
+          theme: buildAppTheme(palette),
+          getPages: route,
+          home: const SizedBox(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(scale)),
+            child: child!,
+          ),
+        ));
+        Get.toNamed(budgetRoute);
+        await tester.pump();
+        // The controller loads from the DB once the route builds.
+        for (var i = 0; i < 20 && find.text('Makanan').evaluate().isEmpty; i++) {
+          await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 100)));
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        expect(find.text('Makanan'), findsWidgets, reason: 'budget loaded');
+
+        for (final open in ['Tambah anggaran', 'Makanan']) {
+          await tester.tap(open == 'Makanan'
+              ? find.text('Makanan').first
+              : find.byIcon(LucideIcons.plus));
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(tester.takeException(), isNull, reason: open);
+          expect(find.text('Ikon & warna'), findsOneWidget, reason: open);
+          expect(find.text('Nama anggaran'), findsOneWidget, reason: open);
+          expect(
+              find.text(open == 'Makanan' ? 'Ubah anggaran' : 'Anggaran baru'),
+              findsOneWidget);
+          Get.back();
+          await tester.pump(const Duration(milliseconds: 400));
+        }
+        Get.back();
+        await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 300)));
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(seconds: 11));
+      });
+
       testWidgets('$tag: sheets paint the themed card background',
           (tester) async {
         await boot(tester);

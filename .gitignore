@@ -47,3 +47,5 @@ app.*.map.json
 
 # Scutum
 .scutum/.current-feature
+# Widget Preview related
+.widget_preview/

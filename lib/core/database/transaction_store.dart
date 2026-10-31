@@ -71,8 +71,9 @@ extension TransactionStore on DatabaseHelper {
     });
   }
 
-  /// Deletes a category with its transactions (balances reverted); budgets
-  /// and recurring rules go with it via ON DELETE CASCADE.
+  /// Deletes a category with its transactions (balances reverted); its
+  /// budget links and recurring rules go via ON DELETE CASCADE, and budgets
+  /// left without a category are pruned.
   Future<int> deleteCategoryWithTransactions(int categoryId) async {
     final db = await database;
     return db.transaction((txn) async {
@@ -82,6 +83,7 @@ extension TransactionStore on DatabaseHelper {
         await _deleteWithEffect(txn, r['id'] as int);
       }
       await txn.delete('categories', where: 'id = ?', whereArgs: [categoryId]);
+      await DatabaseHelper.pruneEmptyBudgets(txn);
       return rows.length;
     });
   }
